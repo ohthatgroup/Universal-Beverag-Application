@@ -57,7 +57,7 @@ export default async function DashboardPage() {
             <div key={order.id} className="rounded-md border p-3 text-sm">
               <div className="font-medium">{formatDeliveryDate(order.delivery_date)}</div>
               <div className="text-xs text-muted-foreground">
-                {order.status} • {order.item_count} items • {formatCurrency(order.total)}
+                {order.status} • {order.item_count ?? 0} items • {formatCurrency(order.total ?? 0)}
               </div>
               <Link className="mt-1 inline-block text-xs underline" href={`/admin/orders/${order.id}`}>
                 View order

@@ -24,7 +24,11 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
   if (dealError) throw dealError
   if (!palletDeal) notFound()
 
-  const itemByProduct = new Map<string, any>(((items ?? []) as any[]).map((item) => [item.product_id, item]))
+  const itemByProduct = new Map(
+    (items ?? [])
+      .filter((item) => Boolean(item.product_id))
+      .map((item) => [item.product_id as string, item] as const)
+  )
 
   async function updatePallet(formData: FormData) {
     'use server'
@@ -128,11 +132,11 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
                 <Label htmlFor="price">Price</Label>
-                <Input id="price" name="price" type="number" step="0.01" defaultValue={palletDeal.price} />
+                <Input id="price" name="price" type="number" step="0.01" defaultValue={palletDeal.price ?? 0} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sort_order">Sort order</Label>
-                <Input id="sort_order" name="sort_order" type="number" defaultValue={palletDeal.sort_order} />
+                <Input id="sort_order" name="sort_order" type="number" defaultValue={palletDeal.sort_order ?? 0} />
               </div>
             </div>
 
@@ -152,7 +156,7 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
             </div>
 
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="is_active" defaultChecked={palletDeal.is_active} />
+              <input type="checkbox" name="is_active" defaultChecked={palletDeal.is_active ?? true} />
               Active
             </label>
 
@@ -166,8 +170,8 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
           <CardTitle className="text-base">Deal Contents</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {((products ?? []) as any[]).map((product) => {
-            const item = itemByProduct.get(product.id) as any
+          {(products ?? []).map((product) => {
+            const item = itemByProduct.get(product.id)
             return (
               <form key={product.id} action={updatePalletItem} className="grid grid-cols-[1fr_auto_auto] items-end gap-2 rounded-md border p-3">
                 <input type="hidden" name="product_id" value={product.id} />

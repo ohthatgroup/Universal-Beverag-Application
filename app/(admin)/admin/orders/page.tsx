@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import type { OrderStatus } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate, getStatusVariant } from '@/lib/utils'
 
 export default async function AdminOrdersPage() {
@@ -46,14 +47,14 @@ export default async function AdminOrdersPage() {
                 <div>
                   <div className="font-medium">{formatDeliveryDate(order.delivery_date)}</div>
                   <div className="text-xs text-muted-foreground">
-                    {customerById.get(order.customer_id) ?? order.customer_id}
+                    {(order.customer_id ? customerById.get(order.customer_id) : null) ?? order.customer_id ?? 'Unknown customer'}
                   </div>
                 </div>
-                <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>
+                <Badge variant={getStatusVariant(asOrderStatus(order.status))}>{order.status}</Badge>
               </div>
 
               <div className="text-sm text-muted-foreground">
-                {order.item_count} items • {formatCurrency(order.total)}
+                {order.item_count ?? 0} items • {formatCurrency(order.total ?? 0)}
               </div>
 
               <div className="flex gap-2 text-sm">
@@ -74,4 +75,11 @@ export default async function AdminOrdersPage() {
       </div>
     </div>
   )
+}
+
+function asOrderStatus(value: string): OrderStatus {
+  if (value === 'draft' || value === 'submitted' || value === 'delivered') {
+    return value
+  }
+  return 'draft'
 }

@@ -27,11 +27,12 @@ export async function GET(
       throw itemsError
     }
 
-    const productIds = ((items ?? []) as any[])
+    const itemRows = items ?? []
+    const productIds = itemRows
       .map((item) => item.product_id)
       .filter((idValue): idValue is string => !!idValue)
 
-    const palletIds = ((items ?? []) as any[])
+    const palletIds = itemRows
       .map((item) => item.pallet_deal_id)
       .filter((idValue): idValue is string => !!idValue)
 
@@ -59,10 +60,10 @@ export async function GET(
       throw palletsError
     }
 
-    const productMap = new Map<string, any>(((products ?? []) as any[]).map((product) => [product.id, product]))
-    const palletMap = new Map<string, any>(((pallets ?? []) as any[]).map((pallet) => [pallet.id, pallet]))
+    const productMap = new Map((products ?? []).map((product) => [product.id, product] as const))
+    const palletMap = new Map((pallets ?? []).map((pallet) => [pallet.id, pallet] as const))
 
-    const rows = ((items ?? []) as any[]).map((item) => {
+    const rows = itemRows.map((item) => {
       if (item.product_id) {
         const product = productMap.get(item.product_id)
         return {
@@ -70,7 +71,7 @@ export async function GET(
           'Pack Details': product?.pack_details ?? '',
           Quantity: item.quantity,
           'Unit Price': Number(item.unit_price).toFixed(2),
-          'Line Total': Number(item.line_total).toFixed(2),
+          'Line Total': Number(item.line_total ?? 0).toFixed(2),
         }
       }
 
@@ -80,7 +81,7 @@ export async function GET(
         'Pack Details': pallet?.description ?? 'Pallet deal',
         Quantity: item.quantity,
         'Unit Price': Number(item.unit_price).toFixed(2),
-        'Line Total': Number(item.line_total).toFixed(2),
+        'Line Total': Number(item.line_total ?? 0).toFixed(2),
       }
     })
 

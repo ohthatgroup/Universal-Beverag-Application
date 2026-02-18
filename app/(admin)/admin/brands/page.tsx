@@ -90,7 +90,7 @@ export default async function BrandsPage() {
               <input type="hidden" name="id" value={brand.id} />
               <Input name="name" defaultValue={brand.name} />
               <Input name="logo_url" defaultValue={brand.logo_url ?? ''} placeholder="Logo URL" />
-              <Input name="sort_order" type="number" defaultValue={brand.sort_order} />
+              <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} />
               <Button size="sm" type="submit">
                 Save
               </Button>

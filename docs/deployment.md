@@ -4,6 +4,7 @@
 - Vercel project connected to repository
 - Supabase project configured with migrations applied
 - Production environment variables set in Vercel
+- Dedicated hosted Supabase CI project configured for `.github/workflows/ci.yml`
 
 ## Release Checklist
 1. Ensure `main` CI is green:
@@ -11,11 +12,14 @@
 - typecheck
 - unit tests
 - build
-- e2e smoke
+- e2e customer/admin flows
+- RLS verification
+- db types drift check
 2. Confirm Supabase schema is up-to-date.
 3. Confirm auth providers and redirect URLs are configured.
 4. Confirm storage buckets exist and policy settings are correct.
 5. Confirm `FEATURE_ECWID_PUSH` is set as intended.
+6. Confirm `inbox@ohthatgrp.com` has a `salesman` profile record in `public.profiles`.
 
 ## Deploy Steps
 1. Merge approved PR into `main`.
@@ -30,6 +34,7 @@
 - submit order
 - download order CSV
 - update order status in admin
+- verify customer/admin route isolation
 
 ## Post-Deploy Monitoring
 - Review server logs for `internal_error` API responses.

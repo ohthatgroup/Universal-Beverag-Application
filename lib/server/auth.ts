@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Profile, UserRole } from '@/lib/types'
+import type { Database, Profile, UserRole } from '@/lib/types'
 
 export type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
+type OrderRow = Database['public']['Tables']['orders']['Row']
+type ProfileRow = Database['public']['Tables']['profiles']['Row']
 
 export interface AuthContext {
   supabase: ServerSupabaseClient
@@ -46,7 +48,7 @@ export async function getAuthContext(): Promise<
     .eq('id', user.id)
     .maybeSingle()
 
-  if (profileError || !profile) {
+  if (profileError || !profile || !isValidRole(profile.role)) {
     throw new RouteError(
       403,
       'profile_missing',
@@ -55,10 +57,12 @@ export async function getAuthContext(): Promise<
     )
   }
 
+  const normalizedProfile = normalizeProfile(profile)
+
   return {
     supabase,
     userId: user.id,
-    profile,
+    profile: normalizedProfile,
     hasSession: true,
   }
 }
@@ -80,7 +84,7 @@ export async function requireAuthContext(allowedRoles?: UserRole[]): Promise<Aut
 export async function requireOrderAccess(
   orderId: string,
   options: { allowSalesman: boolean } = { allowSalesman: true }
-): Promise<AuthContext & { order: { id: string; customer_id: string; status: string } & Record<string, unknown> }> {
+): Promise<AuthContext & { order: OrderRow }> {
   const context = await requireAuthContext()
 
   const { data: order, error } = await context.supabase
@@ -93,6 +97,10 @@ export async function requireOrderAccess(
     throw new RouteError(404, 'order_not_found', 'Order not found')
   }
 
+  if (!order.customer_id) {
+    throw new RouteError(500, 'order_data_invalid', 'Order is missing customer reference')
+  }
+
   const isOwner = order.customer_id === context.userId
   const isSalesman = context.profile.role === 'salesman'
 
@@ -103,5 +111,21 @@ export async function requireOrderAccess(
   return {
     ...context,
     order,
+  }
+}
+
+function isValidRole(value: string): value is UserRole {
+  return value === 'customer' || value === 'salesman'
+}
+
+function normalizeProfile(profile: ProfileRow): Profile {
+  return {
+    ...profile,
+    role: profile.role as UserRole,
+    show_prices: profile.show_prices ?? true,
+    custom_pricing: profile.custom_pricing ?? false,
+    default_group: profile.default_group === 'size' ? 'size' : 'brand',
+    created_at: profile.created_at ?? new Date(0).toISOString(),
+    updated_at: profile.updated_at ?? new Date(0).toISOString(),
   }
 }

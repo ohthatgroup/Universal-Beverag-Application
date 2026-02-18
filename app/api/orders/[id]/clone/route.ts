@@ -16,11 +16,16 @@ export async function POST(
     const { id } = paramsSchema.parse(await routeContext.params)
     const payload = await parseBody(request, cloneOrderSchema)
     const context = await requireOrderAccess(id)
+    const customerId = context.order.customer_id
+
+    if (!customerId) {
+      throw new Error('Order is missing customer reference')
+    }
 
     const { data: existingDraft } = await context.supabase
       .from('orders')
       .select('*')
-      .eq('customer_id', context.order.customer_id)
+      .eq('customer_id', customerId)
       .eq('delivery_date', payload.deliveryDate)
       .eq('status', 'draft')
       .maybeSingle()

@@ -38,8 +38,8 @@ export default async function CustomerProductsPage({ params }: { params: Promise
     notFound()
   }
 
-  const overrideByProductId = new Map<string, any>(
-    ((overrides ?? []) as any[]).map((entry) => [entry.product_id, entry])
+  const overrideByProductId = new Map(
+    (overrides ?? []).map((entry) => [entry.product_id, entry] as const)
   )
 
   async function updateProductSetting(formData: FormData) {
@@ -100,8 +100,8 @@ export default async function CustomerProductsPage({ params }: { params: Promise
       </p>
 
       <div className="space-y-3">
-        {((products ?? []) as any[]).map((product) => {
-          const override = overrideByProductId.get(product.id) as any
+        {(products ?? []).map((product) => {
+          const override = overrideByProductId.get(product.id)
           const excluded = override?.excluded ?? false
           const customPrice = override?.custom_price ?? null
 

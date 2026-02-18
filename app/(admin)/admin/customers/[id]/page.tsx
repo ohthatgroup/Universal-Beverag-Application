@@ -117,11 +117,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
             <div className="grid gap-2">
               <label className="flex items-center gap-2 text-sm">
-                <input defaultChecked={customer.show_prices} name="show_prices" type="checkbox" />
+                <input defaultChecked={customer.show_prices ?? true} name="show_prices" type="checkbox" />
                 Show prices to customer
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input defaultChecked={customer.custom_pricing} name="custom_pricing" type="checkbox" />
+                <input defaultChecked={customer.custom_pricing ?? false} name="custom_pricing" type="checkbox" />
                 Enable custom pricing
               </label>
             </div>
@@ -130,7 +130,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               <Label>Default Grouping</Label>
               <select
                 name="default_group"
-                defaultValue={customer.default_group}
+                defaultValue={customer.default_group ?? 'brand'}
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               >
                 <option value="brand">Brand</option>
@@ -152,7 +152,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             <div key={order.id} className="rounded-md border p-3">
               <div className="font-medium">{order.delivery_date}</div>
               <div className="text-xs text-muted-foreground">
-                {order.status} • {order.item_count} items • ${Number(order.total).toFixed(2)}
+                {order.status} • {order.item_count ?? 0} items • ${Number(order.total ?? 0).toFixed(2)}
               </div>
               <Link className="text-xs underline" href={`/admin/orders/${order.id}`}>
                 Open order

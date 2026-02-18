@@ -13,8 +13,8 @@
 ## Database Rollback
 Database migrations are forward-first. If schema rollback is required:
 1. Stop new writes (temporary maintenance mode or traffic pause).
-2. Run targeted SQL rollback scripts for the last migration.
-3. Validate RLS/policies before reopening traffic.
+2. Restore the last known good Supabase snapshot (PITR) for production.
+3. Re-run schema verification (`scripts/verify-schema.sql`) and RLS verification script before reopening traffic.
 
 ## Data Recovery
 If order data is affected:
@@ -24,3 +24,7 @@ If order data is affected:
 ## Communication
 - Notify internal stakeholders of rollback start and completion.
 - Log root cause, impacted time window, and mitigation in incident tracker.
+
+## CI Project Guardrail
+- Never execute `db:reset` against production.
+- Real CI reset/migrate/provision steps must target only the dedicated CI project ref enforced in `.github/workflows/ci.yml`.

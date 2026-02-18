@@ -34,7 +34,7 @@ export async function PATCH(
     const { id } = paramsSchema.parse(await routeContext.params)
     const payload = await parseBody(request, updateOrderStatusSchema)
     const context = await requireOrderAccess(id)
-    const currentOrder = context.order as any
+    const currentOrder = context.order
 
     if (!isTransitionAllowed(currentOrder.status, payload.status, context.profile.role)) {
       throw new RouteError(

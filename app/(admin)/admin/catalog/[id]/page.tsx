@@ -98,11 +98,11 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
                 <Label htmlFor="price">Price</Label>
-                <Input id="price" name="price" type="number" step="0.01" defaultValue={product.price} />
+                <Input id="price" name="price" type="number" step="0.01" defaultValue={product.price ?? 0} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sort_order">Sort order</Label>
-                <Input id="sort_order" name="sort_order" type="number" defaultValue={product.sort_order} />
+                <Input id="sort_order" name="sort_order" type="number" defaultValue={product.sort_order ?? 0} />
               </div>
             </div>
 
@@ -117,7 +117,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
             </div>
 
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="is_new" defaultChecked={product.is_new} />
+              <input type="checkbox" name="is_new" defaultChecked={product.is_new ?? false} />
               New item
             </label>
 
@@ -125,7 +125,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
               <input
                 type="checkbox"
                 name="is_discontinued"
-                defaultChecked={product.is_discontinued}
+                defaultChecked={product.is_discontinued ?? false}
               />
               Discontinued
             </label>

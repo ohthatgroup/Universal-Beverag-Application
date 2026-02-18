@@ -3,17 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
 interface ReportsPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     from?: string
     to?: string
-  }
+  }>
 }
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const context = await requirePageAuth(['salesman'])
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
 
-  const from = searchParams?.from ?? addDays(todayISODate(), -30)
-  const to = searchParams?.to ?? todayISODate()
+  const from = resolvedSearchParams?.from ?? addDays(todayISODate(), -30)
+  const to = resolvedSearchParams?.to ?? todayISODate()
 
   const { data: orders, error: ordersError } = await context.supabase
     .from('orders')
@@ -23,7 +24,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   if (ordersError) throw ordersError
 
-  const orderIds = ((orders ?? []) as any[]).map((order) => order.id)
+  const orderRows = orders ?? []
+  const orderIds = orderRows.map((order) => order.id).filter((id): id is string => Boolean(id))
 
   const [orderItemsResponse, productsResponse, brandsResponse] = await Promise.all([
     orderIds.length
@@ -40,29 +42,29 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   if (productsResponse.error) throw productsResponse.error
   if (brandsResponse.error) throw brandsResponse.error
 
-  const totalRevenue = ((orders ?? []) as any[]).reduce((sum, order) => sum + Number(order.total), 0)
-  const totalItems = ((orders ?? []) as any[]).reduce((sum, order) => sum + Number(order.item_count), 0)
+  const orderItemRows = orderItemsResponse.data ?? []
+  const productRows = productsResponse.data ?? []
+  const brandRows = brandsResponse.data ?? []
+
+  const totalRevenue = orderRows.reduce((sum, order) => sum + Number(order.total ?? 0), 0)
+  const totalItems = orderRows.reduce((sum, order) => sum + Number(order.item_count ?? 0), 0)
 
   const statusCounts = {
-    draft: ((orders ?? []) as any[]).filter((order) => order.status === 'draft').length,
-    submitted: ((orders ?? []) as any[]).filter((order) => order.status === 'submitted').length,
-    delivered: ((orders ?? []) as any[]).filter((order) => order.status === 'delivered').length,
+    draft: orderRows.filter((order) => order.status === 'draft').length,
+    submitted: orderRows.filter((order) => order.status === 'submitted').length,
+    delivered: orderRows.filter((order) => order.status === 'delivered').length,
   }
 
-  const productById = new Map<string, any>(
-    ((productsResponse.data ?? []) as any[]).map((product) => [product.id, product])
-  )
-  const brandById = new Map<string, string>(
-    ((brandsResponse.data ?? []) as any[]).map((brand) => [brand.id, brand.name])
-  )
+  const productById = new Map(productRows.map((product) => [product.id, product] as const))
+  const brandById = new Map(brandRows.map((brand) => [brand.id, brand.name] as const))
 
   const revenueByBrand = new Map<string, number>()
 
-  for (const item of (orderItemsResponse.data ?? []) as any[]) {
+  for (const item of orderItemRows) {
     if (!item.product_id) continue
     const product = productById.get(item.product_id)
     const brandLabel = product?.brand_id ? brandById.get(product.brand_id) ?? 'Unbranded' : 'Unbranded'
-    revenueByBrand.set(brandLabel, (revenueByBrand.get(brandLabel) ?? 0) + Number(item.line_total))
+    revenueByBrand.set(brandLabel, (revenueByBrand.get(brandLabel) ?? 0) + Number(item.line_total ?? 0))
   }
 
   const topBrands = Array.from(revenueByBrand.entries())

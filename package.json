@@ -10,7 +10,15 @@
     "typecheck": "tsc --noEmit",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:types:generate": "node scripts/generate-db-types.cjs",
+    "db:types:check": "node scripts/generate-db-types.cjs --check",
+    "db:reset": "bash scripts/run-psql.sh -f scripts/reset-public.sql",
+    "db:migrate": "bash scripts/run-psql.sh -f supabase/migrations/202602180001_init.sql && bash scripts/run-psql.sh -f supabase/migrations/202602180002_seed.sql",
+    "db:verify": "bash scripts/run-psql.sh -f scripts/verify-schema.sql",
+    "db:provision": "tsx scripts/provision-users.ts",
+    "verify:rls": "tsx scripts/verify-rls.ts",
+    "ci:prepare-db": "npm run db:reset && npm run db:migrate && npm run db:verify && npm run db:provision"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -48,8 +56,10 @@
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^8",
     "eslint-config-next": "^15.5.10",
+    "pg": "^8.18.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.20.6",
     "typescript": "^5",
     "vitest": "^4.0.18"
   }

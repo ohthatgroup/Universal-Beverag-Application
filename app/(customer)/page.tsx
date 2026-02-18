@@ -32,7 +32,7 @@ export default async function CustomerHome() {
                 <li key={order.id} className="rounded-md border p-3">
                   <div className="text-sm font-medium">{formatDeliveryDate(order.delivery_date)}</div>
                   <div className="text-xs text-muted-foreground">
-                    {order.item_count} items • Updated {new Date(order.updated_at).toLocaleString()}
+                    {order.item_count ?? 0} items • Updated {order.updated_at ? new Date(order.updated_at).toLocaleString() : 'Unknown'}
                   </div>
                 </li>
               ))}

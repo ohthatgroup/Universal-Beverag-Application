@@ -16,6 +16,7 @@
 - Supabase status and query errors
 - Sentry exceptions
 - API logs by `x-request-id`
+- most recent CI artifact `production-readiness-checklist`
 
 ## Mitigation Patterns
 - Deploy rollback via Vercel promote
@@ -28,3 +29,4 @@
 - Root cause
 - Fix and preventive actions
 - Follow-up owner and due date
+- RLS verification output (`npm run verify:rls`)

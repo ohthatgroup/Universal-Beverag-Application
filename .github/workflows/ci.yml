@@ -5,6 +5,10 @@ on:
   push:
     branches: [main, 'codex/**']
 
+concurrency:
+  group: universal-beverages-real-supabase-ci
+  cancel-in-progress: false
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -13,6 +17,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: anon-test-key
       SUPABASE_SERVICE_ROLE_KEY: service-role-test-key
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      FEATURE_ECWID_PUSH: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,8 +43,162 @@ jobs:
       - name: Build
         run: npm run build
 
+  db_prepare:
+    needs: validate
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      CI_SUPABASE_PROJECT_REF: ${{ secrets.CI_SUPABASE_PROJECT_REF }}
+      SUPABASE_PROJECT_ID: ${{ secrets.CI_SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CI_SALESMAN_EMAIL: ${{ secrets.CI_SALESMAN_EMAIL }}
+      CI_SALESMAN_PASSWORD: ${{ secrets.CI_SALESMAN_PASSWORD }}
+      CI_CUSTOMER_A_EMAIL: ${{ secrets.CI_CUSTOMER_A_EMAIL }}
+      CI_CUSTOMER_A_PASSWORD: ${{ secrets.CI_CUSTOMER_A_PASSWORD }}
+      CI_CUSTOMER_B_EMAIL: ${{ secrets.CI_CUSTOMER_B_EMAIL }}
+      CI_CUSTOMER_B_PASSWORD: ${{ secrets.CI_CUSTOMER_B_PASSWORD }}
+      CI_INBOX_EMAIL: ${{ secrets.CI_INBOX_EMAIL }}
+      CI_INBOX_PASSWORD: ${{ secrets.CI_INBOX_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate protected CI contract
+        run: |
+          required_vars=(
+            CI_SUPABASE_PROJECT_REF
+            SUPABASE_PROJECT_ID
+            SUPABASE_DB_URL
+            NEXT_PUBLIC_SUPABASE_URL
+            NEXT_PUBLIC_SUPABASE_ANON_KEY
+            SUPABASE_SERVICE_ROLE_KEY
+            CI_SALESMAN_EMAIL
+            CI_SALESMAN_PASSWORD
+            CI_CUSTOMER_A_EMAIL
+            CI_CUSTOMER_A_PASSWORD
+            CI_CUSTOMER_B_EMAIL
+            CI_CUSTOMER_B_PASSWORD
+          )
+
+          for var_name in "${required_vars[@]}"; do
+            if [ -z "${!var_name:-}" ]; then
+              echo "::error::Missing required CI secret: ${var_name}"
+              exit 1
+            fi
+          done
+
+          if [ "${SUPABASE_PROJECT_ID}" != "${CI_SUPABASE_PROJECT_REF}" ]; then
+            echo "::error::SUPABASE_PROJECT_ID must match CI_SUPABASE_PROJECT_REF."
+            exit 1
+          fi
+
+          if [[ "${NEXT_PUBLIC_SUPABASE_URL}" != *"${CI_SUPABASE_PROJECT_REF}"* ]]; then
+            echo "::error::NEXT_PUBLIC_SUPABASE_URL does not match CI_SUPABASE_PROJECT_REF."
+            exit 1
+          fi
+
+      - name: Reset + migrate + verify + provision
+        run: npm run ci:prepare-db
+
+      - name: Check generated DB types are current
+        run: npm run db:types:check
+
+  e2e:
+    needs: [validate, db_prepare]
+    if: needs.db_prepare.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      CI_SALESMAN_EMAIL: ${{ secrets.CI_SALESMAN_EMAIL }}
+      CI_SALESMAN_PASSWORD: ${{ secrets.CI_SALESMAN_PASSWORD }}
+      CI_CUSTOMER_A_EMAIL: ${{ secrets.CI_CUSTOMER_A_EMAIL }}
+      CI_CUSTOMER_A_PASSWORD: ${{ secrets.CI_CUSTOMER_A_PASSWORD }}
+      CI_CUSTOMER_B_EMAIL: ${{ secrets.CI_CUSTOMER_B_EMAIL }}
+      CI_CUSTOMER_B_PASSWORD: ${{ secrets.CI_CUSTOMER_B_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: E2E smoke tests
+      - name: E2E tests
         run: npm run test:e2e
+
+  rls_verify:
+    needs: [db_prepare, e2e]
+    if: needs.db_prepare.result == 'success' && needs.e2e.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CI_SALESMAN_EMAIL: ${{ secrets.CI_SALESMAN_EMAIL }}
+      CI_SALESMAN_PASSWORD: ${{ secrets.CI_SALESMAN_PASSWORD }}
+      CI_CUSTOMER_A_EMAIL: ${{ secrets.CI_CUSTOMER_A_EMAIL }}
+      CI_CUSTOMER_A_PASSWORD: ${{ secrets.CI_CUSTOMER_A_PASSWORD }}
+      CI_CUSTOMER_B_EMAIL: ${{ secrets.CI_CUSTOMER_B_EMAIL }}
+      CI_CUSTOMER_B_PASSWORD: ${{ secrets.CI_CUSTOMER_B_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify RLS with real users
+        run: npm run verify:rls
+
+      - name: Build production readiness artifact
+        run: |
+          mkdir -p artifacts
+          cat <<'EOF' > artifacts/production-readiness-checklist.md
+          # Production Readiness Checklist
+
+          - CI validate (lint/typecheck/unit/build): PASS
+          - Real Supabase reset/migrate/verify/provision: PASS
+          - DB types drift check: PASS
+          - E2E customer/admin flows: PASS
+          - RLS verification suite: PASS
+          - Inbox profile requirement (`inbox@ohthatgrp.com` salesman): covered by provisioning
+          - Commit: ${{ github.sha }}
+          EOF
+
+      - name: Upload production readiness artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-readiness-checklist
+          path: artifacts/production-readiness-checklist.md

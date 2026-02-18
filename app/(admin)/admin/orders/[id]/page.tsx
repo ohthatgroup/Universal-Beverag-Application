@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import type { OrderStatus } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,23 +24,29 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
     notFound()
   }
 
-  const [{ data: customer }, { data: items }, { data: products }, { data: pallets }] = await Promise.all([
-    context.supabase
-      .from('profiles')
-      .select('id,business_name,contact_name,email,phone')
-      .eq('id', order.customer_id)
-      .maybeSingle(),
-    context.supabase
-      .from('order_items')
-      .select('id,product_id,pallet_deal_id,quantity,unit_price,line_total')
-      .eq('order_id', order.id)
-      .order('id', { ascending: true }),
-    context.supabase.from('products').select('id,title,pack_details'),
-    context.supabase.from('pallet_deals').select('id,title,description'),
-  ])
+  const customerPromise = order.customer_id
+    ? context.supabase
+        .from('profiles')
+        .select('id,business_name,contact_name,email,phone')
+        .eq('id', order.customer_id)
+        .maybeSingle()
+    : Promise.resolve({ data: null, error: null })
 
-  const productById = new Map<string, any>(((products ?? []) as any[]).map((product) => [product.id, product]))
-  const palletById = new Map<string, any>(((pallets ?? []) as any[]).map((pallet) => [pallet.id, pallet]))
+  const [{ data: customer }, { data: items }, { data: products }, { data: pallets }] =
+    await Promise.all([
+      customerPromise,
+      context.supabase
+        .from('order_items')
+        .select('id,product_id,pallet_deal_id,quantity,unit_price,line_total')
+        .eq('order_id', order.id)
+        .order('id', { ascending: true }),
+      context.supabase.from('products').select('id,title,pack_details'),
+      context.supabase.from('pallet_deals').select('id,title,description'),
+    ])
+
+  const productById = new Map((products ?? []).map((product) => [product.id, product] as const))
+  const palletById = new Map((pallets ?? []).map((pallet) => [pallet.id, pallet] as const))
+  const orderStatus = asOrderStatus(order.status)
 
   return (
     <div className="space-y-4 p-4 pb-20">
@@ -57,8 +64,8 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <CardContent className="space-y-2 text-sm">
           <div>Delivery: {formatDeliveryDate(order.delivery_date)}</div>
           <div>Status: {order.status}</div>
-          <div>Items: {order.item_count}</div>
-          <div>Total: {formatCurrency(order.total)}</div>
+          <div>Items: {order.item_count ?? 0}</div>
+          <div>Total: {formatCurrency(order.total ?? 0)}</div>
           <div>Submitted: {order.submitted_at ? new Date(order.submitted_at).toLocaleString() : '—'}</div>
           <div>Delivered: {order.delivered_at ? new Date(order.delivered_at).toLocaleString() : '—'}</div>
         </CardContent>
@@ -69,23 +76,23 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           <CardTitle className="text-base">Customer</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div>{customer?.business_name || customer?.contact_name || order.customer_id}</div>
+          <div>{customer?.business_name || customer?.contact_name || order.customer_id || 'Unknown customer'}</div>
           <div className="text-muted-foreground">{customer?.email ?? 'No email'}</div>
           <div className="text-muted-foreground">{customer?.phone ?? 'No phone'}</div>
-          <Link className="underline" href={`/admin/customers/${order.customer_id}`}>
+          <Link className="underline" href={order.customer_id ? `/admin/customers/${order.customer_id}` : '/admin/customers'}>
             Open customer
           </Link>
         </CardContent>
       </Card>
 
-      <OrderStatusForm orderId={order.id} initialStatus={order.status} />
+      <OrderStatusForm orderId={order.id} initialStatus={orderStatus} />
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Order Items</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {((items ?? []) as any[]).map((item) => {
+          {(items ?? []).map((item) => {
             const product = item.product_id ? productById.get(item.product_id) : null
             const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
 
@@ -96,7 +103,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                   {product?.pack_details ?? pallet?.description ?? ''}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Qty {item.quantity} • {formatCurrency(item.unit_price)} each • {formatCurrency(item.line_total)}
+                  Qty {item.quantity} • {formatCurrency(item.unit_price)} each • {formatCurrency(item.line_total ?? 0)}
                 </div>
               </div>
             )
@@ -107,4 +114,11 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
       </Card>
     </div>
   )
+}
+
+function asOrderStatus(value: string): OrderStatus {
+  if (value === 'draft' || value === 'submitted' || value === 'delivered') {
+    return value
+  }
+  return 'draft'
 }
