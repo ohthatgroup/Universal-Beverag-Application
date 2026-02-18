@@ -2,6 +2,27 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  const isStaticAsset =
+    pathname === '/favicon.ico' ||
+    pathname.startsWith('/_next') ||
+    /\.[a-zA-Z0-9]+$/.test(pathname)
+
+  if (isStaticAsset || pathname.startsWith('/auth')) {
+    return NextResponse.next()
+  }
+
+  const isCustomerRoute =
+    pathname === '/' || pathname.startsWith('/orders') || pathname.startsWith('/order')
+  const isAdminRoute = pathname.startsWith('/admin')
+  const isApiRoute = pathname.startsWith('/api')
+  const requiresPageAuth = isCustomerRoute || isAdminRoute
+
+  if (isApiRoute || !requiresPageAuth) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -13,11 +34,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          // Update request cookies for downstream middleware
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          // Rebuild response with updated cookies
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -27,25 +44,10 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Do not add logic between createServerClient and getUser()
-  // that could cause the session refresh to be skipped.
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
-  // ── Public routes — allow through ──────────────────────────────────────
-  if (
-    pathname.startsWith('/auth') ||
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/') ||
-    pathname === '/favicon.ico'
-  ) {
-    return supabaseResponse
-  }
-
-  // ── Not authenticated — redirect to login ───────────────────────────────
   if (!user) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/auth/login'
@@ -53,27 +55,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // ── Fetch role from profiles table ─────────────────────────────────────
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   const role = profile?.role
 
-  // ── Admin routes — require salesman role ────────────────────────────────
-  // All admin pages live under /admin/
-  if (pathname.startsWith('/admin') && role !== 'salesman') {
+  if (!role) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/auth/login'
+    loginUrl.searchParams.set('error', 'profile_missing')
+    return NextResponse.redirect(loginUrl)
+  }
+
+  if (isAdminRoute && role !== 'salesman') {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  // ── Salesman visiting customer routes — redirect to admin dashboard ──────
-  if (
-    role === 'salesman' &&
-    (pathname === '/' || pathname.startsWith('/order'))
-  ) {
+  if (role === 'salesman' && isCustomerRoute) {
     return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+  }
+
+  if (role === 'customer' && isAdminRoute) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return supabaseResponse

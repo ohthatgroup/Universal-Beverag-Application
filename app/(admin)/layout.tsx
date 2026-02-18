@@ -1,7 +1,14 @@
+import { AdminNav } from '@/components/layout/admin-nav'
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return <>{children}</>
+  return (
+    <div className="mx-auto flex min-h-screen w-full max-w-mobile flex-col bg-background pb-16">
+      <main className="flex-1">{children}</main>
+      <AdminNav />
+    </div>
+  )
 }

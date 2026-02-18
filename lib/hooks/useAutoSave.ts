@@ -34,6 +34,11 @@ export function useAutoSave({
         quantity: number
         unitPrice: number
       }) => {
+        if (!productId && !palletDealId) {
+          onError?.(new Error('Autosave requires either productId or palletDealId'))
+          return
+        }
+
         if (quantity === 0) {
           // Delete the row when quantity reaches zero
           const query = supabase
@@ -41,10 +46,19 @@ export function useAutoSave({
             .delete()
             .eq('order_id', orderId)
 
+          let error: { message: string } | null = null
           if (productId) {
-            await query.eq('product_id', productId)
+            const response = await query.eq('product_id', productId)
+            error = response.error
           } else if (palletDealId) {
-            await query.eq('pallet_deal_id', palletDealId)
+            const response = await query.eq('pallet_deal_id', palletDealId)
+            error = response.error
+          }
+
+          if (error) {
+            onError?.(new Error(error.message))
+          } else {
+            onSuccess?.()
           }
         } else {
           const payload: OrderItemInsert = {
@@ -55,8 +69,7 @@ export function useAutoSave({
             pallet_deal_id: palletDealId ?? null,
           }
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error } = await (supabase as any)
+          const { error } = await supabase
             .from('order_items')
             .upsert(payload, {
               onConflict: productId
