@@ -58,9 +58,14 @@ export default async function CatalogPage() {
     <div className="space-y-4 p-4 pb-20">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Catalog</h1>
-        <Link className="text-sm underline" href="/admin/catalog/pallets">
-          Pallet Deals
-        </Link>
+        <div className="flex items-center gap-4 text-sm">
+          <Link className="underline" href="/admin/brands">
+            Brands
+          </Link>
+          <Link className="underline" href="/admin/catalog/pallets">
+            Pallet Deals
+          </Link>
+        </div>
       </div>
 
       <Card>
