@@ -1,10 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FormEvent, Suspense, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { buildAuthCallbackUrl } from '@/lib/config/public-url'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,11 +26,8 @@ function LoginContent() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [customerEmail, setCustomerEmail] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-
-  const callbackUrl = buildAuthCallbackUrl('/')
 
   const onSalesmanLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -55,31 +50,9 @@ function LoginContent() {
     router.refresh()
   }
 
-  const onCustomerMagicLink = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setIsLoading(true)
-    setMessage(null)
-
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: customerEmail,
-      options: {
-        emailRedirectTo: callbackUrl,
-      },
-    })
-
-    setIsLoading(false)
-
-    if (otpError) {
-      setMessage(otpError.message)
-      return
-    }
-
-    setMessage('Magic link sent. Check your email inbox.')
-  }
-
   return (
     <div className="min-h-screen bg-muted/20 p-4 sm:p-8">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-6">
         <h1 className="text-2xl font-semibold">Universal Beverages</h1>
 
         {(error || message) && (
@@ -92,73 +65,40 @@ function LoginContent() {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Salesman Login</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={onSalesmanLogin}>
-                <div className="space-y-2">
-                  <Label htmlFor="salesman-email">Email</Label>
-                  <Input
-                    id="salesman-email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
-                </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Salesman Login</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={onSalesmanLogin}>
+              <div className="space-y-2">
+                <Label htmlFor="salesman-email">Email</Label>
+                <Input
+                  id="salesman-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="salesman-password">Password</Label>
-                  <Input
-                    id="salesman-password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="salesman-password">Password</Label>
+                <Input
+                  id="salesman-password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
 
-                <Button disabled={isLoading} type="submit" className="w-full">
-                  {isLoading ? 'Signing in...' : 'Sign in'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Magic Link</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={onCustomerMagicLink}>
-                <div className="space-y-2">
-                  <Label htmlFor="customer-email">Email</Label>
-                  <Input
-                    id="customer-email"
-                    type="email"
-                    required
-                    value={customerEmail}
-                    onChange={(event) => setCustomerEmail(event.target.value)}
-                  />
-                </div>
-
-                <Button disabled={isLoading} type="submit" variant="secondary" className="w-full">
-                  {isLoading ? 'Sending...' : 'Send magic link'}
-                </Button>
-              </form>
-
-              <p className="mt-4 text-sm text-muted-foreground">
-                Prefer a dedicated magic-link page?{' '}
-                <Link className="underline" href="/auth/magic">
-                  Open /auth/magic
-                </Link>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+              <Button disabled={isLoading} type="submit" className="w-full">
+                {isLoading ? 'Signing in...' : 'Sign in'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

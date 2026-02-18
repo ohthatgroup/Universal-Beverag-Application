@@ -12,7 +12,10 @@
       "Bash(npx vitest run:*)",
       "Bash(npx shadcn@latest add:*)",
       "Bash(PGPASSWORD='eClips@usa25' psql:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ]
   }
 }

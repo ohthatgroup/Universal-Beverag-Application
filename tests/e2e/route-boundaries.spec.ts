@@ -7,7 +7,7 @@ test('customer cannot access admin dashboard', async ({ page }) => {
 
   await page.goto('/admin/dashboard')
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByText('Welcome back')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Universal Beverages' })).toBeVisible()
 })
 
 test('salesman is redirected away from customer home', async ({ page }) => {
