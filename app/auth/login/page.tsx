@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FormEvent, Suspense, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { buildAuthCallbackUrl } from '@/lib/config/public-url'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,10 +32,7 @@ function LoginContent() {
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  const callbackUrl =
-    typeof window === 'undefined'
-      ? undefined
-      : `${window.location.origin}/auth/callback?next=/`
+  const callbackUrl = buildAuthCallbackUrl('/')
 
   const onSalesmanLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

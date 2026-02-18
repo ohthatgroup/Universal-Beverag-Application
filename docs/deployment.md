@@ -17,9 +17,12 @@
 - db types drift check
 2. Confirm Supabase schema is up-to-date.
 3. Confirm auth providers and redirect URLs are configured.
+  - Site URL: `https://universal-beverag-application.vercel.app`
+  - Redirect allowlist includes: `https://universal-beverag-application.vercel.app/auth/callback`
 4. Confirm storage buckets exist and policy settings are correct.
 5. Confirm `FEATURE_ECWID_PUSH` is set as intended.
 6. Confirm `inbox@ohthatgrp.com` has a `salesman` profile record in `public.profiles`.
+7. Confirm generated order links never point to localhost.
 
 ## Deploy Steps
 1. Merge approved PR into `main`.

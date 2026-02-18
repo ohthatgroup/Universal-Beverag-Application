@@ -14,9 +14,11 @@ interface CustomerMagicLinkGeneratorProps {
 
 interface MagicLinkResponse {
   data?: {
+    orderId: string
     customerId: string
     customerEmail: string
     deliveryDate: string
+    orderDeepLink: string
     magicLink: string
   }
   error?: {
@@ -30,16 +32,18 @@ export function CustomerMagicLinkGenerator({
 }: CustomerMagicLinkGeneratorProps) {
   const [deliveryDate, setDeliveryDate] = useState(() => addDays(todayISODate(), 1))
   const [isGenerating, setIsGenerating] = useState(false)
+  const [orderDeepLink, setOrderDeepLink] = useState('')
   const [magicLink, setMagicLink] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copiedField, setCopiedField] = useState<'order' | 'magic' | null>(null)
 
   const isDisabled = useMemo(() => !customerEmail || isGenerating, [customerEmail, isGenerating])
 
   const generate = async () => {
     setIsGenerating(true)
     setError(null)
-    setCopied(false)
+    setCopiedField(null)
+    setOrderDeepLink('')
     setMagicLink('')
 
     try {
@@ -58,12 +62,14 @@ export function CustomerMagicLinkGenerator({
         return
       }
 
+      const nextOrderDeepLink = payload?.data?.orderDeepLink ?? ''
       const nextMagicLink = payload?.data?.magicLink ?? ''
-      if (!nextMagicLink) {
-        setError('Magic link was not returned by the server')
+      if (!nextOrderDeepLink || !nextMagicLink) {
+        setError('Order link payload was not returned by the server')
         return
       }
 
+      setOrderDeepLink(nextOrderDeepLink)
       setMagicLink(nextMagicLink)
     } catch {
       setError('Failed to generate magic link')
@@ -72,14 +78,15 @@ export function CustomerMagicLinkGenerator({
     }
   }
 
-  const copyLink = async () => {
-    if (!magicLink) return
+  const copyLink = async (target: 'order' | 'magic') => {
+    const value = target === 'order' ? orderDeepLink : magicLink
+    if (!value) return
     try {
-      await navigator.clipboard.writeText(magicLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      await navigator.clipboard.writeText(value)
+      setCopiedField(target)
+      setTimeout(() => setCopiedField(null), 1500)
     } catch {
-      setError('Unable to copy magic link')
+      setError(`Unable to copy ${target === 'order' ? 'order' : 'magic'} link`)
     }
   }
 
@@ -90,7 +97,7 @@ export function CustomerMagicLinkGenerator({
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Generate a one-click login link for this customer that opens the selected delivery-date order page.
+          Generate a unique order link and one-click login link for this customer.
         </p>
 
         <div className="space-y-2">
@@ -116,13 +123,21 @@ export function CustomerMagicLinkGenerator({
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        {magicLink && (
+        {magicLink && orderDeepLink && (
           <div className="space-y-2">
+            <Label htmlFor="order-link-output">Order Link</Label>
+            <Input id="order-link-output" readOnly value={orderDeepLink} />
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" onClick={() => copyLink('order')}>
+                {copiedField === 'order' ? 'Copied' : 'Copy Order Link'}
+              </Button>
+            </div>
+
             <Label htmlFor="magic-link-output">Magic Link</Label>
             <Input id="magic-link-output" readOnly value={magicLink} />
             <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={copyLink}>
-                {copied ? 'Copied' : 'Copy Link'}
+              <Button type="button" variant="secondary" onClick={() => copyLink('magic')}>
+                {copiedField === 'magic' ? 'Copied' : 'Copy Magic Link'}
               </Button>
               <Button asChild type="button" variant="outline">
                 <a href={magicLink} target="_blank" rel="noreferrer">

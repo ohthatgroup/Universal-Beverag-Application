@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { requirePageAuth } from '@/lib/server/page-auth'
@@ -86,6 +87,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
       </Card>
 
       <OrderStatusForm orderId={order.id} initialStatus={orderStatus} />
+      <OrderLinkActions orderId={order.id} />
 
       <Card>
         <CardHeader>

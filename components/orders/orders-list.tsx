@@ -53,7 +53,7 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
     })
 
     const payload = (await response.json().catch(() => null)) as
-      | { data?: { order?: { delivery_date: string } } }
+      | { data?: { order?: { id: string; delivery_date: string } } }
       | { error?: { message?: string } }
       | null
 
@@ -64,12 +64,11 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
       return
     }
 
+    const clonedOrderId = payload && 'data' in payload ? payload.data?.order?.id : null
     const deliveryDate =
-      payload && 'data' in payload && payload.data?.order?.delivery_date
-        ? payload.data.order.delivery_date
-        : reorderDate
+      payload && 'data' in payload ? payload.data?.order?.delivery_date ?? reorderDate : reorderDate
 
-    router.push(`/order/${deliveryDate}`)
+    router.push(clonedOrderId ? `/order/link/${clonedOrderId}` : `/order/${deliveryDate}`)
     router.refresh()
   }
 
@@ -98,7 +97,7 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
               <div className="flex flex-wrap gap-2">
                 {order.status === 'draft' && (
                   <Button asChild size="sm">
-                    <Link href={`/order/${order.delivery_date}`}>Continue</Link>
+                    <Link href={`/order/link/${order.id}`}>Continue</Link>
                   </Button>
                 )}
 

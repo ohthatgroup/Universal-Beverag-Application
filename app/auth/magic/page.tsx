@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { buildAuthCallbackUrl } from '@/lib/config/public-url'
 import { createClient } from '@/lib/supabase/client'
 
 export default function MagicLinkPage() {
@@ -14,10 +15,7 @@ export default function MagicLinkPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const callbackUrl =
-    typeof window === 'undefined'
-      ? undefined
-      : `${window.location.origin}/auth/callback?next=/`
+  const callbackUrl = buildAuthCallbackUrl('/')
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

@@ -64,6 +64,14 @@ Type generation introspects the live DB via `SUPABASE_DB_URL` (or `POSTGRES_URL_
 
 Middleware protects page routes by role. API routes enforce auth/role via server guards.
 
+## Link Host Policy
+- Generated customer order links and magic-link callbacks are pinned to:
+`https://universal-beverag-application.vercel.app`
+- Localhost is for local debugging only and is never used for generated production links.
+- Supabase Auth settings must include:
+  - Site URL: `https://universal-beverag-application.vercel.app`
+  - Redirect allowlist: `https://universal-beverag-application.vercel.app/auth/callback`
+
 ## API Response Contract
 - Success: `{ "data": ... }`
 - Error: `{ "error": { "code": string, "message": string, "details"?: unknown } }`

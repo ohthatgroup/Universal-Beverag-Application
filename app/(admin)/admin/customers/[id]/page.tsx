@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { CustomerMagicLinkGenerator } from '@/components/admin/customer-magic-link-generator'
+import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -158,6 +159,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               <Link className="text-xs underline" href={`/admin/orders/${order.id}`}>
                 Open order
               </Link>
+              <OrderLinkActions orderId={order.id} className="mt-2" />
             </div>
           ))}
           {(orderHistory ?? []).length === 0 && (

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
+import { generateOrderMagicLink } from '@/lib/server/order-links'
 import { isoDateSchema } from '@/lib/server/schemas'
 
 const paramsSchema = z.object({
@@ -46,40 +47,75 @@ export async function POST(
       )
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin
-    const baseUrl = appUrl.replace(/\/$/, '')
-    const nextPath = `/order/${payload.deliveryDate}`
-    const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`
+    const { data: existingOrder, error: existingOrderError } = await adminClient
+      .from('orders')
+      .select('id,customer_id,delivery_date')
+      .eq('customer_id', customer.id)
+      .eq('delivery_date', payload.deliveryDate)
+      .eq('status', 'draft')
+      .maybeSingle()
 
-    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: customer.email,
-      options: {
-        redirectTo,
-      },
+    if (existingOrderError) {
+      throw existingOrderError
+    }
+
+    let order = existingOrder
+
+    if (!order) {
+      const { data: insertedOrder, error: insertError } = await adminClient
+        .from('orders')
+        .insert({
+          customer_id: customer.id,
+          delivery_date: payload.deliveryDate,
+          status: 'draft',
+        })
+        .select('id,customer_id,delivery_date')
+        .single()
+
+      if (insertError) {
+        if (insertError.code === '23505') {
+          const { data: raceOrder, error: raceError } = await adminClient
+            .from('orders')
+            .select('id,customer_id,delivery_date')
+            .eq('customer_id', customer.id)
+            .eq('delivery_date', payload.deliveryDate)
+            .eq('status', 'draft')
+            .maybeSingle()
+
+          if (raceError) {
+            throw raceError
+          }
+
+          order = raceOrder
+        } else {
+          throw insertError
+        }
+      } else {
+        order = insertedOrder
+      }
+    }
+
+    if (!order) {
+      throw new Error('Unable to create or load draft order for magic link')
+    }
+
+    const linkPayload = await generateOrderMagicLink({
+      orderId: order.id,
+      customerId: customer.id,
+      customerEmail: customer.email,
     })
-
-    if (linkError) {
-      throw linkError
-    }
-
-    const magicLink = linkData?.properties?.action_link
-    if (!magicLink) {
-      throw new Error('Failed to generate action link')
-    }
 
     logApiEvent(requestId, 'customer_magic_link_generated', {
       customerId: customer.id,
       customerEmail: customer.email,
-      deliveryDate: payload.deliveryDate,
+      orderId: order.id,
+      deliveryDate: order.delivery_date,
     })
 
     return apiOk(
       {
-        customerId: customer.id,
-        customerEmail: customer.email,
-        deliveryDate: payload.deliveryDate,
-        magicLink,
+        ...linkPayload,
+        deliveryDate: order.delivery_date,
       },
       200,
       requestId

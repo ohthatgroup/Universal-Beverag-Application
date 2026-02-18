@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -177,6 +178,7 @@ export default async function AdminOrdersPage() {
                   CSV
                 </a>
               </div>
+              <OrderLinkActions orderId={order.id} />
             </CardContent>
           </Card>
         ))}

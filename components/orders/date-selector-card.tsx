@@ -33,7 +33,7 @@ export function DateSelectorCard({ initialDate, draftDates }: DateSelectorCardPr
     })
 
     const payload = (await response.json().catch(() => null)) as
-      | { data?: { order?: { delivery_date: string } } }
+      | { data?: { order?: { id: string; delivery_date: string } } }
       | { error?: { message?: string } }
       | null
 
@@ -44,12 +44,11 @@ export function DateSelectorCard({ initialDate, draftDates }: DateSelectorCardPr
       return
     }
 
+    const orderId = payload && 'data' in payload ? payload.data?.order?.id : null
     const deliveryDate =
-      payload && 'data' in payload && payload.data?.order?.delivery_date
-        ? payload.data.order.delivery_date
-        : date
+      payload && 'data' in payload ? payload.data?.order?.delivery_date ?? date : date
 
-    router.push(`/order/${deliveryDate}`)
+    router.push(orderId ? `/order/link/${orderId}` : `/order/${deliveryDate}`)
     router.refresh()
   }
 
