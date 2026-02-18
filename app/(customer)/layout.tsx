@@ -6,9 +6,13 @@ export default function CustomerLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-mobile flex-col bg-background pb-16">
-      <main className="flex-1">{children}</main>
+    <div className="min-h-screen bg-background">
       <CustomerNav />
+      <main className="pb-20 md:pb-0">
+        <div className="mx-auto max-w-4xl p-4 md:p-6">
+          {children}
+        </div>
+      </main>
     </div>
   )
 }

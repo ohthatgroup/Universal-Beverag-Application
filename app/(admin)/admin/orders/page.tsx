@@ -1,15 +1,14 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Badge } from '@/components/ui/badge'
+import { Plus, Search, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { createClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate, getStatusVariant, todayISODate } from '@/lib/utils'
+import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel, todayISODate } from '@/lib/utils'
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
 
@@ -177,22 +176,27 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
   ]
 
   return (
-    <div className="space-y-4 p-4 pb-20">
-      <h1 className="text-2xl font-semibold">Orders</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Orders</h1>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create Customer Draft Order</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={createAdminDraftOrder} className="grid gap-3">
+      {/* Create order — collapsible */}
+      <details className="group rounded-lg border">
+        <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
+          <Plus className="h-4 w-4" />
+          New Draft Order
+        </summary>
+        <div className="border-t p-4">
+          <form action={createAdminDraftOrder} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="customer_id">Customer</Label>
               <select
                 id="customer_id"
                 name="customer_id"
                 required
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 defaultValue=""
               >
                 <option value="" disabled>
@@ -210,12 +214,13 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
               <Input id="delivery_date" name="delivery_date" type="date" required defaultValue={todayISODate()} />
             </div>
             <Button type="submit" disabled={customers.length === 0}>
-              {customers.length === 0 ? 'Create a customer first' : 'Create / Open Draft'}
+              {customers.length === 0 ? 'Create a customer first' : 'Create Draft'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </details>
 
+      {/* Status filter tabs */}
       <div className="flex flex-wrap gap-2">
         {statusTabs.map((tab) => (
           <Button key={tab.value} asChild size="sm" variant={selectedStatus === tab.value ? 'default' : 'outline'}>
@@ -235,55 +240,106 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
         ))}
       </div>
 
-      <Card>
-        <CardContent className="pt-4">
-          <form method="GET" className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-            {selectedStatus !== 'all' && <input type="hidden" name="status" value={selectedStatus} />}
-            <Input name="q" placeholder="Search by customer..." defaultValue={searchQuery} />
-            <Input name="deliveryDate" type="date" defaultValue={selectedDeliveryDate} />
-            <Button type="submit">Apply</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {/* Search + date filter — no Card wrapper */}
+      <form method="GET" className="flex flex-col gap-2 md:flex-row">
+        {selectedStatus !== 'all' && <input type="hidden" name="status" value={selectedStatus} />}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input name="q" placeholder="Search by customer..." defaultValue={searchQuery} className="pl-9" />
+        </div>
+        <Input name="deliveryDate" type="date" defaultValue={selectedDeliveryDate} className="md:w-44" />
+        <Button type="submit">Apply</Button>
+      </form>
 
-      <div className="space-y-4">
-        {dateGroups.map(([deliveryDate, dateOrders]) => (
-          <section key={deliveryDate} className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground">{formatDeliveryDate(deliveryDate)}</h2>
-            {dateOrders.map((order) => (
-              <Card key={order.id}>
-                <CardContent className="space-y-2 pt-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-medium">
-                        {(order.customer_id ? customerById.get(order.customer_id) : null) ??
-                          order.customer_id ??
-                          'Unknown customer'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {order.item_count ?? 0} items • {formatCurrency(order.total ?? 0)}
-                      </div>
-                    </div>
-                    <Badge variant={getStatusVariant(asOrderStatus(order.status))}>{order.status}</Badge>
-                  </div>
+      {/* Orders grouped by date */}
+      {dateGroups.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No orders found.</p>
+      ) : (
+        <div className="space-y-6">
+          {dateGroups.map(([deliveryDate, dateOrders]) => (
+            <section key={deliveryDate} className="space-y-2">
+              <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {formatDeliveryDate(deliveryDate)}
+              </h2>
 
-                  <div className="flex gap-2 text-sm">
-                    <Link className="underline" href={`/admin/orders/${order.id}`}>
-                      Open
+              {/* Mobile cards */}
+              <div className="space-y-0 md:hidden">
+                {dateOrders.map((order) => (
+                  <div key={order.id} className="border-b py-3 last:border-0">
+                    <Link href={`/admin/orders/${order.id}`} className="block">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm truncate">
+                            {(order.customer_id ? customerById.get(order.customer_id) : null) ??
+                              'Unknown customer'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
+                          </div>
+                        </div>
+                        <span className="ml-3 text-sm">
+                          {getStatusIcon(asOrderStatus(order.status))} {getStatusLabel(asOrderStatus(order.status))}
+                        </span>
+                      </div>
                     </Link>
-                    <a className="underline" href={`/api/orders/${order.id}/csv`}>
-                      CSV
-                    </a>
+                    <div className="mt-2 flex gap-2">
+                      <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                        <a href={`/api/orders/${order.id}/csv`}>
+                          <Download className="mr-1 h-3 w-3" />
+                          CSV
+                        </a>
+                      </Button>
+                      <OrderLinkActions orderId={order.id} className="flex-1" />
+                    </div>
                   </div>
-                  <OrderLinkActions orderId={order.id} />
-                </CardContent>
-              </Card>
-            ))}
-          </section>
-        ))}
+                ))}
+              </div>
 
-        {dateGroups.length === 0 && <p className="text-sm text-muted-foreground">No orders found.</p>}
-      </div>
+              {/* Desktop table */}
+              <div className="hidden md:block rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-4 py-3 text-left font-medium">Customer</th>
+                      <th className="px-4 py-3 text-right font-medium">Items</th>
+                      <th className="px-4 py-3 text-right font-medium">Total</th>
+                      <th className="px-4 py-3 text-left font-medium">Status</th>
+                      <th className="px-4 py-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dateOrders.map((order) => (
+                      <tr key={order.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-3">
+                          <Link href={`/admin/orders/${order.id}`} className="font-medium hover:underline">
+                            {(order.customer_id ? customerById.get(order.customer_id) : null) ??
+                              'Unknown customer'}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{order.item_count ?? 0}</td>
+                        <td className="px-4 py-3 text-right">{formatCurrency(order.total ?? 0)}</td>
+                        <td className="px-4 py-3">
+                          {getStatusIcon(asOrderStatus(order.status))} {getStatusLabel(asOrderStatus(order.status))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button asChild size="sm" variant="ghost">
+                              <a href={`/api/orders/${order.id}/csv`}>
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                            <OrderLinkActions orderId={order.id} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

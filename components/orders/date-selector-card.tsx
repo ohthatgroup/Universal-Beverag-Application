@@ -2,17 +2,15 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 
 interface DateSelectorCardProps {
   initialDate?: string
@@ -77,44 +75,39 @@ export function DateSelectorCard({ initialDate, drafts }: DateSelectorCardProps)
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Select Delivery Date</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="text-sm text-muted-foreground">Selected: {formatDeliveryDate(date)}</div>
+    <>
+      <Button onClick={() => setIsDialogOpen(true)} disabled={isSubmitting} size="lg">
+        {isSubmitting ? 'Opening...' : 'Select Delivery Date'}
+      </Button>
 
-        <Button className="w-full" onClick={() => setIsDialogOpen(true)} disabled={isSubmitting}>
-          {isSubmitting ? 'Opening...' : 'Select Date'}
-        </Button>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </CardContent>
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Select Date</DialogTitle>
-            <DialogDescription>Choose a delivery date to create or continue an order.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => moveDate(-1)}>
-                Prev
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => moveDate(-1)}
+              >
+                <ChevronLeft className="h-5 w-5" />
               </Button>
-              <div className="text-sm font-medium">{formatDeliveryDate(date)}</div>
-              <Button type="button" variant="outline" size="sm" onClick={() => moveDate(1)}>
-                Next
+              <span className="text-lg font-semibold">{formatDeliveryDate(date)}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => moveDate(1)}
+              >
+                <ChevronRight className="h-5 w-5" />
               </Button>
             </div>
-
-            <Input
-              type="date"
-              value={date}
-              min={todayISODate()}
-              onChange={(event) => setDate(event.target.value)}
-            />
 
             <Button
               className="w-full"
@@ -139,6 +132,6 @@ export function DateSelectorCard({ initialDate, drafts }: DateSelectorCardProps)
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </>
   )
 }

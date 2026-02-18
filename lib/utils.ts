@@ -120,12 +120,20 @@ export function getStatusLabel(status: OrderStatus): string {
 
 export function getStatusVariant(
   status: OrderStatus
-): 'default' | 'secondary' | 'outline' {
+): 'default' | 'secondary' | 'outline' | 'success' {
   return {
     draft: 'outline',
     submitted: 'default',
-    delivered: 'secondary',
-  }[status] as 'default' | 'secondary' | 'outline'
+    delivered: 'success',
+  }[status] as 'default' | 'secondary' | 'outline' | 'success'
+}
+
+export function getStatusIcon(status: OrderStatus): string {
+  return {
+    draft: '○',
+    submitted: '●',
+    delivered: '✓',
+  }[status]
 }
 
 // ─── Debounce ─────────────────────────────────────────────────────────────

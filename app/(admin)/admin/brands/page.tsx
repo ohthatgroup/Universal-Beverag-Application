@@ -1,6 +1,7 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/server'
@@ -53,16 +54,25 @@ export default async function BrandsPage() {
     redirect('/admin/brands')
   }
 
-  return (
-    <div className="space-y-4 p-4 pb-20">
-      <h1 className="text-2xl font-semibold">Brands</h1>
+  const brandList = brands ?? []
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create Brand</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={createBrand} className="grid gap-3">
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link href="/admin/catalog" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
+          <ArrowLeft className="h-4 w-4" />
+          Catalog
+        </Link>
+        <h1 className="text-2xl font-semibold">Brands</h1>
+      </div>
+
+      <details className="group rounded-lg border">
+        <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
+          <Plus className="h-4 w-4" />
+          New Brand
+        </summary>
+        <div className="border-t p-4">
+          <form action={createBrand} className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" name="name" required />
@@ -73,32 +83,66 @@ export default async function BrandsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="sort_order">Sort order</Label>
-              <Input id="sort_order" name="sort_order" type="number" defaultValue={0} />
+              <Input id="sort_order" name="sort_order" type="number" defaultValue={0} className="w-24" />
             </div>
-            <Button type="submit">Create Brand</Button>
+            <div className="flex items-end">
+              <Button type="submit">Create</Button>
+            </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </details>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Existing Brands</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {(brands ?? []).map((brand) => (
-            <form key={brand.id} action={updateBrand} className="space-y-2 rounded-md border p-3">
-              <input type="hidden" name="id" value={brand.id} />
-              <Input name="name" defaultValue={brand.name} />
-              <Input name="logo_url" defaultValue={brand.logo_url ?? ''} placeholder="Logo URL" />
-              <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} />
-              <Button size="sm" type="submit">
-                Save
-              </Button>
-            </form>
-          ))}
-          {(brands ?? []).length === 0 && <p className="text-sm text-muted-foreground">No brands found.</p>}
-        </CardContent>
-      </Card>
+      {brandList.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No brands found.</p>
+      ) : (
+        <>
+          {/* Mobile */}
+          <div className="space-y-0 md:hidden">
+            {brandList.map((brand) => (
+              <form key={brand.id} action={updateBrand} className="border-b py-3 last:border-0">
+                <input type="hidden" name="id" value={brand.id} />
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Input name="name" defaultValue={brand.name} className="h-8 text-sm" />
+                    <Input name="logo_url" defaultValue={brand.logo_url ?? ''} placeholder="Logo URL" className="h-8 text-xs" />
+                  </div>
+                  <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} className="w-16 h-8 text-xs text-right" />
+                  <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
+                </div>
+              </form>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-lg border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-2 text-left font-medium">Name</th>
+                  <th className="px-4 py-2 text-left font-medium">Logo URL</th>
+                  <th className="px-4 py-2 text-right font-medium">Sort</th>
+                  <th className="px-4 py-2 w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {brandList.map((brand) => (
+                  <tr key={brand.id} className="border-b last:border-0">
+                    <td className="px-4 py-2" colSpan={4}>
+                      <form action={updateBrand} className="flex items-center gap-4">
+                        <input type="hidden" name="id" value={brand.id} />
+                        <Input name="name" defaultValue={brand.name} className="h-8 text-sm flex-1" />
+                        <Input name="logo_url" defaultValue={brand.logo_url ?? ''} placeholder="Logo URL" className="h-8 text-sm w-60" />
+                        <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} className="h-8 text-sm text-right w-20" />
+                        <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

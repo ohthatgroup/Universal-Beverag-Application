@@ -1,14 +1,15 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { ArrowLeft, ArrowRight, Mail, Phone, Plus } from 'lucide-react'
 import { CustomerMagicLinkGenerator } from '@/components/admin/customer-magic-link-generator'
-import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { formatCurrency, formatDeliveryDate, todayISODate } from '@/lib/utils'
+import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel, todayISODate } from '@/lib/utils'
+import type { OrderStatus } from '@/lib/types'
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
 
@@ -44,6 +45,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   if (!customer) {
     notFound()
   }
+
+  const customerName = customer.business_name || customer.contact_name || 'Customer'
+  const orders = orderHistory ?? []
 
   async function updateCustomer(formData: FormData) {
     'use server'
@@ -121,45 +125,64 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     redirect(`/admin/orders/${createdOrder.id}`)
   }
 
+  async function deleteCustomer() {
+    'use server'
+
+    await requirePageAuth(['salesman'])
+    const supabaseClient = await createClient()
+
+    const { error: deleteError } = await supabaseClient
+      .from('profiles')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      throw deleteError
+    }
+
+    redirect('/admin/customers')
+  }
+
   return (
-    <div className="space-y-4 p-4 pb-20">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{customer.business_name || customer.contact_name || 'Customer Detail'}</h1>
-        <Link className="text-sm underline" href={`/admin/customers/${id}/products`}>
-          Manage Products
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <Link href="/admin/customers" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
+          <ArrowLeft className="h-4 w-4" />
+          Customers
         </Link>
+        <h1 className="text-2xl font-semibold">{customerName}</h1>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div>Phone: {customer.phone ?? 'No phone'}</div>
-          <div>Email: {customer.email ?? 'No email'}</div>
-          <div>Address: {[customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', ') || 'No address'}</div>
-          <div className="flex flex-wrap gap-2">
-            {customer.phone && (
-              <Button asChild size="sm" variant="outline">
-                <a href={`tel:${customer.phone}`}>Call</a>
-              </Button>
-            )}
-            {customer.email && (
-              <Button asChild size="sm" variant="outline">
-                <a href={`mailto:${customer.email}`}>Email</a>
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Contact info */}
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        {customer.email && (
+          <a href={`mailto:${customer.email}`} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+            <Mail className="h-3.5 w-3.5" />
+            {customer.email}
+          </a>
+        )}
+        {customer.phone && (
+          <a href={`tel:${customer.phone}`} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+            <Phone className="h-3.5 w-3.5" />
+            {customer.phone}
+          </a>
+        )}
+        {(customer.address || customer.city || customer.state) && (
+          <span className="text-muted-foreground">
+            {[customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', ')}
+          </span>
+        )}
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Customer Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Edit info — collapsible */}
+      <details className="group rounded-lg border">
+        <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
+          Edit Info
+        </summary>
+        <div className="border-t p-4">
           <form action={updateCustomer} className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="business_name">Business Name</Label>
                 <Input id="business_name" name="business_name" defaultValue={customer.business_name ?? ''} />
@@ -193,67 +216,153 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 <Input id="zip" name="zip" defaultValue={customer.zip ?? ''} />
               </div>
             </div>
-
-            <div className="grid gap-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input defaultChecked={customer.show_prices ?? true} name="show_prices" type="checkbox" />
-                Show prices to customer
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input defaultChecked={customer.custom_pricing ?? false} name="custom_pricing" type="checkbox" />
-                Enable custom pricing
-              </label>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Default Grouping</Label>
-              <select
-                name="default_group"
-                defaultValue={customer.default_group ?? 'brand'}
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="brand">Brand</option>
-                <option value="size">Size</option>
-              </select>
-            </div>
-
-            <p className="text-xs text-muted-foreground">{excludedCount ?? 0} excluded products</p>
-            <Button type="submit">Save customer</Button>
+            <Button type="submit">Save</Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </details>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Orders</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <form action={createOrderForCustomer} className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <Input name="delivery_date" type="date" required defaultValue={todayISODate()} />
-            <Button type="submit">+ New Order for Customer</Button>
-          </form>
+      <Separator />
 
-          {(orderHistory ?? []).map((order) => (
-            <div key={order.id} className="space-y-2 rounded-md border p-3">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <div>
-                  <div className="font-medium">{formatDeliveryDate(order.delivery_date)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {order.item_count ?? 0} items • {formatCurrency(order.total ?? 0)} • {order.status}
+      {/* Catalog Settings */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Catalog Settings</h2>
+
+        <form action={updateCustomer} className="space-y-4">
+          {/* Hidden fields to preserve existing values */}
+          <input type="hidden" name="business_name" value={customer.business_name ?? ''} />
+          <input type="hidden" name="contact_name" value={customer.contact_name ?? ''} />
+          <input type="hidden" name="email" value={customer.email ?? ''} />
+          <input type="hidden" name="phone" value={customer.phone ?? ''} />
+          <input type="hidden" name="address" value={customer.address ?? ''} />
+          <input type="hidden" name="city" value={customer.city ?? ''} />
+          <input type="hidden" name="state" value={customer.state ?? ''} />
+          <input type="hidden" name="zip" value={customer.zip ?? ''} />
+
+          <div className="space-y-3">
+            <label className="flex items-center justify-between rounded-lg border p-3">
+              <span className="text-sm font-medium">Show prices</span>
+              <input defaultChecked={customer.show_prices ?? true} name="show_prices" type="checkbox" className="h-4 w-4" />
+            </label>
+            <label className="flex items-center justify-between rounded-lg border p-3">
+              <span className="text-sm font-medium">Custom pricing</span>
+              <input defaultChecked={customer.custom_pricing ?? false} name="custom_pricing" type="checkbox" className="h-4 w-4" />
+            </label>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Default Grouping</Label>
+            <select
+              name="default_group"
+              defaultValue={customer.default_group ?? 'brand'}
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="brand">Brand</option>
+              <option value="size">Size</option>
+            </select>
+          </div>
+
+          <Button type="submit" size="sm">Save Settings</Button>
+        </form>
+
+        <Link
+          href={`/admin/customers/${id}/products`}
+          className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50"
+        >
+          <div>
+            <div className="text-sm font-medium">Manage Products</div>
+            <div className="text-xs text-muted-foreground">{excludedCount ?? 0} excluded</div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      </section>
+
+      <Separator />
+
+      {/* Orders */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Orders</h2>
+        </div>
+
+        <form action={createOrderForCustomer} className="flex gap-2">
+          <Input name="delivery_date" type="date" required defaultValue={todayISODate()} className="flex-1 md:w-44 md:flex-none" />
+          <Button type="submit" size="sm">
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            New Order
+          </Button>
+        </form>
+
+        {orders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No order history yet.</p>
+        ) : (
+          <>
+            {/* Mobile */}
+            <div className="space-y-0 md:hidden">
+              {orders.map((order) => (
+                <Link
+                  key={order.id}
+                  href={`/admin/orders/${order.id}`}
+                  className="flex items-center justify-between border-b py-3 last:border-0"
+                >
+                  <div>
+                    <div className="font-medium text-sm">{formatDeliveryDate(order.delivery_date)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
+                    </div>
                   </div>
-                </div>
-                <Link className="text-xs underline" href={`/admin/orders/${order.id}`}>
-                  Open
+                  <span className="text-sm">
+                    {getStatusIcon(order.status as OrderStatus)} {getStatusLabel(order.status as OrderStatus)}
+                  </span>
                 </Link>
-              </div>
-              <OrderLinkActions orderId={order.id} className="mt-2" />
+              ))}
             </div>
-          ))}
-          {(orderHistory ?? []).length === 0 && <p className="text-muted-foreground">No order history yet.</p>}
-        </CardContent>
-      </Card>
 
+            {/* Desktop table */}
+            <div className="hidden md:block rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium">Date</th>
+                    <th className="px-4 py-3 text-right font-medium">Items</th>
+                    <th className="px-4 py-3 text-right font-medium">Total</th>
+                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr key={order.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <Link href={`/admin/orders/${order.id}`} className="font-medium hover:underline">
+                          {formatDeliveryDate(order.delivery_date)}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">{order.item_count ?? 0}</td>
+                      <td className="px-4 py-3 text-right">{formatCurrency(order.total ?? 0)}</td>
+                      <td className="px-4 py-3">
+                        {getStatusIcon(order.status as OrderStatus)} {getStatusLabel(order.status as OrderStatus)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
+
+      <Separator />
+
+      {/* Magic Link */}
       <CustomerMagicLinkGenerator customerId={customer.id} customerEmail={customer.email} />
+
+      <Separator />
+
+      {/* Danger zone */}
+      <form action={deleteCustomer}>
+        <Button type="submit" variant="destructive" size="sm">
+          Delete Customer
+        </Button>
+      </form>
     </div>
   )
 }

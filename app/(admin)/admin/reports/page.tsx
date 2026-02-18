@@ -1,5 +1,8 @@
-import { addDays, formatCurrency, todayISODate } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { addDays, formatCurrency, getStatusIcon, todayISODate } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
 interface ReportsPageProps {
@@ -73,92 +76,101 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     .slice(0, 10)
 
   return (
-    <div className="space-y-4 p-4 pb-20">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Reports</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Date Range</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="grid grid-cols-2 gap-2" method="GET">
-            <label className="text-sm">
-              From
-              <input
-                className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
-                name="from"
-                type="date"
-                defaultValue={from}
-              />
-            </label>
-            <label className="text-sm">
-              To
-              <input
-                className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
-                name="to"
-                type="date"
-                defaultValue={to}
-              />
-            </label>
-            <button className="col-span-2 h-10 rounded-md bg-primary text-sm font-medium text-primary-foreground" type="submit">
-              Refresh Report
-            </button>
-          </form>
-        </CardContent>
-      </Card>
+      {/* Date range filter */}
+      <form className="flex flex-wrap items-end gap-3" method="GET">
+        <div className="space-y-1">
+          <Label htmlFor="from" className="text-xs">From</Label>
+          <Input id="from" name="from" type="date" defaultValue={from} className="h-9 w-40" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="to" className="text-xs">To</Label>
+          <Input id="to" name="to" type="date" defaultValue={to} className="h-9 w-40" />
+        </div>
+        <Button type="submit" size="sm">Refresh</Button>
+      </form>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Card>
-          <CardContent className="space-y-1 p-3">
-            <div className="text-xs text-muted-foreground">Orders</div>
-            <div className="text-xl font-semibold">{orders?.length ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 p-3">
-            <div className="text-xs text-muted-foreground">Revenue</div>
-            <div className="text-xl font-semibold">{formatCurrency(totalRevenue)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 p-3">
-            <div className="text-xs text-muted-foreground">Item Count</div>
-            <div className="text-xl font-semibold">{totalItems}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 p-3">
-            <div className="text-xs text-muted-foreground">Delivered</div>
-            <div className="text-xl font-semibold">{statusCounts.delivered}</div>
-          </CardContent>
-        </Card>
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-lg border p-4">
+          <div className="text-2xl font-semibold">{orderRows.length}</div>
+          <div className="text-xs text-muted-foreground mt-1">Orders</div>
+        </div>
+        <div className="rounded-lg border p-4">
+          <div className="text-2xl font-semibold">{formatCurrency(totalRevenue)}</div>
+          <div className="text-xs text-muted-foreground mt-1">Revenue</div>
+        </div>
+        <div className="rounded-lg border p-4">
+          <div className="text-2xl font-semibold">{totalItems}</div>
+          <div className="text-xs text-muted-foreground mt-1">Items Ordered</div>
+        </div>
+        <div className="rounded-lg border p-4">
+          <div className="text-2xl font-semibold">{statusCounts.delivered}</div>
+          <div className="text-xs text-muted-foreground mt-1">Delivered</div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Status Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1 text-sm">
-          <div>Draft: {statusCounts.draft}</div>
-          <div>Submitted: {statusCounts.submitted}</div>
-          <div>Delivered: {statusCounts.delivered}</div>
-        </CardContent>
-      </Card>
+      <Separator />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Top Brands by Revenue</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {topBrands.map((entry) => (
-            <div key={entry.brand} className="flex items-center justify-between text-sm">
-              <span>{entry.brand}</span>
-              <span>{formatCurrency(entry.revenue)}</span>
+      {/* Status breakdown */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Status Breakdown</h2>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <span>{getStatusIcon('draft')} Draft: {statusCounts.draft}</span>
+          <span>{getStatusIcon('submitted')} Submitted: {statusCounts.submitted}</span>
+          <span>{getStatusIcon('delivered')} Delivered: {statusCounts.delivered}</span>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Top brands */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Top Brands by Revenue</h2>
+
+        {topBrands.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No brand data available.</p>
+        ) : (
+          <>
+            {/* Mobile */}
+            <div className="space-y-0 md:hidden">
+              {topBrands.map((entry, index) => (
+                <div key={entry.brand} className="flex items-center justify-between border-b py-2.5 last:border-0">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground mr-2">{index + 1}.</span>
+                    {entry.brand}
+                  </div>
+                  <div className="text-sm font-medium">{formatCurrency(entry.revenue)}</div>
+                </div>
+              ))}
             </div>
-          ))}
-          {topBrands.length === 0 && <p className="text-sm text-muted-foreground">No brand data available.</p>}
-        </CardContent>
-      </Card>
+
+            {/* Desktop table */}
+            <div className="hidden md:block rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-2 text-left font-medium w-12">#</th>
+                    <th className="px-4 py-2 text-left font-medium">Brand</th>
+                    <th className="px-4 py-2 text-right font-medium">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topBrands.map((entry, index) => (
+                    <tr key={entry.brand} className="border-b last:border-0">
+                      <td className="px-4 py-2 text-muted-foreground">{index + 1}</td>
+                      <td className="px-4 py-2 font-medium">{entry.brand}</td>
+                      <td className="px-4 py-2 text-right">{formatCurrency(entry.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   )
 }

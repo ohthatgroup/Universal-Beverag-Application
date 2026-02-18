@@ -1,4 +1,5 @@
 import { AdminNav } from '@/components/layout/admin-nav'
+import { AdminSidebar } from '@/components/layout/admin-sidebar'
 
 export default function AdminLayout({
   children,
@@ -6,8 +7,15 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-mobile flex-col bg-background pb-16">
-      <main className="flex-1">{children}</main>
+    <div className="min-h-screen bg-background">
+      <AdminSidebar />
+      <div className="flex flex-col md:pl-60">
+        <main className="flex-1 pb-20 md:pb-0">
+          <div className="mx-auto max-w-6xl p-4 md:p-6">
+            {children}
+          </div>
+        </main>
+      </div>
       <AdminNav />
     </div>
   )

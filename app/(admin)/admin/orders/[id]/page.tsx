@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { ArrowLeft, Check, Download, Mail, Phone, Trash2 } from 'lucide-react'
 import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { createClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
+import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel } from '@/lib/utils'
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -52,6 +53,9 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   const orderStatus = asOrderStatus(order.status)
   const orderId = order.id
   const submittedAt = order.submitted_at
+  const orderItems = items ?? []
+
+  const customerName = customer?.business_name || customer?.contact_name || 'Unknown customer'
 
   async function markDelivered() {
     'use server'
@@ -109,22 +113,149 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   }
 
   return (
-    <div className="space-y-4 p-4 pb-20">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Order Detail</h1>
-        <a className="text-sm underline" href={`/api/orders/${order.id}/csv`}>
-          Download CSV
-        </a>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <Link href="/admin/orders" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
+          <ArrowLeft className="h-4 w-4" />
+          Orders
+        </Link>
+        <h1 className="text-2xl font-semibold">{customerName}</h1>
+        <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+          <span>{formatDeliveryDate(order.delivery_date)}</span>
+          <span>{getStatusIcon(orderStatus)} {getStatusLabel(orderStatus)}</span>
+        </div>
       </div>
 
+      {/* Action bar */}
       <div className="flex flex-wrap gap-2">
         {order.status === 'submitted' && (
           <form action={markDelivered}>
             <Button size="sm" type="submit">
+              <Check className="mr-1.5 h-3.5 w-3.5" />
               Mark Delivered
             </Button>
           </form>
         )}
+        <Button asChild size="sm" variant="outline">
+          <a href={`/api/orders/${order.id}/csv`}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            CSV
+          </a>
+        </Button>
+        <OrderLinkActions orderId={order.id} />
+      </div>
+
+      {/* Customer info */}
+      {customer && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          {customer.email && (
+            <a href={`mailto:${customer.email}`} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+              <Mail className="h-3.5 w-3.5" />
+              {customer.email}
+            </a>
+          )}
+          {customer.phone && (
+            <a href={`tel:${customer.phone}`} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
+              <Phone className="h-3.5 w-3.5" />
+              {customer.phone}
+            </a>
+          )}
+          <Link
+            href={`/admin/customers/${customer.id}`}
+            className="text-muted-foreground hover:text-foreground hover:underline"
+          >
+            View customer
+          </Link>
+        </div>
+      )}
+
+      <Separator />
+
+      {/* Status form */}
+      <OrderStatusForm orderId={order.id} initialStatus={orderStatus} />
+
+      <Separator />
+
+      {/* Order items */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">
+          Items ({order.item_count ?? orderItems.length})
+        </h2>
+
+        {orderItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No line items.</p>
+        ) : (
+          <>
+            {/* Mobile list */}
+            <div className="space-y-0 md:hidden">
+              {orderItems.map((item) => {
+                const product = item.product_id ? productById.get(item.product_id) : null
+                const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
+                return (
+                  <div key={item.id} className="flex items-center justify-between border-b py-3 last:border-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-sm">{product?.title ?? pallet?.title ?? 'Unknown item'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {product?.pack_details ?? pallet?.description ?? ''}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {formatCurrency(item.unit_price)} × {item.quantity}
+                      </div>
+                    </div>
+                    <div className="ml-4 text-sm font-medium">{formatCurrency(item.line_total ?? 0)}</div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium">Product</th>
+                    <th className="px-4 py-3 text-left font-medium">Pack</th>
+                    <th className="px-4 py-3 text-right font-medium">Qty</th>
+                    <th className="px-4 py-3 text-right font-medium">Unit Price</th>
+                    <th className="px-4 py-3 text-right font-medium">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderItems.map((item) => {
+                    const product = item.product_id ? productById.get(item.product_id) : null
+                    const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
+                    return (
+                      <tr key={item.id} className="border-b last:border-0">
+                        <td className="px-4 py-3 font-medium">
+                          {product?.title ?? pallet?.title ?? 'Unknown item'}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {product?.pack_details ?? pallet?.description ?? ''}
+                        </td>
+                        <td className="px-4 py-3 text-right">{item.quantity}</td>
+                        <td className="px-4 py-3 text-right">{formatCurrency(item.unit_price)}</td>
+                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.line_total ?? 0)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Total */}
+            <div className="flex items-center justify-between font-semibold">
+              <span>{order.item_count ?? orderItems.length} items</span>
+              <span>{formatCurrency(order.total ?? 0)}</span>
+            </div>
+          </>
+        )}
+      </section>
+
+      <Separator />
+
+      {/* Danger zone */}
+      <div className="flex flex-wrap gap-2">
         <form action={cancelOrder}>
           <Button size="sm" type="submit" variant="outline">
             Cancel Order
@@ -132,67 +263,11 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         </form>
         <form action={deleteOrder}>
           <Button size="sm" type="submit" variant="destructive">
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
             Delete
           </Button>
         </form>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Order Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div>Delivery: {formatDeliveryDate(order.delivery_date)}</div>
-          <div>Status: {order.status}</div>
-          <div>Items: {order.item_count ?? 0}</div>
-          <div>Total: {formatCurrency(order.total ?? 0)}</div>
-          <div>Submitted: {order.submitted_at ? new Date(order.submitted_at).toLocaleString() : '—'}</div>
-          <div>Delivered: {order.delivered_at ? new Date(order.delivered_at).toLocaleString() : '—'}</div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Customer</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div>{customer?.business_name || customer?.contact_name || order.customer_id || 'Unknown customer'}</div>
-          <div className="text-muted-foreground">{customer?.email ?? 'No email'}</div>
-          <div className="text-muted-foreground">{customer?.phone ?? 'No phone'}</div>
-          <Link className="underline" href={order.customer_id ? `/admin/customers/${order.customer_id}` : '/admin/customers'}>
-            Open customer
-          </Link>
-        </CardContent>
-      </Card>
-
-      <OrderStatusForm orderId={order.id} initialStatus={orderStatus} />
-      <OrderLinkActions orderId={order.id} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Order Items</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {(items ?? []).map((item) => {
-            const product = item.product_id ? productById.get(item.product_id) : null
-            const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
-
-            return (
-              <div key={item.id} className="rounded-md border p-3 text-sm">
-                <div className="font-medium">{product?.title ?? pallet?.title ?? 'Unknown item'}</div>
-                <div className="text-xs text-muted-foreground">
-                  {product?.pack_details ?? pallet?.description ?? ''}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Qty {item.quantity} • {formatCurrency(item.unit_price)} each • {formatCurrency(item.line_total ?? 0)}
-                </div>
-              </div>
-            )
-          })}
-
-          {(items ?? []).length === 0 && <p className="text-sm text-muted-foreground">No line items.</p>}
-        </CardContent>
-      </Card>
     </div>
   )
 }

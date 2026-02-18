@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx next lint:*)",
+      "Bash(npx --no-install next lint:*)",
+      "Bash(node_modules.binnext lint:*)",
+      "Bash(npm install)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(npx shadcn@latest add:*)"
+    ]
+  }
+}

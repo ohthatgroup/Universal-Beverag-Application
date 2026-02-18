@@ -29,9 +29,8 @@ export default async function CustomerOrdersPage() {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-2xl font-semibold">Universal Beverages</h1>
-      <p className="text-sm text-muted-foreground">Orders</p>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">Orders</h1>
       <OrdersList
         currentOrders={currentOrders}
         pastOrders={pastOrders}

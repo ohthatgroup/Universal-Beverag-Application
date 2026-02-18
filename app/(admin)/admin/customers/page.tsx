@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -108,9 +108,7 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
     const email = String(formData.get('email') ?? '')
       .trim()
       .toLowerCase()
-    const contactName = String(formData.get('contact_name') ?? '').trim()
     const businessName = String(formData.get('business_name') ?? '').trim()
-    const phone = String(formData.get('phone') ?? '').trim()
 
     if (!emailRegex.test(email)) {
       throw new Error('A valid email is required')
@@ -123,7 +121,6 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
       const { error: updateUserError } = await adminClient.auth.admin.updateUserById(userId, {
         email_confirm: true,
         user_metadata: {
-          full_name: contactName || undefined,
           role: 'customer',
         },
       })
@@ -137,7 +134,6 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
         password: randomPassword(),
         email_confirm: true,
         user_metadata: {
-          full_name: contactName || undefined,
           role: 'customer',
         },
       })
@@ -168,9 +164,9 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
         id: userId,
         role: 'customer',
         business_name: businessName || null,
-        contact_name: contactName || null,
+        contact_name: null,
         email,
-        phone: phone || null,
+        phone: null,
         show_prices: true,
         custom_pricing: false,
         default_group: 'brand',
@@ -186,76 +182,108 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
   }
 
   return (
-    <div className="space-y-4 p-4 pb-20">
-      <h1 className="text-2xl font-semibold">Customers</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Customers</h1>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create Customer</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={createCustomer} className="grid gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="customer-email">Email</Label>
-              <Input id="customer-email" name="email" type="email" required />
-            </div>
+      {/* Simplified create — business name + email */}
+      <details className="group rounded-lg border">
+        <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
+          <Plus className="h-4 w-4" />
+          New Customer
+        </summary>
+        <div className="border-t p-4">
+          <form action={createCustomer} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="customer-business-name">Business Name</Label>
-              <Input id="customer-business-name" name="business_name" />
+              <Input id="customer-business-name" name="business_name" placeholder="Acme Beverages" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="customer-contact-name">Contact Name</Label>
-              <Input id="customer-contact-name" name="contact_name" />
+              <Label htmlFor="customer-email">Email</Label>
+              <Input id="customer-email" name="email" type="email" required placeholder="owner@acme.com" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-phone">Phone</Label>
-              <Input id="customer-phone" name="phone" />
-            </div>
-            <Button type="submit">Create Customer</Button>
+            <Button type="submit">Create</Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </details>
 
-      <Card>
-        <CardContent className="pt-4">
-          <form method="GET" className="flex gap-2">
-            <Input name="q" placeholder="Search customers..." defaultValue={searchQuery} />
-            <Button type="submit">Search</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {/* Search — no Card wrapper */}
+      <form method="GET" className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input name="q" placeholder="Search customers..." defaultValue={searchQuery} className="pl-9" />
+        </div>
+        <Button type="submit">Search</Button>
+      </form>
 
-      <div className="space-y-3">
-        {customers.map((customer) => {
-          const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
-          return (
-            <Card key={customer.id}>
-              <CardContent className="space-y-2 pt-4 text-sm">
-                <div className="font-medium">{customer.business_name || customer.contact_name || customer.id}</div>
-                <div className="text-xs text-muted-foreground">Phone: {customer.phone ?? 'No phone'}</div>
-                <div className="text-xs text-muted-foreground">{customer.email ?? 'No email'}</div>
-                <div className="text-xs text-muted-foreground">
-                  Last order: {lastOrderDate ? formatDeliveryDate(lastOrderDate) : 'No orders yet'}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  show_prices={String(customer.show_prices)} • custom_pricing={String(customer.custom_pricing)} •
-                  default_group={customer.default_group}
-                </div>
-                <div className="flex gap-3">
-                  <Link className="text-xs underline" href={`/admin/customers/${customer.id}`}>
-                    Details
-                  </Link>
-                  <Link className="text-xs underline" href={`/admin/customers/${customer.id}/products`}>
-                    Products
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+      {/* Customer list */}
+      {customers.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No customers found.</p>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <div className="space-y-0 md:hidden">
+            {customers.map((customer) => {
+              const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
+              return (
+                <Link
+                  key={customer.id}
+                  href={`/admin/customers/${customer.id}`}
+                  className="flex items-center justify-between border-b py-3 last:border-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm truncate">
+                      {customer.business_name || customer.contact_name || customer.email || customer.id}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {customer.email ?? 'No email'}
+                      {customer.phone && ` · ${customer.phone}`}
+                    </div>
+                  </div>
+                  <div className="ml-3 text-xs text-muted-foreground whitespace-nowrap">
+                    {lastOrderDate ? formatDeliveryDate(lastOrderDate) : 'No orders'}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
 
-        {customers.length === 0 && <p className="text-sm text-muted-foreground">No customers available.</p>}
-      </div>
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-lg border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-3 text-left font-medium">Business Name</th>
+                  <th className="px-4 py-3 text-left font-medium">Email</th>
+                  <th className="px-4 py-3 text-left font-medium">Phone</th>
+                  <th className="px-4 py-3 text-left font-medium">Last Order</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.map((customer) => {
+                  const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
+                  return (
+                    <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <Link href={`/admin/customers/${customer.id}`} className="font-medium hover:underline">
+                          {customer.business_name || customer.contact_name || customer.email || customer.id}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{customer.email ?? '—'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{customer.phone ?? '—'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {lastOrderDate ? formatDeliveryDate(lastOrderDate) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

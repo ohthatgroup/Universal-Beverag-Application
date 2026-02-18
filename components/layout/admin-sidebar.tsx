@@ -6,19 +6,24 @@ import { LayoutDashboard, Package, Users, ShoppingBag, BarChart3 } from 'lucide-
 import { cn } from '@/lib/utils'
 
 const links = [
-  { href: '/admin/dashboard', label: 'Home', icon: LayoutDashboard },
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/orders', label: 'Orders', icon: Package },
-  { href: '/admin/customers', label: 'Cust', icon: Users },
+  { href: '/admin/customers', label: 'Customers', icon: Users },
   { href: '/admin/catalog', label: 'Catalog', icon: ShoppingBag },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
 ]
 
-export function AdminNav() {
+export function AdminSidebar() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur md:hidden">
-      <div className="mx-auto grid h-16 w-full grid-cols-5 gap-1 px-2">
+    <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 border-r bg-background">
+      <div className="flex h-14 items-center border-b px-6">
+        <Link href="/admin/dashboard" className="text-lg font-semibold">
+          Universal Beverages
+        </Link>
+      </div>
+      <nav className="flex-1 space-y-1 px-3 py-4">
         {links.map((link) => {
           const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
           return (
@@ -26,16 +31,16 @@ export function AdminNav() {
               key={link.href}
               href={link.href}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground transition-colors',
-                isActive && 'text-foreground'
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+                isActive && 'bg-accent text-foreground'
               )}
             >
-              <link.icon className="h-5 w-5" />
+              <link.icon className="h-4 w-4" />
               {link.label}
             </Link>
           )
         })}
-      </div>
-    </nav>
+      </nav>
+    </aside>
   )
 }
