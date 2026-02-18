@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { CustomerMagicLinkGenerator } from '@/components/admin/customer-magic-link-generator'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -164,6 +165,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           )}
         </CardContent>
       </Card>
+
+      <CustomerMagicLinkGenerator customerId={customer.id} customerEmail={customer.email} />
     </div>
   )
 }
