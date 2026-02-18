@@ -1,9 +1,11 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import { createClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
 
@@ -48,6 +50,63 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   const productById = new Map((products ?? []).map((product) => [product.id, product] as const))
   const palletById = new Map((pallets ?? []).map((pallet) => [pallet.id, pallet] as const))
   const orderStatus = asOrderStatus(order.status)
+  const orderId = order.id
+  const submittedAt = order.submitted_at
+
+  async function markDelivered() {
+    'use server'
+
+    await requirePageAuth(['salesman'])
+    const supabase = await createClient()
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        status: 'delivered',
+        delivered_at: new Date().toISOString(),
+        submitted_at: submittedAt ?? new Date().toISOString(),
+      })
+      .eq('id', orderId)
+
+    if (updateError) {
+      throw updateError
+    }
+
+    redirect(`/admin/orders/${orderId}`)
+  }
+
+  async function cancelOrder() {
+    'use server'
+
+    await requirePageAuth(['salesman'])
+    const supabase = await createClient()
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        status: 'draft',
+        delivered_at: null,
+      })
+      .eq('id', orderId)
+
+    if (updateError) {
+      throw updateError
+    }
+
+    redirect(`/admin/orders/${orderId}`)
+  }
+
+  async function deleteOrder() {
+    'use server'
+
+    await requirePageAuth(['salesman'])
+    const supabase = await createClient()
+    const { error: deleteError } = await supabase.from('orders').delete().eq('id', orderId)
+
+    if (deleteError) {
+      throw deleteError
+    }
+
+    redirect('/admin/orders')
+  }
 
   return (
     <div className="space-y-4 p-4 pb-20">
@@ -56,6 +115,26 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <a className="text-sm underline" href={`/api/orders/${order.id}/csv`}>
           Download CSV
         </a>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {order.status === 'submitted' && (
+          <form action={markDelivered}>
+            <Button size="sm" type="submit">
+              Mark Delivered
+            </Button>
+          </form>
+        )}
+        <form action={cancelOrder}>
+          <Button size="sm" type="submit" variant="outline">
+            Cancel Order
+          </Button>
+        </form>
+        <form action={deleteOrder}>
+          <Button size="sm" type="submit" variant="destructive">
+            Delete
+          </Button>
+        </form>
       </div>
 
       <Card>

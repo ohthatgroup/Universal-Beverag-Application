@@ -2,25 +2,40 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { formatDeliveryDate, todayISODate } from '@/lib/utils'
+import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
 interface DateSelectorCardProps {
   initialDate?: string
-  draftDates: string[]
+  drafts: Array<{
+    deliveryDate: string
+    itemCount: number
+  }>
 }
 
-export function DateSelectorCard({ initialDate, draftDates }: DateSelectorCardProps) {
+type ActionType = 'new' | 'continue'
+
+export function DateSelectorCard({ initialDate, drafts }: DateSelectorCardProps) {
   const router = useRouter()
   const [date, setDate] = useState(initialDate ?? todayISODate())
+  const [isDialogOpen, setIsDialogOpen] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [actionType, setActionType] = useState<ActionType>('new')
   const [error, setError] = useState<string | null>(null)
 
-  const hasDraft = draftDates.includes(date)
+  const draftForDate = drafts.find((draft) => draft.deliveryDate === date)
 
-  const openOrder = async () => {
+  const openOrder = async (action: ActionType) => {
+    setActionType(action)
     setIsSubmitting(true)
     setError(null)
 
@@ -48,8 +63,17 @@ export function DateSelectorCard({ initialDate, draftDates }: DateSelectorCardPr
     const deliveryDate =
       payload && 'data' in payload ? payload.data?.order?.delivery_date ?? date : date
 
+    setIsDialogOpen(false)
     router.push(orderId ? `/order/link/${orderId}` : `/order/${deliveryDate}`)
     router.refresh()
+  }
+
+  const moveDate = (direction: -1 | 1) => {
+    const nextDate = addDays(date, direction)
+    if (nextDate < todayISODate()) {
+      return
+    }
+    setDate(nextDate)
   }
 
   return (
@@ -58,21 +82,63 @@ export function DateSelectorCard({ initialDate, draftDates }: DateSelectorCardPr
         <CardTitle>Select Delivery Date</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Input
-          type="date"
-          value={date}
-          min={todayISODate()}
-          onChange={(event) => setDate(event.target.value)}
-        />
-
         <div className="text-sm text-muted-foreground">Selected: {formatDeliveryDate(date)}</div>
 
-        <Button className="w-full" onClick={openOrder} disabled={isSubmitting}>
-          {isSubmitting ? 'Opening...' : hasDraft ? 'Continue Order' : 'New Order'}
+        <Button className="w-full" onClick={() => setIsDialogOpen(true)} disabled={isSubmitting}>
+          {isSubmitting ? 'Opening...' : 'Select Date'}
         </Button>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Select Date</DialogTitle>
+            <DialogDescription>Choose a delivery date to create or continue an order.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => moveDate(-1)}>
+                Prev
+              </Button>
+              <div className="text-sm font-medium">{formatDeliveryDate(date)}</div>
+              <Button type="button" variant="outline" size="sm" onClick={() => moveDate(1)}>
+                Next
+              </Button>
+            </div>
+
+            <Input
+              type="date"
+              value={date}
+              min={todayISODate()}
+              onChange={(event) => setDate(event.target.value)}
+            />
+
+            <Button
+              className="w-full"
+              onClick={() => openOrder('new')}
+              disabled={isSubmitting}
+            >
+              {isSubmitting && actionType === 'new' ? 'Opening...' : '+ New Order'}
+            </Button>
+
+            {draftForDate && (
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={() => openOrder('continue')}
+                disabled={isSubmitting}
+              >
+                {isSubmitting && actionType === 'continue'
+                  ? 'Opening...'
+                  : `Continue Order (${draftForDate.itemCount} items)`}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

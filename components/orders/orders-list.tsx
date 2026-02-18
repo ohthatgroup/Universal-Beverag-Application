@@ -4,10 +4,17 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { Order, OrderStatus } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate, getStatusLabel } from '@/lib/utils'
+import { addDays, formatCurrency, formatDeliveryDate, getStatusLabel, todayISODate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
 interface OrdersListProps {
@@ -31,20 +38,34 @@ function statusVariant(status: OrderStatus): 'default' | 'secondary' | 'outline'
 
 export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersListProps) {
   const router = useRouter()
-  const [reorderDate, setReorderDate] = useState('')
+  const [reorderDate, setReorderDate] = useState(addDays(todayISODate(), 1))
+  const [selectedReorderOrderId, setSelectedReorderOrderId] = useState<string | null>(null)
+  const [isReorderDialogOpen, setIsReorderDialogOpen] = useState(false)
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const cloneOrder = async (orderId: string) => {
+  const openReorderDialog = (orderId: string) => {
+    setError(null)
+    setSelectedReorderOrderId(orderId)
+    setReorderDate(addDays(todayISODate(), 1))
+    setIsReorderDialogOpen(true)
+  }
+
+  const cloneOrder = async () => {
+    if (!selectedReorderOrderId) {
+      setError('Choose an order to reorder')
+      return
+    }
+
     if (!reorderDate) {
       setError('Choose a reorder delivery date first')
       return
     }
 
     setError(null)
-    setReorderingOrderId(orderId)
+    setReorderingOrderId(selectedReorderOrderId)
 
-    const response = await fetch(`/api/orders/${orderId}/clone`, {
+    const response = await fetch(`/api/orders/${selectedReorderOrderId}/clone`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,6 +89,8 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
     const deliveryDate =
       payload && 'data' in payload ? payload.data?.order?.delivery_date ?? reorderDate : reorderDate
 
+    setIsReorderDialogOpen(false)
+    setSelectedReorderOrderId(null)
     router.push(clonedOrderId ? `/order/link/${clonedOrderId}` : `/order/${deliveryDate}`)
     router.refresh()
   }
@@ -97,22 +120,17 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
               <div className="flex flex-wrap gap-2">
                 {order.status === 'draft' && (
                   <Button asChild size="sm">
-                    <Link href={`/order/link/${order.id}`}>Continue</Link>
+                    <Link href={`/order/link/${order.id}`}>Edit</Link>
                   </Button>
                 )}
 
                 <Button asChild size="sm" variant="outline">
-                  <a href={`/api/orders/${order.id}/csv`}>Download CSV</a>
+                  <a href={`/api/orders/${order.id}/csv`}>CSV</a>
                 </Button>
 
                 {order.status !== 'draft' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => cloneOrder(order.id)}
-                    disabled={reorderingOrderId === order.id}
-                  >
-                    {reorderingOrderId === order.id ? 'Reordering...' : 'Reorder'}
+                  <Button size="sm" variant="secondary" onClick={() => openReorderDialog(order.id)}>
+                    Reorder
                   </Button>
                 )}
               </div>
@@ -125,21 +143,6 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2 rounded-md border p-3">
-        <label className="text-sm font-medium" htmlFor="reorder-date">
-          Reorder delivery date
-        </label>
-        <Input
-          id="reorder-date"
-          type="date"
-          value={reorderDate}
-          onChange={(event) => setReorderDate(event.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Applies when you tap Reorder on a submitted or delivered order.
-        </p>
-      </div>
-
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <section className="space-y-2">
@@ -151,6 +154,37 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
         <h2 className="text-lg font-semibold">Past Orders</h2>
         {renderOrders(pastOrders, 'No order history yet.')}
       </section>
+
+      <Dialog open={isReorderDialogOpen} onOpenChange={setIsReorderDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reorder For...</DialogTitle>
+            <DialogDescription>Pick a delivery date and clone this order into a new draft.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <Input
+              id="reorder-date"
+              type="date"
+              min={todayISODate()}
+              value={reorderDate}
+              onChange={(event) => setReorderDate(event.target.value)}
+            />
+            <Button
+              className="w-full"
+              onClick={cloneOrder}
+              disabled={
+                !selectedReorderOrderId ||
+                (selectedReorderOrderId !== null && reorderingOrderId === selectedReorderOrderId)
+              }
+            >
+              {selectedReorderOrderId !== null && reorderingOrderId === selectedReorderOrderId
+                ? 'Cloning...'
+                : 'Clone Order'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

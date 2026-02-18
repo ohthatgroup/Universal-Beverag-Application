@@ -17,9 +17,15 @@ export default async function CustomerHome() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-2xl font-semibold">Welcome back</h1>
+      <h1 className="text-2xl font-semibold">Universal Beverages</h1>
+      <p className="text-sm text-muted-foreground">Welcome back</p>
 
-      <DateSelectorCard draftDates={(drafts ?? []).map((order) => order.delivery_date)} />
+      <DateSelectorCard
+        drafts={(drafts ?? []).map((order) => ({
+          deliveryDate: order.delivery_date,
+          itemCount: order.item_count ?? 0,
+        }))}
+      />
 
       <Card>
         <CardHeader>

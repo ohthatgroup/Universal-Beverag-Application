@@ -4,28 +4,48 @@ import { findOrderId, getOrderStatus, getUserIdByEmail } from './helpers/supabas
 
 test.describe.configure({ mode: 'serial' })
 
-const deliveryDate = futureDate(21)
+const draftDate = futureDate(21)
+const submittedDate = futureDate(22)
 
-test('customer creates and submits an order', async ({ page }) => {
+test('customer creates draft through unique order link', async ({ page }) => {
   const customer = credentials('customerA')
 
   await loginWithPassword(page, customer.email, customer.password, '/')
-  await expect(page.getByText('Welcome back')).toBeVisible()
+  await expect(page.getByText('Universal Beverages')).toBeVisible()
 
-  const dateInput = page.locator('input[type="date"]').first()
-  await dateInput.fill(deliveryDate)
-  await page.getByRole('button', { name: /New Order|Continue Order/i }).click()
+  await page.getByRole('button', { name: 'Select Date' }).click()
+  await page.locator('input[type="date"]').first().fill(draftDate)
+  await page.getByRole('button', { name: '+ New Order' }).click()
 
-  await expect(page).toHaveURL(new RegExp(`/order/${deliveryDate}$`))
+  await expect(page).toHaveURL(/\/order\/link\/[0-9a-f-]+$/i)
 
   await page.getByRole('button', { name: '+' }).first().click()
+  await page.getByRole('button', { name: /Review Order/i }).click()
   await expect(page.getByRole('button', { name: 'Submit Order' })).toBeEnabled()
+})
+
+test('customer submits and sees submitted order in read-only deep link', async ({ page }) => {
+  const customer = credentials('customerA')
+
+  await loginWithPassword(page, customer.email, customer.password, '/')
+  await page.getByRole('button', { name: 'Select Date' }).click()
+  await page.locator('input[type="date"]').first().fill(submittedDate)
+  await page.getByRole('button', { name: '+ New Order' }).click()
+  await expect(page).toHaveURL(/\/order\/link\/[0-9a-f-]+$/i)
+
+  await page.getByRole('button', { name: '+' }).first().click()
+  await page.getByRole('button', { name: /Review Order/i }).click()
   await page.getByRole('button', { name: 'Submit Order' }).click()
 
   await expect(page).toHaveURL(/\/orders$/)
+
   const customerId = await getUserIdByEmail(customer.email)
-  const orderId = await findOrderId(customerId, deliveryDate)
+  const orderId = await findOrderId(customerId, submittedDate)
   await expect.poll(async () => getOrderStatus(orderId)).toBe('submitted')
+
+  await page.goto(`/order/link/${orderId}`)
+  await expect(page.getByRole('heading', { name: 'Order Details' })).toBeVisible()
+  await expect(page.getByText(/submitted/i)).toBeVisible()
 })
 
 test('salesman updates submitted order to delivered', async ({ page }) => {
@@ -36,7 +56,7 @@ test('salesman updates submitted order to delivered', async ({ page }) => {
   await expect(page).toHaveURL(/\/admin\/dashboard/)
 
   const customerId = await getUserIdByEmail(customer.email)
-  const orderId = await findOrderId(customerId, deliveryDate)
+  const orderId = await findOrderId(customerId, submittedDate)
 
   await page.goto(`/admin/orders/${orderId}`)
   await expect(page.getByText('Order Detail')).toBeVisible()

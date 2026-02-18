@@ -48,6 +48,11 @@ export function useCatalog({
 
   // Step 2: Apply search + dropdowns
   const filtered = useMemo<CatalogProduct[]>(() => {
+    if (activeTab === 'new') {
+      // "New Items" is intentionally curated without additional filter controls.
+      return tabFiltered
+    }
+
     return tabFiltered.filter((product) => {
       if (filters.brandId && product.brand_id !== filters.brandId) return false
 
@@ -69,7 +74,7 @@ export function useCatalog({
 
       return true
     })
-  }, [tabFiltered, filters.brandId, filters.sizeFilter, filters.searchQuery])
+  }, [tabFiltered, filters.brandId, filters.sizeFilter, filters.searchQuery, activeTab])
 
   // Step 3: Group the filtered products
   const grouped = useMemo<CatalogGroup[]>(() => {

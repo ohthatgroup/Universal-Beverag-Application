@@ -8,10 +8,17 @@ import { Label } from '@/components/ui/label'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import type { Database } from '@/lib/types'
+import { formatDeliveryDate } from '@/lib/utils'
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 type AdminClient = SupabaseClient<Database>
+
+interface CustomersPageProps {
+  searchParams?: Promise<{
+    q?: string
+  }>
+}
 
 function randomPassword(): string {
   return `Temp-${Math.random().toString(36).slice(2)}-A1!`
@@ -41,18 +48,57 @@ async function findUserIdByEmail(adminClient: AdminClient, email: string): Promi
   }
 }
 
-export default async function CustomersPage() {
+export default async function CustomersPage({ searchParams }: CustomersPageProps) {
   const context = await requirePageAuth(['salesman'])
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const searchQuery = (resolvedSearchParams?.q ?? '').trim()
+  const searchTerm = searchQuery.toLowerCase()
 
-  const { data: customers, error } = await context.supabase
-    .from('profiles')
-    .select('id,business_name,contact_name,email,phone,show_prices,custom_pricing,default_group')
-    .eq('role', 'customer')
-    .order('business_name', { ascending: true })
+  const [customersResponse, ordersResponse] = await Promise.all([
+    context.supabase
+      .from('profiles')
+      .select('id,business_name,contact_name,email,phone,show_prices,custom_pricing,default_group')
+      .eq('role', 'customer')
+      .order('business_name', { ascending: true }),
+    context.supabase
+      .from('orders')
+      .select('customer_id,delivery_date')
+      .order('delivery_date', { ascending: false })
+      .limit(2000),
+  ])
 
-  if (error) {
-    throw error
+  if (customersResponse.error) {
+    throw customersResponse.error
   }
+
+  if (ordersResponse.error) {
+    throw ordersResponse.error
+  }
+
+  const lastOrderByCustomer = new Map<string, string>()
+  for (const order of ordersResponse.data ?? []) {
+    if (!order.customer_id || lastOrderByCustomer.has(order.customer_id)) {
+      continue
+    }
+    lastOrderByCustomer.set(order.customer_id, order.delivery_date)
+  }
+
+  const customers = (customersResponse.data ?? []).filter((customer) => {
+    if (!searchTerm) {
+      return true
+    }
+
+    const haystack = [
+      customer.business_name ?? '',
+      customer.contact_name ?? '',
+      customer.email ?? '',
+      customer.phone ?? '',
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    return haystack.includes(searchTerm)
+  })
 
   async function createCustomer(formData: FormData) {
     'use server'
@@ -170,32 +216,45 @@ export default async function CustomersPage() {
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
-        {(customers ?? []).map((customer) => (
-          <Card key={customer.id}>
-            <CardContent className="space-y-2 pt-4 text-sm">
-              <div className="font-medium">{customer.business_name || customer.contact_name || customer.id}</div>
-              <div className="text-xs text-muted-foreground">{customer.email ?? 'No email'}</div>
-              <div className="text-xs text-muted-foreground">{customer.phone ?? 'No phone'}</div>
-              <div className="text-xs text-muted-foreground">
-                show_prices={String(customer.show_prices)} • custom_pricing={String(customer.custom_pricing)} •
-                default_group={customer.default_group}
-              </div>
-              <div className="flex gap-3">
-                <Link className="text-xs underline" href={`/admin/customers/${customer.id}`}>
-                  Details
-                </Link>
-                <Link className="text-xs underline" href={`/admin/customers/${customer.id}/products`}>
-                  Products
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <Card>
+        <CardContent className="pt-4">
+          <form method="GET" className="flex gap-2">
+            <Input name="q" placeholder="Search customers..." defaultValue={searchQuery} />
+            <Button type="submit">Search</Button>
+          </form>
+        </CardContent>
+      </Card>
 
-        {(customers ?? []).length === 0 && (
-          <p className="text-sm text-muted-foreground">No customers available.</p>
-        )}
+      <div className="space-y-3">
+        {customers.map((customer) => {
+          const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
+          return (
+            <Card key={customer.id}>
+              <CardContent className="space-y-2 pt-4 text-sm">
+                <div className="font-medium">{customer.business_name || customer.contact_name || customer.id}</div>
+                <div className="text-xs text-muted-foreground">Phone: {customer.phone ?? 'No phone'}</div>
+                <div className="text-xs text-muted-foreground">{customer.email ?? 'No email'}</div>
+                <div className="text-xs text-muted-foreground">
+                  Last order: {lastOrderDate ? formatDeliveryDate(lastOrderDate) : 'No orders yet'}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  show_prices={String(customer.show_prices)} • custom_pricing={String(customer.custom_pricing)} •
+                  default_group={customer.default_group}
+                </div>
+                <div className="flex gap-3">
+                  <Link className="text-xs underline" href={`/admin/customers/${customer.id}`}>
+                    Details
+                  </Link>
+                  <Link className="text-xs underline" href={`/admin/customers/${customer.id}/products`}>
+                    Products
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+
+        {customers.length === 0 && <p className="text-sm text-muted-foreground">No customers available.</p>}
       </div>
     </div>
   )

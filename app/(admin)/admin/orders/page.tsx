@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { requirePageAuth } from '@/lib/server/page-auth'
@@ -13,15 +13,40 @@ import { formatCurrency, formatDeliveryDate, getStatusVariant, todayISODate } fr
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
 
-export default async function AdminOrdersPage() {
+interface AdminOrdersPageProps {
+  searchParams?: Promise<{
+    q?: string
+    status?: string
+    deliveryDate?: string
+  }>
+}
+
+function normalizeStatus(value: string | undefined): OrderStatus | 'all' {
+  if (value === 'draft' || value === 'submitted' || value === 'delivered') {
+    return value
+  }
+  return 'all'
+}
+
+export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageProps) {
   const context = await requirePageAuth(['salesman'])
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+
+  const searchQuery = (resolvedSearchParams?.q ?? '').trim()
+  const searchTerm = searchQuery.toLowerCase()
+  const selectedStatus = normalizeStatus(resolvedSearchParams?.status)
+  const selectedDeliveryDate =
+    resolvedSearchParams?.deliveryDate && isoDateRegex.test(resolvedSearchParams.deliveryDate)
+      ? resolvedSearchParams.deliveryDate
+      : ''
 
   const [ordersResponse, customersResponse] = await Promise.all([
     context.supabase
       .from('orders')
       .select('*')
       .order('delivery_date', { ascending: false })
-      .limit(100),
+      .order('created_at', { ascending: false })
+      .limit(200),
     context.supabase
       .from('profiles')
       .select('id,business_name,contact_name,email')
@@ -43,6 +68,40 @@ export default async function AdminOrdersPage() {
       customer.id,
       customer.business_name || customer.contact_name || customer.email || customer.id,
     ])
+  )
+
+  const filteredOrders = (ordersResponse.data ?? []).filter((order) => {
+    if (selectedStatus !== 'all' && order.status !== selectedStatus) {
+      return false
+    }
+
+    if (selectedDeliveryDate && order.delivery_date !== selectedDeliveryDate) {
+      return false
+    }
+
+    if (searchTerm) {
+      const customerLabel = ((order.customer_id ? customerById.get(order.customer_id) : null) ?? '')
+        .toLowerCase()
+      if (!customerLabel.includes(searchTerm)) {
+        return false
+      }
+    }
+
+    return true
+  })
+
+  const ordersByDate = new Map<string, typeof filteredOrders>()
+  for (const order of filteredOrders) {
+    const bucket = ordersByDate.get(order.delivery_date)
+    if (bucket) {
+      bucket.push(order)
+    } else {
+      ordersByDate.set(order.delivery_date, [order])
+    }
+  }
+
+  const dateGroups = Array.from(ordersByDate.entries()).sort(([left], [right]) =>
+    left < right ? 1 : left > right ? -1 : 0
   )
 
   async function createAdminDraftOrder(formData: FormData) {
@@ -110,6 +169,13 @@ export default async function AdminOrdersPage() {
     redirect(`/admin/orders/${createdOrder.id}`)
   }
 
+  const statusTabs: Array<{ label: string; value: 'all' | OrderStatus }> = [
+    { label: 'All', value: 'all' },
+    { label: 'Submitted', value: 'submitted' },
+    { label: 'Drafts', value: 'draft' },
+    { label: 'Delivered', value: 'delivered' },
+  ]
+
   return (
     <div className="space-y-4 p-4 pb-20">
       <h1 className="text-2xl font-semibold">Orders</h1>
@@ -150,42 +216,73 @@ export default async function AdminOrdersPage() {
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
-        {(ordersResponse.data ?? []).map((order) => (
-          <Card key={order.id}>
-            <CardContent className="space-y-2 pt-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium">{formatDeliveryDate(order.delivery_date)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {(order.customer_id ? customerById.get(order.customer_id) : null) ??
-                      order.customer_id ??
-                      'Unknown customer'}
+      <div className="flex flex-wrap gap-2">
+        {statusTabs.map((tab) => (
+          <Button key={tab.value} asChild size="sm" variant={selectedStatus === tab.value ? 'default' : 'outline'}>
+            <Link
+              href={{
+                pathname: '/admin/orders',
+                query: {
+                  ...(tab.value !== 'all' ? { status: tab.value } : {}),
+                  ...(searchQuery ? { q: searchQuery } : {}),
+                  ...(selectedDeliveryDate ? { deliveryDate: selectedDeliveryDate } : {}),
+                },
+              }}
+            >
+              {tab.label}
+            </Link>
+          </Button>
+        ))}
+      </div>
+
+      <Card>
+        <CardContent className="pt-4">
+          <form method="GET" className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            {selectedStatus !== 'all' && <input type="hidden" name="status" value={selectedStatus} />}
+            <Input name="q" placeholder="Search by customer..." defaultValue={searchQuery} />
+            <Input name="deliveryDate" type="date" defaultValue={selectedDeliveryDate} />
+            <Button type="submit">Apply</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        {dateGroups.map(([deliveryDate, dateOrders]) => (
+          <section key={deliveryDate} className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground">{formatDeliveryDate(deliveryDate)}</h2>
+            {dateOrders.map((order) => (
+              <Card key={order.id}>
+                <CardContent className="space-y-2 pt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium">
+                        {(order.customer_id ? customerById.get(order.customer_id) : null) ??
+                          order.customer_id ??
+                          'Unknown customer'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {order.item_count ?? 0} items • {formatCurrency(order.total ?? 0)}
+                      </div>
+                    </div>
+                    <Badge variant={getStatusVariant(asOrderStatus(order.status))}>{order.status}</Badge>
                   </div>
-                </div>
-                <Badge variant={getStatusVariant(asOrderStatus(order.status))}>{order.status}</Badge>
-              </div>
 
-              <div className="text-sm text-muted-foreground">
-                {order.item_count ?? 0} items • {formatCurrency(order.total ?? 0)}
-              </div>
-
-              <div className="flex gap-2 text-sm">
-                <Link className="underline" href={`/admin/orders/${order.id}`}>
-                  View
-                </Link>
-                <a className="underline" href={`/api/orders/${order.id}/csv`}>
-                  CSV
-                </a>
-              </div>
-              <OrderLinkActions orderId={order.id} />
-            </CardContent>
-          </Card>
+                  <div className="flex gap-2 text-sm">
+                    <Link className="underline" href={`/admin/orders/${order.id}`}>
+                      Open
+                    </Link>
+                    <a className="underline" href={`/api/orders/${order.id}/csv`}>
+                      CSV
+                    </a>
+                  </div>
+                  <OrderLinkActions orderId={order.id} />
+                </CardContent>
+              </Card>
+            ))}
+          </section>
         ))}
 
-        {(ordersResponse.data ?? []).length === 0 && (
-          <p className="text-sm text-muted-foreground">No orders found.</p>
-        )}
+        {dateGroups.length === 0 && <p className="text-sm text-muted-foreground">No orders found.</p>}
       </div>
     </div>
   )

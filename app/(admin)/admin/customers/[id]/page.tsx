@@ -8,21 +8,37 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import { formatCurrency, formatDeliveryDate, todayISODate } from '@/lib/utils'
+
+const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   await requirePageAuth(['salesman'])
   const supabase = await createClient()
 
-  const { data: customer, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .eq('role', 'customer')
-    .maybeSingle()
+  const [{ data: customer, error: customerError }, { data: orderHistory }, { count: excludedCount }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', id)
+      .eq('role', 'customer')
+      .maybeSingle(),
+    supabase
+      .from('orders')
+      .select('id,delivery_date,status,total,item_count,created_at')
+      .eq('customer_id', id)
+      .order('delivery_date', { ascending: false })
+      .limit(20),
+    supabase
+      .from('customer_products')
+      .select('*', { head: true, count: 'exact' })
+      .eq('customer_id', id)
+      .eq('excluded', true),
+  ])
 
-  if (error) {
-    throw error
+  if (customerError) {
+    throw customerError
   }
 
   if (!customer) {
@@ -32,6 +48,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   async function updateCustomer(formData: FormData) {
     'use server'
 
+    await requirePageAuth(['salesman'])
     const supabaseClient = await createClient()
     const showPrices = formData.get('show_prices') === 'on'
     const customPricing = formData.get('custom_pricing') === 'on'
@@ -39,14 +56,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     const { error: updateError } = await supabaseClient
       .from('profiles')
       .update({
-        business_name: (formData.get('business_name') as string) || null,
-        contact_name: (formData.get('contact_name') as string) || null,
-        email: (formData.get('email') as string) || null,
-        phone: (formData.get('phone') as string) || null,
-        address: (formData.get('address') as string) || null,
-        city: (formData.get('city') as string) || null,
-        state: (formData.get('state') as string) || null,
-        zip: (formData.get('zip') as string) || null,
+        business_name: String(formData.get('business_name') ?? '').trim() || null,
+        contact_name: String(formData.get('contact_name') ?? '').trim() || null,
+        email: String(formData.get('email') ?? '').trim() || null,
+        phone: String(formData.get('phone') ?? '').trim() || null,
+        address: String(formData.get('address') ?? '').trim() || null,
+        city: String(formData.get('city') ?? '').trim() || null,
+        state: String(formData.get('state') ?? '').trim() || null,
+        zip: String(formData.get('zip') ?? '').trim() || null,
         show_prices: showPrices,
         custom_pricing: customPricing,
         default_group: (formData.get('default_group') as 'brand' | 'size') || 'brand',
@@ -60,21 +77,81 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     redirect(`/admin/customers/${id}`)
   }
 
-  const { data: orderHistory } = await supabase
-    .from('orders')
-    .select('id,delivery_date,status,total,item_count,created_at')
-    .eq('customer_id', id)
-    .order('delivery_date', { ascending: false })
-    .limit(10)
+  async function createOrderForCustomer(formData: FormData) {
+    'use server'
+
+    await requirePageAuth(['salesman'])
+    const supabaseClient = await createClient()
+
+    const deliveryDate = String(formData.get('delivery_date') ?? '').trim()
+    if (!isoDateRegex.test(deliveryDate)) {
+      throw new Error('Delivery date must use YYYY-MM-DD format')
+    }
+
+    const { data: existingDraft, error: existingDraftError } = await supabaseClient
+      .from('orders')
+      .select('id')
+      .eq('customer_id', id)
+      .eq('delivery_date', deliveryDate)
+      .eq('status', 'draft')
+      .maybeSingle()
+
+    if (existingDraftError) {
+      throw existingDraftError
+    }
+
+    if (existingDraft?.id) {
+      redirect(`/admin/orders/${existingDraft.id}`)
+    }
+
+    const { data: createdOrder, error: createOrderError } = await supabaseClient
+      .from('orders')
+      .insert({
+        customer_id: id,
+        delivery_date: deliveryDate,
+        status: 'draft',
+      })
+      .select('id')
+      .single()
+
+    if (createOrderError || !createdOrder) {
+      throw createOrderError ?? new Error('Unable to create draft order')
+    }
+
+    redirect(`/admin/orders/${createdOrder.id}`)
+  }
 
   return (
     <div className="space-y-4 p-4 pb-20">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Customer Detail</h1>
+        <h1 className="text-xl font-semibold">{customer.business_name || customer.contact_name || 'Customer Detail'}</h1>
         <Link className="text-sm underline" href={`/admin/customers/${id}/products`}>
           Manage Products
         </Link>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div>Phone: {customer.phone ?? 'No phone'}</div>
+          <div>Email: {customer.email ?? 'No email'}</div>
+          <div>Address: {[customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', ') || 'No address'}</div>
+          <div className="flex flex-wrap gap-2">
+            {customer.phone && (
+              <Button asChild size="sm" variant="outline">
+                <a href={`tel:${customer.phone}`}>Call</a>
+              </Button>
+            )}
+            {customer.email && (
+              <Button asChild size="sm" variant="outline">
+                <a href={`mailto:${customer.email}`}>Email</a>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -140,6 +217,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               </select>
             </div>
 
+            <p className="text-xs text-muted-foreground">{excludedCount ?? 0} excluded products</p>
             <Button type="submit">Save customer</Button>
           </form>
         </CardContent>
@@ -147,24 +225,31 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent Orders</CardTitle>
+          <CardTitle className="text-base">Orders</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
+        <CardContent className="space-y-3">
+          <form action={createOrderForCustomer} className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input name="delivery_date" type="date" required defaultValue={todayISODate()} />
+            <Button type="submit">+ New Order for Customer</Button>
+          </form>
+
           {(orderHistory ?? []).map((order) => (
-            <div key={order.id} className="rounded-md border p-3">
-              <div className="font-medium">{order.delivery_date}</div>
-              <div className="text-xs text-muted-foreground">
-                {order.status} • {order.item_count ?? 0} items • ${Number(order.total ?? 0).toFixed(2)}
+            <div key={order.id} className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <div>
+                  <div className="font-medium">{formatDeliveryDate(order.delivery_date)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {order.item_count ?? 0} items • {formatCurrency(order.total ?? 0)} • {order.status}
+                  </div>
+                </div>
+                <Link className="text-xs underline" href={`/admin/orders/${order.id}`}>
+                  Open
+                </Link>
               </div>
-              <Link className="text-xs underline" href={`/admin/orders/${order.id}`}>
-                Open order
-              </Link>
               <OrderLinkActions orderId={order.id} className="mt-2" />
             </div>
           ))}
-          {(orderHistory ?? []).length === 0 && (
-            <p className="text-muted-foreground">No order history yet.</p>
-          )}
+          {(orderHistory ?? []).length === 0 && <p className="text-muted-foreground">No order history yet.</p>}
         </CardContent>
       </Card>
 
