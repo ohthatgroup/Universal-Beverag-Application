@@ -104,8 +104,8 @@ async function main() {
     },
   })
 
-  const inboxEmail = process.env.CI_INBOX_EMAIL ?? 'inbox@ohthatgrp.com'
-  const inboxPassword = process.env.CI_INBOX_PASSWORD ?? process.env.CI_SALESMAN_PASSWORD ?? randomPassword()
+  const inboxEmail = process.env.CI_INBOX_EMAIL || 'inbox@ohthatgrp.com'
+  const inboxPassword = process.env.CI_INBOX_PASSWORD || process.env.CI_SALESMAN_PASSWORD || randomPassword()
 
   const desiredUsers: UserSpec[] = [
     {
