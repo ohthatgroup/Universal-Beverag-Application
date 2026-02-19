@@ -13,7 +13,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'npx next start -H 0.0.0.0',
-    url: `http://127.0.0.1:${PORT}`,
+    url: `http://127.0.0.1:${PORT}/auth/login`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
