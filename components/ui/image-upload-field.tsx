@@ -10,20 +10,21 @@ interface ImageUploadFieldProps {
   folder: string
   defaultValue?: string | null
   compact?: boolean
+  iconOnly?: boolean
 }
 
 /**
  * A wrapper around ImageUpload that stores the URL in a hidden input
  * so it works seamlessly with server action forms.
  */
-export function ImageUploadField({ name, label, folder, defaultValue, compact = false }: ImageUploadFieldProps) {
+export function ImageUploadField({ name, label, folder, defaultValue, compact = false, iconOnly = false }: ImageUploadFieldProps) {
   const [url, setUrl] = useState(defaultValue ?? null)
 
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
       <input type="hidden" name={name} value={url ?? ''} />
-      <ImageUpload value={url} onChange={setUrl} folder={folder} compact={compact} />
+      <ImageUpload value={url} onChange={setUrl} folder={folder} compact={compact} iconOnly={iconOnly} />
     </div>
   )
 }
