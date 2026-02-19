@@ -12,7 +12,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm run start',
+    command: 'npx next start -H 0.0.0.0',
     url: `http://127.0.0.1:${PORT}`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
