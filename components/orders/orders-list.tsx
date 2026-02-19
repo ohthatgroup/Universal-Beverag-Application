@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/alert-dialog'
 
 interface OrdersListProps {
+  token: string
   currentOrders: Order[]
   pastOrders: Order[]
   showPrices: boolean
@@ -40,7 +41,7 @@ function StatusText({ status }: { status: OrderStatus }) {
   )
 }
 
-export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersListProps) {
+export function OrdersList({ token, currentOrders, pastOrders, showPrices }: OrdersListProps) {
   const router = useRouter()
   const [reorderDate, setReorderDate] = useState(addDays(todayISODate(), 1))
   const [selectedReorderOrderId, setSelectedReorderOrderId] = useState<string | null>(null)
@@ -50,6 +51,11 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null)
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const portalHeaders = {
+    'Content-Type': 'application/json',
+    'X-Customer-Token': token,
+  }
 
   const shiftDate = (days: number) => {
     setReorderDate((prev) => addDays(prev, days))
@@ -66,9 +72,9 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
     setCancellingOrderId(orderId)
     setError(null)
     try {
-      const response = await fetch(`/api/orders/${orderId}/status`, {
+      const response = await fetch(`/api/portal/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: portalHeaders,
         body: JSON.stringify({ status: 'draft' }),
       })
       if (!response.ok) {
@@ -87,8 +93,9 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
     setDeletingOrderId(deleteOrderId)
     setError(null)
     try {
-      const response = await fetch(`/api/orders/${deleteOrderId}`, {
+      const response = await fetch(`/api/portal/orders/${deleteOrderId}`, {
         method: 'DELETE',
+        headers: { 'X-Customer-Token': token },
       })
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
@@ -112,9 +119,9 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
     setError(null)
     setReorderingOrderId(selectedReorderOrderId)
 
-    const response = await fetch(`/api/orders/${selectedReorderOrderId}/clone`, {
+    const response = await fetch(`/api/portal/orders/${selectedReorderOrderId}/clone`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: portalHeaders,
       body: JSON.stringify({ deliveryDate: reorderDate }),
     })
 
@@ -136,7 +143,7 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
 
     setIsReorderDialogOpen(false)
     setSelectedReorderOrderId(null)
-    router.push(clonedOrderId ? `/order/link/${clonedOrderId}` : `/order/${deliveryDate}`)
+    router.push(clonedOrderId ? `/c/${token}/order/link/${clonedOrderId}` : `/c/${token}/order/${deliveryDate}`)
     router.refresh()
   }
 
@@ -156,7 +163,7 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
       <div className="mt-3 flex flex-wrap gap-2">
         {order.status === 'draft' && (
           <Button asChild size="sm" variant="outline">
-            <Link href={`/order/link/${order.id}`}>
+            <Link href={`/c/${token}/order/link/${order.id}`}>
               <Pencil className="mr-1.5 h-3.5 w-3.5" />
               Edit
             </Link>
@@ -164,7 +171,7 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
         )}
 
         <Button asChild size="sm" variant="outline">
-          <a href={`/api/orders/${order.id}/csv`}>
+          <a href={`/api/portal/orders/${order.id}/csv?token=${token}`}>
             <Download className="mr-1.5 h-3.5 w-3.5" />
             CSV
           </a>
@@ -236,14 +243,14 @@ export function OrdersList({ currentOrders, pastOrders, showPrices }: OrdersList
                 <div className="flex items-center justify-end gap-1">
                   {order.status === 'draft' && (
                     <Button asChild size="sm" variant="ghost">
-                      <Link href={`/order/link/${order.id}`}>
+                      <Link href={`/c/${token}/order/link/${order.id}`}>
                         <Pencil className="mr-1.5 h-3.5 w-3.5" />
                         Edit
                       </Link>
                     </Button>
                   )}
                   <Button asChild size="sm" variant="ghost">
-                    <a href={`/api/orders/${order.id}/csv`}>
+                    <a href={`/api/portal/orders/${order.id}/csv?token=${token}`}>
                       <Download className="h-3.5 w-3.5" />
                     </a>
                   </Button>

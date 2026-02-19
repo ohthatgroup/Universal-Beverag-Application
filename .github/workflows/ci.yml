@@ -57,9 +57,7 @@ jobs:
       CI_SALESMAN_EMAIL: ${{ secrets.CI_SALESMAN_EMAIL }}
       CI_SALESMAN_PASSWORD: ${{ secrets.CI_SALESMAN_PASSWORD }}
       CI_CUSTOMER_A_EMAIL: ${{ secrets.CI_CUSTOMER_A_EMAIL }}
-      CI_CUSTOMER_A_PASSWORD: ${{ secrets.CI_CUSTOMER_A_PASSWORD }}
       CI_CUSTOMER_B_EMAIL: ${{ secrets.CI_CUSTOMER_B_EMAIL }}
-      CI_CUSTOMER_B_PASSWORD: ${{ secrets.CI_CUSTOMER_B_PASSWORD }}
       CI_INBOX_EMAIL: ${{ secrets.CI_INBOX_EMAIL }}
       CI_INBOX_PASSWORD: ${{ secrets.CI_INBOX_PASSWORD }}
     steps:
@@ -86,10 +84,6 @@ jobs:
             SUPABASE_SERVICE_ROLE_KEY
             CI_SALESMAN_EMAIL
             CI_SALESMAN_PASSWORD
-            CI_CUSTOMER_A_EMAIL
-            CI_CUSTOMER_A_PASSWORD
-            CI_CUSTOMER_B_EMAIL
-            CI_CUSTOMER_B_PASSWORD
           )
 
           for var_name in "${required_vars[@]}"; do
@@ -126,10 +120,6 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       CI_SALESMAN_EMAIL: ${{ secrets.CI_SALESMAN_EMAIL }}
       CI_SALESMAN_PASSWORD: ${{ secrets.CI_SALESMAN_PASSWORD }}
-      CI_CUSTOMER_A_EMAIL: ${{ secrets.CI_CUSTOMER_A_EMAIL }}
-      CI_CUSTOMER_A_PASSWORD: ${{ secrets.CI_CUSTOMER_A_PASSWORD }}
-      CI_CUSTOMER_B_EMAIL: ${{ secrets.CI_CUSTOMER_B_EMAIL }}
-      CI_CUSTOMER_B_PASSWORD: ${{ secrets.CI_CUSTOMER_B_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -162,10 +152,6 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       CI_SALESMAN_EMAIL: ${{ secrets.CI_SALESMAN_EMAIL }}
       CI_SALESMAN_PASSWORD: ${{ secrets.CI_SALESMAN_PASSWORD }}
-      CI_CUSTOMER_A_EMAIL: ${{ secrets.CI_CUSTOMER_A_EMAIL }}
-      CI_CUSTOMER_A_PASSWORD: ${{ secrets.CI_CUSTOMER_A_PASSWORD }}
-      CI_CUSTOMER_B_EMAIL: ${{ secrets.CI_CUSTOMER_B_EMAIL }}
-      CI_CUSTOMER_B_PASSWORD: ${{ secrets.CI_CUSTOMER_B_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

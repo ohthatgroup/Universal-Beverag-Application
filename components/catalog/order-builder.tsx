@@ -4,9 +4,8 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Package, Search } from 'lucide-react'
-import { useAutoSave } from '@/lib/hooks/useAutoSave'
+import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
 import { useCatalog, type CatalogTab } from '@/lib/hooks/useCatalog'
-import { createClient } from '@/lib/supabase/client'
 import type { CatalogProduct, GroupByOption, PalletDeal } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
@@ -23,6 +22,7 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 
 interface OrderBuilderProps {
+  token: string
   orderId: string
   deliveryDate: string
   products: CatalogProduct[]
@@ -54,6 +54,7 @@ type ReviewItem = {
 }
 
 export function OrderBuilder({
+  token,
   orderId,
   deliveryDate,
   products,
@@ -63,7 +64,6 @@ export function OrderBuilder({
   initialItems,
 }: OrderBuilderProps) {
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
 
   const [activeTab, setActiveTab] = useState<CatalogTab>('all')
   const [isReviewOpen, setIsReviewOpen] = useState(false)
@@ -87,8 +87,9 @@ export function OrderBuilder({
     defaultGroupBy: defaultGroupBy === 'size' ? 'size' : 'brand',
   })
 
-  const { save } = useAutoSave({
+  const { save } = useAutoSavePortal({
     orderId,
+    token,
     onError: (saveError) => {
       setError(saveError.message)
     },
@@ -185,9 +186,20 @@ export function OrderBuilder({
     if (reviewItems.length === 0) return
     setIsResetting(true)
     setError(null)
-    const { error: deleteError } = await supabase.from('order_items').delete().eq('order_id', orderId)
+
+    const response = await fetch(`/api/portal/orders/${orderId}/items/all`, {
+      method: 'DELETE',
+      headers: { 'X-Customer-Token': token },
+    })
+
     setIsResetting(false)
-    if (deleteError) { setError(deleteError.message); return }
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      setError(payload?.error?.message ?? 'Failed to reset order')
+      return
+    }
+
     setQuantities({})
     setStatusMessage('Order reset')
     setTimeout(() => setStatusMessage(null), 1200)
@@ -196,16 +208,19 @@ export function OrderBuilder({
   const submitOrder = async () => {
     setIsSubmitting(true)
     setError(null)
-    const response = await fetch(`/api/orders/${orderId}/status`, {
+    const response = await fetch(`/api/portal/orders/${orderId}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Customer-Token': token,
+      },
       body: JSON.stringify({ status: 'submitted' }),
     })
     const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
     setIsSubmitting(false)
     if (!response.ok) { setError(payload?.error?.message ?? 'Failed to submit order'); return }
     setIsReviewOpen(false)
-    router.push('/orders')
+    router.push(`/c/${token}/orders`)
     router.refresh()
   }
 
@@ -220,7 +235,7 @@ export function OrderBuilder({
       {/* Header */}
       <header className="flex items-center justify-between">
         <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link href="/orders">
+          <Link href={`/c/${token}/orders`}>
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back
           </Link>

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Mail, Phone, Plus } from 'lucide-react'
-import { CustomerMagicLinkGenerator } from '@/components/admin/customer-magic-link-generator'
+import { CustomerPortalLink } from '@/components/admin/customer-portal-link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -352,8 +352,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
       <Separator />
 
-      {/* Magic Link */}
-      <CustomerMagicLinkGenerator customerId={customer.id} customerEmail={customer.email} />
+      {/* Portal Link */}
+      <CustomerPortalLink customerId={customer.id} accessToken={customer.access_token} />
 
       <Separator />
 

@@ -17,13 +17,13 @@ export function credentials(name: 'salesman' | 'customerA' | 'customerB') {
   }
   if (name === 'customerA') {
     return {
-      email: requireEnv('CI_CUSTOMER_A_EMAIL'),
-      password: requireEnv('CI_CUSTOMER_A_PASSWORD'),
+      email: process.env.CI_CUSTOMER_A_EMAIL ?? '',
+      password: process.env.CI_CUSTOMER_A_PASSWORD ?? '',
     }
   }
   return {
-    email: requireEnv('CI_CUSTOMER_B_EMAIL'),
-    password: requireEnv('CI_CUSTOMER_B_PASSWORD'),
+    email: process.env.CI_CUSTOMER_B_EMAIL ?? '',
+    password: process.env.CI_CUSTOMER_B_PASSWORD ?? '',
   }
 }
 

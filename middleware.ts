@@ -9,20 +9,20 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     /\.[a-zA-Z0-9]+$/.test(pathname)
 
-  if (isStaticAsset || pathname.startsWith('/auth')) {
+  // Portal routes (/c/[token]/...) are public — auth is handled in-page via token
+  if (isStaticAsset || pathname.startsWith('/auth') || pathname.startsWith('/c/')) {
     return NextResponse.next()
   }
 
-  const isCustomerRoute =
-    pathname === '/' || pathname.startsWith('/orders') || pathname.startsWith('/order')
   const isAdminRoute = pathname.startsWith('/admin')
   const isApiRoute = pathname.startsWith('/api')
-  const requiresPageAuth = isCustomerRoute || isAdminRoute
 
-  if (isApiRoute || !requiresPageAuth) {
+  // API routes handle their own auth; non-admin routes don't need page auth
+  if (isApiRoute || !isAdminRoute) {
     return NextResponse.next()
   }
 
+  // Only admin routes need Supabase session-based auth from here on
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -70,16 +70,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (isAdminRoute && role !== 'salesman') {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  if (role === 'salesman' && isCustomerRoute) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-  }
-
-  if (role === 'customer' && isAdminRoute) {
-    return NextResponse.redirect(new URL('/', request.url))
+  if (role !== 'salesman') {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/auth/login'
+    return NextResponse.redirect(loginUrl)
   }
 
   return supabaseResponse

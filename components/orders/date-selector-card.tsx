@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 
 interface DateSelectorCardProps {
+  token: string
   initialDate?: string
   drafts: Array<{
     deliveryDate: string
@@ -22,7 +23,7 @@ interface DateSelectorCardProps {
 
 type ActionType = 'new' | 'continue'
 
-export function DateSelectorCard({ initialDate, drafts }: DateSelectorCardProps) {
+export function DateSelectorCard({ token, initialDate, drafts }: DateSelectorCardProps) {
   const router = useRouter()
   const [date, setDate] = useState(initialDate ?? todayISODate())
   const [isDialogOpen, setIsDialogOpen] = useState(true)
@@ -37,10 +38,11 @@ export function DateSelectorCard({ initialDate, drafts }: DateSelectorCardProps)
     setIsSubmitting(true)
     setError(null)
 
-    const response = await fetch('/api/orders', {
+    const response = await fetch('/api/portal/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Customer-Token': token,
       },
       body: JSON.stringify({ deliveryDate: date }),
     })
@@ -62,7 +64,7 @@ export function DateSelectorCard({ initialDate, drafts }: DateSelectorCardProps)
       payload && 'data' in payload ? payload.data?.order?.delivery_date ?? date : date
 
     setIsDialogOpen(false)
-    router.push(orderId ? `/order/link/${orderId}` : `/order/${deliveryDate}`)
+    router.push(orderId ? `/c/${token}/order/link/${orderId}` : `/c/${token}/order/${deliveryDate}`)
     router.refresh()
   }
 

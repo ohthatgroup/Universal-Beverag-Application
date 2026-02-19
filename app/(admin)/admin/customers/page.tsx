@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { randomBytes, randomUUID } from 'crypto'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Plus, Search } from 'lucide-react'
@@ -7,45 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import type { Database } from '@/lib/types'
 import { formatDeliveryDate } from '@/lib/utils'
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-type AdminClient = SupabaseClient<Database>
 
 interface CustomersPageProps {
   searchParams?: Promise<{
     q?: string
   }>
-}
-
-function randomPassword(): string {
-  return `Temp-${Math.random().toString(36).slice(2)}-A1!`
-}
-
-async function findUserIdByEmail(adminClient: AdminClient, email: string): Promise<string | null> {
-  let page = 1
-  const normalizedEmail = email.toLowerCase()
-
-  while (true) {
-    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 200 })
-
-    if (error) {
-      throw error
-    }
-
-    const match = data.users.find((user) => user.email?.toLowerCase() === normalizedEmail)
-    if (match) {
-      return match.id
-    }
-
-    if (data.users.length < 200) {
-      return null
-    }
-
-    page += 1
-  }
 }
 
 export default async function CustomersPage({ searchParams }: CustomersPageProps) {
@@ -105,80 +72,37 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
 
     await requirePageAuth(['salesman'])
 
-    const email = String(formData.get('email') ?? '')
-      .trim()
-      .toLowerCase()
     const businessName = String(formData.get('business_name') ?? '').trim()
+    const email = String(formData.get('email') ?? '').trim().toLowerCase() || null
 
-    if (!emailRegex.test(email)) {
-      throw new Error('A valid email is required')
+    if (!businessName) {
+      throw new Error('Business name is required')
     }
 
     const adminClient = createAdminClient()
-    let userId = await findUserIdByEmail(adminClient, email)
 
-    if (userId) {
-      const { error: updateUserError } = await adminClient.auth.admin.updateUserById(userId, {
-        email_confirm: true,
-        user_metadata: {
-          role: 'customer',
-        },
-      })
+    // Generate a new profile ID and access token (no auth user needed)
+    const profileId = randomUUID()
+    const accessToken = randomBytes(16).toString('hex')
 
-      if (updateUserError) {
-        throw updateUserError
-      }
-    } else {
-      const { data, error: createUserError } = await adminClient.auth.admin.createUser({
-        email,
-        password: randomPassword(),
-        email_confirm: true,
-        user_metadata: {
-          role: 'customer',
-        },
-      })
+    const { error: insertError } = await adminClient.from('profiles').insert({
+      id: profileId,
+      role: 'customer',
+      business_name: businessName || null,
+      contact_name: null,
+      email,
+      phone: null,
+      show_prices: true,
+      custom_pricing: false,
+      default_group: 'brand',
+      access_token: accessToken,
+    })
 
-      if (createUserError || !data.user) {
-        throw createUserError ?? new Error('Unable to create auth user')
-      }
-
-      userId = data.user.id
+    if (insertError) {
+      throw insertError
     }
 
-    const { data: existingProfile, error: existingProfileError } = await adminClient
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .maybeSingle()
-
-    if (existingProfileError) {
-      throw existingProfileError
-    }
-
-    if (existingProfile?.role === 'salesman') {
-      throw new Error('This email belongs to a salesman account and cannot be converted to a customer.')
-    }
-
-    const { error: upsertProfileError } = await adminClient.from('profiles').upsert(
-      {
-        id: userId,
-        role: 'customer',
-        business_name: businessName || null,
-        contact_name: null,
-        email,
-        phone: null,
-        show_prices: true,
-        custom_pricing: false,
-        default_group: 'brand',
-      },
-      { onConflict: 'id' }
-    )
-
-    if (upsertProfileError) {
-      throw upsertProfileError
-    }
-
-    redirect(`/admin/customers/${userId}`)
+    redirect(`/admin/customers/${profileId}`)
   }
 
   return (
@@ -188,7 +112,7 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
         <h1 className="text-2xl font-semibold">Customers</h1>
       </div>
 
-      {/* Simplified create — business name + email */}
+      {/* Simplified create — business name + optional email */}
       <details className="group rounded-lg border">
         <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
           <Plus className="h-4 w-4" />
@@ -198,11 +122,11 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
           <form action={createCustomer} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="customer-business-name">Business Name</Label>
-              <Input id="customer-business-name" name="business_name" placeholder="Acme Beverages" />
+              <Input id="customer-business-name" name="business_name" required placeholder="Acme Beverages" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="customer-email">Email</Label>
-              <Input id="customer-email" name="email" type="email" required placeholder="owner@acme.com" />
+              <Label htmlFor="customer-email">Email (optional)</Label>
+              <Input id="customer-email" name="email" type="email" placeholder="owner@acme.com" />
             </div>
             <Button type="submit">Create</Button>
           </form>

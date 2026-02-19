@@ -4,7 +4,6 @@ import { Plus, Search, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { createClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/types'
@@ -289,7 +288,6 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                           CSV
                         </a>
                       </Button>
-                      <OrderLinkActions orderId={order.id} className="flex-1" />
                     </div>
                   </div>
                 ))}
@@ -328,7 +326,6 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
                                 <Download className="h-3.5 w-3.5" />
                               </a>
                             </Button>
-                            <OrderLinkActions orderId={order.id} />
                           </div>
                         </td>
                       </tr>

@@ -15,6 +15,7 @@ interface CustomerReadonlyLineItem {
 }
 
 interface CustomerOrderReadonlyProps {
+  token: string
   order: {
     id: string
     delivery_date: string
@@ -28,14 +29,14 @@ interface CustomerOrderReadonlyProps {
   showPrices: boolean
 }
 
-export function CustomerOrderReadonly({ order, items, showPrices }: CustomerOrderReadonlyProps) {
+export function CustomerOrderReadonly({ token, order, items, showPrices }: CustomerOrderReadonlyProps) {
   return (
     <div className="space-y-4 p-4 pb-20 md:pb-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-            <Link href="/orders">
+            <Link href={`/c/${token}/orders`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
@@ -48,7 +49,7 @@ export function CustomerOrderReadonly({ order, items, showPrices }: CustomerOrde
         </div>
 
         <Button variant="outline" size="sm" asChild>
-          <a href={`/api/orders/${order.id}/csv`}>
+          <a href={`/api/portal/orders/${order.id}/csv?token=${token}`}>
             <Download className="mr-1.5 h-3.5 w-3.5" />
             CSV
           </a>

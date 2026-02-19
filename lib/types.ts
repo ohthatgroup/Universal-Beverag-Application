@@ -19,6 +19,7 @@ export interface Profile {
   show_prices: boolean
   default_group: GroupByOption
   custom_pricing: boolean
+  access_token: string | null
   created_at: string
   updated_at: string
 }
@@ -37,6 +38,7 @@ export interface ProfileInsert {
   show_prices?: boolean
   default_group?: GroupByOption
   custom_pricing?: boolean
+  access_token?: string | null
 }
 
 export type ProfileUpdate = Partial<ProfileInsert>

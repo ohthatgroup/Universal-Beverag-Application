@@ -5,25 +5,30 @@ import { usePathname } from 'next/navigation'
 import { Home, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const links = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/orders', label: 'Orders', icon: ClipboardList },
-]
+interface CustomerNavProps {
+  token: string
+}
 
-export function CustomerNav() {
+export function CustomerNav({ token }: CustomerNavProps) {
   const pathname = usePathname()
+  const base = `/c/${token}`
+
+  const links = [
+    { href: base, label: 'Home', icon: Home },
+    { href: `${base}/orders`, label: 'Orders', icon: ClipboardList },
+  ]
 
   return (
     <>
       {/* Desktop top nav */}
       <nav className="hidden md:flex h-14 items-center justify-between border-b bg-background px-6">
-        <Link href="/" className="text-lg font-semibold">
+        <Link href={base} className="text-lg font-semibold">
           Universal Beverages
         </Link>
         <div className="flex items-center gap-6">
           {links.map((link) => {
             const isActive =
-              pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href))
+              pathname === link.href || (link.href !== base && pathname.startsWith(link.href))
             return (
               <Link
                 key={link.href}
@@ -46,7 +51,7 @@ export function CustomerNav() {
         <div className="mx-auto grid h-16 w-full grid-cols-2 px-4">
           {links.map((link) => {
             const isActive =
-              pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href))
+              pathname === link.href || (link.href !== base && pathname.startsWith(link.href))
             return (
               <Link
                 key={link.href}

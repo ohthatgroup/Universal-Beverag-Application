@@ -21,6 +21,9 @@ function adminClient() {
   )
 }
 
+/**
+ * Look up a salesman auth user by email (auth.users table).
+ */
 export async function getUserIdByEmail(email: string): Promise<string> {
   const client = adminClient()
   let page = 1
@@ -48,6 +51,44 @@ export async function getUserIdByEmail(email: string): Promise<string> {
   }
 
   throw new Error(`Unable to find user by email: ${email}`)
+}
+
+/**
+ * Look up a customer profile by business name and return the access_token (portal token).
+ */
+export async function getCustomerToken(businessName: string): Promise<string> {
+  const client = adminClient()
+  const { data, error } = await client
+    .from('profiles')
+    .select('access_token')
+    .eq('role', 'customer')
+    .eq('business_name', businessName)
+    .single()
+
+  if (error || !data?.access_token) {
+    throw new Error(`Unable to find customer token for "${businessName}": ${error?.message ?? 'no token'}`)
+  }
+
+  return data.access_token
+}
+
+/**
+ * Look up a customer profile ID by business name.
+ */
+export async function getCustomerIdByName(businessName: string): Promise<string> {
+  const client = adminClient()
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .eq('role', 'customer')
+    .eq('business_name', businessName)
+    .single()
+
+  if (error || !data) {
+    throw new Error(`Unable to find customer "${businessName}": ${error?.message ?? 'not found'}`)
+  }
+
+  return data.id
 }
 
 export async function findOrderId(customerId: string, deliveryDate: string): Promise<string> {

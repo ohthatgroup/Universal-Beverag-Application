@@ -118,13 +118,14 @@ function isValidRole(value: string): value is UserRole {
   return value === 'customer' || value === 'salesman'
 }
 
-function normalizeProfile(profile: ProfileRow): Profile {
+export function normalizeProfile(profile: ProfileRow): Profile {
   return {
     ...profile,
     role: profile.role as UserRole,
     show_prices: profile.show_prices ?? true,
     custom_pricing: profile.custom_pricing ?? false,
     default_group: profile.default_group === 'size' ? 'size' : 'brand',
+    access_token: profile.access_token ?? null,
     created_at: profile.created_at ?? new Date(0).toISOString(),
     updated_at: profile.updated_at ?? new Date(0).toISOString(),
   }

@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../lib/database.generated'
 
 interface CheckResult {
@@ -19,37 +19,6 @@ function addDays(isoDate: string, days: number): string {
   const [year, month, day] = isoDate.split('-').map(Number)
   const date = new Date(year, month - 1, day + days)
   return date.toISOString().slice(0, 10)
-}
-
-async function findUserIdByEmail(
-  adminClient: SupabaseClient<Database>,
-  email: string
-): Promise<string> {
-  let page = 1
-  const normalizedEmail = email.toLowerCase()
-
-  while (true) {
-    const { data, error } = await adminClient.auth.admin.listUsers({
-      page,
-      perPage: 200,
-    })
-
-    if (error) {
-      throw new Error(`Unable to list auth users: ${error.message}`)
-    }
-
-    const match = data.users.find((user) => user.email?.toLowerCase() === normalizedEmail)
-    if (match) {
-      return match.id
-    }
-
-    if (data.users.length < 200) {
-      break
-    }
-    page += 1
-  }
-
-  throw new Error(`No auth user found for ${email}`)
 }
 
 async function signInClient(
@@ -77,10 +46,6 @@ async function main() {
   const anonKey = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
   const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
-  const customerAEmail = requireEnv('CI_CUSTOMER_A_EMAIL')
-  const customerAPassword = requireEnv('CI_CUSTOMER_A_PASSWORD')
-  const customerBEmail = requireEnv('CI_CUSTOMER_B_EMAIL')
-  const customerBPassword = requireEnv('CI_CUSTOMER_B_PASSWORD')
   const salesmanEmail = requireEnv('CI_SALESMAN_EMAIL')
   const salesmanPassword = requireEnv('CI_SALESMAN_PASSWORD')
 
@@ -91,10 +56,27 @@ async function main() {
     },
   })
 
-  const [customerAId, customerBId] = await Promise.all([
-    findUserIdByEmail(admin, customerAEmail),
-    findUserIdByEmail(admin, customerBEmail),
-  ])
+  // Find customer profiles (no auth users — customers use portal tokens)
+  const { data: customerA } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'customer')
+    .eq('business_name', 'CI Customer A')
+    .single()
+
+  const { data: customerB } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'customer')
+    .eq('business_name', 'CI Customer B')
+    .single()
+
+  if (!customerA || !customerB) {
+    throw new Error('Missing CI customer profiles. Run provision-users.ts first.')
+  }
+
+  const customerAId = customerA.id
+  const customerBId = customerB.id
 
   const today = new Date().toISOString().slice(0, 10)
   const customerADate = addDays(today, 28)
@@ -120,6 +102,7 @@ async function main() {
     throw new Error(`Missing seed products for RLS verification: ${productError?.message ?? 'no product'}`)
   }
 
+  // Create test orders via admin client (same as portal API does)
   const { data: orderA, error: orderAError } = await admin
     .from('orders')
     .insert({
@@ -167,78 +150,21 @@ async function main() {
     throw new Error(`Failed to seed order items: ${orderItemsError.message}`)
   }
 
-  const customerAClient = await signInClient(supabaseUrl, anonKey, customerAEmail, customerAPassword)
-  const customerBClient = await signInClient(supabaseUrl, anonKey, customerBEmail, customerBPassword)
+  // Sign in as salesman (only auth user type remaining)
   const salesmanClient = await signInClient(supabaseUrl, anonKey, salesmanEmail, salesmanPassword)
+
+  // Anonymous client (simulates unauthenticated access)
+  const anonClient = createClient<Database>(supabaseUrl, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 
   const checks: CheckResult[] = []
   const record = (name: string, pass: boolean, details?: string) => checks.push({ name, pass, details })
 
-  const ownOrderRead = await customerAClient
-    .from('orders')
-    .select('id')
-    .eq('id', orderA.id)
-  record(
-    'customer_a_reads_own_order',
-    !ownOrderRead.error && (ownOrderRead.data?.length ?? 0) === 1,
-    ownOrderRead.error?.message
-  )
-
-  const foreignOrderRead = await customerAClient
-    .from('orders')
-    .select('id')
-    .eq('id', orderB.id)
-  record(
-    'customer_a_cannot_read_customer_b_order',
-    !foreignOrderRead.error && (foreignOrderRead.data?.length ?? 0) === 0,
-    foreignOrderRead.error?.message
-  )
-
-  const ownOrderUpdate = await customerAClient
-    .from('orders')
-    .update({ status: 'submitted' })
-    .eq('id', orderA.id)
-    .select('id,status')
-  record(
-    'customer_a_updates_own_draft',
-    !ownOrderUpdate.error && ownOrderUpdate.data?.[0]?.status === 'submitted',
-    ownOrderUpdate.error?.message
-  )
-
-  const foreignOrderUpdate = await customerAClient
-    .from('orders')
-    .update({ status: 'submitted' })
-    .eq('id', orderB.id)
-    .select('id')
-  record(
-    'customer_a_cannot_update_customer_b_order',
-    !foreignOrderUpdate.error && (foreignOrderUpdate.data?.length ?? 0) === 0,
-    foreignOrderUpdate.error?.message
-  )
-
-  const foreignInsertAttempt = await customerAClient
-    .from('orders')
-    .insert({
-      customer_id: customerBId,
-      delivery_date: addDays(today, 31),
-      status: 'draft',
-    })
-    .select('id')
-  record(
-    'customer_a_cannot_insert_for_customer_b',
-    Boolean(foreignInsertAttempt.error),
-    foreignInsertAttempt.error?.message
-  )
-
-  const customerBReadsOwn = await customerBClient
-    .from('orders')
-    .select('id')
-    .eq('id', orderB.id)
-  record(
-    'customer_b_reads_own_order',
-    !customerBReadsOwn.error && (customerBReadsOwn.data?.length ?? 0) === 1,
-    customerBReadsOwn.error?.message
-  )
+  // -- Salesman RLS checks --
 
   const salesmanReadsAll = await salesmanClient
     .from('orders')
@@ -259,6 +185,49 @@ async function main() {
     'salesman_updates_customer_order',
     !salesmanUpdates.error && salesmanUpdates.data?.[0]?.status === 'delivered',
     salesmanUpdates.error?.message
+  )
+
+  const salesmanReadsProfiles = await salesmanClient
+    .from('profiles')
+    .select('id')
+    .eq('role', 'customer')
+  record(
+    'salesman_reads_customer_profiles',
+    !salesmanReadsProfiles.error && (salesmanReadsProfiles.data?.length ?? 0) >= 2,
+    salesmanReadsProfiles.error?.message
+  )
+
+  // -- Anonymous client checks (should have NO access) --
+
+  const anonOrderRead = await anonClient
+    .from('orders')
+    .select('id')
+    .in('id', [orderA.id, orderB.id])
+  record(
+    'anon_cannot_read_orders',
+    !anonOrderRead.error && (anonOrderRead.data?.length ?? 0) === 0,
+    anonOrderRead.error?.message ?? `found ${anonOrderRead.data?.length ?? 0} orders`
+  )
+
+  const anonProfileRead = await anonClient
+    .from('profiles')
+    .select('id')
+  record(
+    'anon_cannot_read_profiles',
+    !anonProfileRead.error && (anonProfileRead.data?.length ?? 0) === 0,
+    anonProfileRead.error?.message ?? `found ${anonProfileRead.data?.length ?? 0} profiles`
+  )
+
+  // -- Admin client checks (portal API uses service role, bypasses RLS) --
+
+  const adminReadsAll = await admin
+    .from('orders')
+    .select('id')
+    .in('id', [orderA.id, orderB.id])
+  record(
+    'admin_client_reads_all_orders',
+    !adminReadsAll.error && (adminReadsAll.data?.length ?? 0) === 2,
+    adminReadsAll.error?.message
   )
 
   const failures = checks.filter((check) => !check.pass)

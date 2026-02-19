@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, Check, Download, Mail, Phone, Trash2 } from 'lucide-react'
-import { OrderLinkActions } from '@/components/admin/order-link-actions'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -143,7 +142,6 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             CSV
           </a>
         </Button>
-        <OrderLinkActions orderId={order.id} />
       </div>
 
       {/* Customer info */}

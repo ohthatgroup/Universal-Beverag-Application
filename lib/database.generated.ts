@@ -376,6 +376,7 @@ export type Database = {
           show_prices: boolean
           default_group: string
           custom_pricing: boolean
+          access_token: string | null
           created_at: string
           updated_at: string
         }
@@ -393,6 +394,7 @@ export type Database = {
           show_prices?: boolean
           default_group?: string
           custom_pricing?: boolean
+          access_token?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -410,6 +412,7 @@ export type Database = {
           show_prices?: boolean
           default_group?: string
           custom_pricing?: boolean
+          access_token?: string | null
           created_at?: string
           updated_at?: string
         }
