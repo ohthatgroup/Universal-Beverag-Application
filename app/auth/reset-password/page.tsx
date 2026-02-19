@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +10,10 @@ import { Label } from '@/components/ui/label'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  if (!supabaseRef.current && typeof window !== 'undefined') {
+    supabaseRef.current = createClient()
+  }
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -32,6 +35,13 @@ export default function ResetPasswordPage() {
     }
 
     setIsLoading(true)
+
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      setMessage('Unable to connect. Please refresh the page.')
+      setIsLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.updateUser({ password })
 

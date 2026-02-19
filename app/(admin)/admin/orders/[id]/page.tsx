@@ -115,9 +115,9 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Link href="/admin/orders" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
+        <Link href="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
           <ArrowLeft className="h-4 w-4" />
-          Orders
+          Dashboard
         </Link>
         <h1 className="text-2xl font-semibold">{customerName}</h1>
         <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">

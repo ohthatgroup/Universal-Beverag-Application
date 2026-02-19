@@ -5,12 +5,6 @@ import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 
 interface DateSelectorCardProps {
   token: string
@@ -27,7 +21,6 @@ export function DateSelectorCard({ token, initialDate, drafts }: DateSelectorCar
   const router = useRouter()
   const dateInputRef = useRef<HTMLInputElement>(null)
   const [date, setDate] = useState(initialDate ?? todayISODate())
-  const [isDialogOpen, setIsDialogOpen] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [actionType, setActionType] = useState<ActionType>('new')
   const [error, setError] = useState<string | null>(null)
@@ -64,7 +57,6 @@ export function DateSelectorCard({ token, initialDate, drafts }: DateSelectorCar
     const deliveryDate =
       payload && 'data' in payload ? payload.data?.order?.delivery_date ?? date : date
 
-    setIsDialogOpen(false)
     router.push(orderId ? `/c/${token}/order/link/${orderId}` : `/c/${token}/order/${deliveryDate}`)
     router.refresh()
   }
@@ -78,81 +70,75 @@ export function DateSelectorCard({ token, initialDate, drafts }: DateSelectorCar
   }
 
   return (
-    <>
-      <Button onClick={() => setIsDialogOpen(true)} disabled={isSubmitting} size="lg">
-        {isSubmitting ? 'Opening...' : 'Select Delivery Date'}
-      </Button>
+    <div className="rounded-lg border bg-card p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Date picker with arrows */}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => moveDate(-1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <button
+            type="button"
+            className="relative min-w-[160px] text-center text-sm font-semibold"
+            onClick={() => dateInputRef.current?.showPicker?.()}
+          >
+            {formatDeliveryDate(date)}
+            <input
+              ref={dateInputRef}
+              type="date"
+              className="absolute inset-0 cursor-pointer opacity-0"
+              value={date}
+              min={todayISODate()}
+              onChange={(e) => {
+                if (e.target.value && e.target.value >= todayISODate()) {
+                  setDate(e.target.value)
+                }
+              }}
+            />
+          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => moveDate(1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={() => openOrder('new')}
+            disabled={isSubmitting}
+          >
+            {isSubmitting && actionType === 'new' ? 'Opening...' : '+ New Order'}
+          </Button>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Select Date</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => moveDate(-1)}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <button
-                type="button"
-                className="relative text-lg font-semibold"
-                onClick={() => dateInputRef.current?.showPicker?.()}
-              >
-                {formatDeliveryDate(date)}
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  className="absolute inset-0 cursor-pointer opacity-0"
-                  value={date}
-                  min={todayISODate()}
-                  onChange={(e) => {
-                    if (e.target.value && e.target.value >= todayISODate()) {
-                      setDate(e.target.value)
-                    }
-                  }}
-                />
-              </button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => moveDate(1)}
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </div>
-
+          {draftForDate && (
             <Button
-              className="w-full"
-              onClick={() => openOrder('new')}
+              size="sm"
+              variant="secondary"
+              onClick={() => openOrder('continue')}
               disabled={isSubmitting}
             >
-              {isSubmitting && actionType === 'new' ? 'Opening...' : '+ New Order'}
+              {isSubmitting && actionType === 'continue'
+                ? 'Opening...'
+                : `Continue (${draftForDate.itemCount} items)`}
             </Button>
+          )}
+        </div>
+      </div>
 
-            {draftForDate && (
-              <Button
-                className="w-full"
-                variant="secondary"
-                onClick={() => openOrder('continue')}
-                disabled={isSubmitting}
-              >
-                {isSubmitting && actionType === 'continue'
-                  ? 'Opening...'
-                  : `Continue Order (${draftForDate.itemCount} items)`}
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+    </div>
   )
 }

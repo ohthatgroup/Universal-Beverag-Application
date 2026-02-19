@@ -39,9 +39,3 @@ export async function loginWithPassword(
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page).not.toHaveURL(/\/auth\/login/)
 }
-
-export function futureDate(daysAhead: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + daysAhead)
-  return date.toISOString().slice(0, 10)
-}

@@ -29,17 +29,22 @@ export default async function PalletsPage() {
       throw new Error('Price must be greater than zero')
     }
 
-    const { error: insertError } = await supabaseClient.from('pallet_deals').insert({
-      title: (formData.get('title') as string).trim(),
-      pallet_type: (formData.get('pallet_type') as 'single' | 'mixed') || 'single',
-      price,
-      savings_text: (formData.get('savings_text') as string) || null,
-      description: (formData.get('description') as string) || null,
-      is_active: formData.get('is_active') === 'on',
-    })
+    const { data: created, error: insertError } = await supabaseClient
+      .from('pallet_deals')
+      .insert({
+        title: (formData.get('title') as string).trim(),
+        pallet_type: (formData.get('pallet_type') as 'single' | 'mixed') || 'single',
+        price,
+        savings_text: (formData.get('savings_text') as string) || null,
+        description: (formData.get('description') as string) || null,
+        is_active: formData.get('is_active') === 'on',
+      })
+      .select('id')
+      .single()
 
-    if (insertError) throw insertError
-    redirect('/admin/catalog/pallets')
+    if (insertError || !created) throw insertError ?? new Error('Failed to create pallet deal')
+    // Redirect to detail page so user can immediately add products
+    redirect(`/admin/catalog/pallets/${created.id}`)
   }
 
   const deals = palletDeals ?? []

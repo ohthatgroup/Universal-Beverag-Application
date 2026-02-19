@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { formatStructuredPack, isSupportedPackUom, normalizePackUom, PACK_UOM_OPTIONS } from '@/lib/utils'
@@ -169,10 +170,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
             <Label htmlFor="sort_order">Sort order</Label>
             <Input id="sort_order" name="sort_order" type="number" defaultValue={product.sort_order ?? 0} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="image_url">Image URL</Label>
-            <Input id="image_url" name="image_url" defaultValue={product.image_url ?? ''} />
-          </div>
+          <ImageUploadField name="image_url" label="Image" folder="products" defaultValue={product.image_url} />
         </div>
 
         <div className="space-y-2">

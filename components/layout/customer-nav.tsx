@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ClipboardList } from 'lucide-react'
+import { Home, UserCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface CustomerNavProps {
@@ -15,7 +15,7 @@ export function CustomerNav({ token }: CustomerNavProps) {
 
   const links = [
     { href: base, label: 'Home', icon: Home },
-    { href: `${base}/orders`, label: 'Orders', icon: ClipboardList },
+    { href: `${base}/account`, label: 'Account', icon: UserCircle },
   ]
 
   return (

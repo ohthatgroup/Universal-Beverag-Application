@@ -20,3 +20,13 @@ export const updateOrderStatusSchema = z.object({
 export const cloneOrderSchema = z.object({
   deliveryDate: isoDateSchema,
 })
+
+export const portalProfileUpdateSchema = z.object({
+  contact_name: z.string().min(1).max(200).optional(),
+  email: z.string().email().max(320).optional().or(z.literal('')),
+  phone: z.string().max(50).optional().or(z.literal('')),
+  address: z.string().max(500).optional().or(z.literal('')),
+  city: z.string().max(200).optional().or(z.literal('')),
+  state: z.string().max(100).optional().or(z.literal('')),
+  zip: z.string().max(20).optional().or(z.literal('')),
+})

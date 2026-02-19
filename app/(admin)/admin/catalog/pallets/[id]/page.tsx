@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
+import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { getProductPackLabel } from '@/lib/utils'
@@ -31,6 +31,8 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
       .filter((item) => Boolean(item.product_id))
       .map((item) => [item.product_id as string, item] as const)
   )
+
+  const includedCount = (items ?? []).filter((item) => item.quantity > 0).length
 
   async function updatePallet(formData: FormData) {
     'use server'
@@ -106,105 +108,80 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
           Pallets
         </Link>
         <h1 className="text-2xl font-semibold">{palletDeal.title}</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {palletDeal.pallet_type} · {palletDeal.is_active ? 'Active' : 'Inactive'} · {includedCount} products
+        </p>
       </div>
 
-      <form action={updatePallet} className="space-y-4 max-w-2xl">
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" name="title" defaultValue={palletDeal.title} required />
+      {/* Two-column layout on desktop */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Left column: Pallet settings */}
+        <form action={updatePallet} className="space-y-4 rounded-lg border p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Settings</h2>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input id="title" name="title" defaultValue={palletDeal.title} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pallet_type">Type</Label>
+              <select id="pallet_type" name="pallet_type" className="h-9 w-full rounded-md border bg-background px-3 text-sm" defaultValue={palletDeal.pallet_type}>
+                <option value="single">Single</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="price">Price</Label>
+              <Input id="price" name="price" type="number" step="0.01" defaultValue={palletDeal.price ?? 0} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sort_order">Sort order</Label>
+              <Input id="sort_order" name="sort_order" type="number" defaultValue={palletDeal.sort_order ?? 0} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="savings_text">Savings text</Label>
+              <Input id="savings_text" name="savings_text" defaultValue={palletDeal.savings_text ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Input id="description" name="description" defaultValue={palletDeal.description ?? ''} />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="pallet_type">Type</Label>
-            <select id="pallet_type" name="pallet_type" className="h-9 w-full rounded-md border bg-background px-3 text-sm" defaultValue={palletDeal.pallet_type}>
-              <option value="single">Single</option>
-              <option value="mixed">Mixed</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="price">Price</Label>
-            <Input id="price" name="price" type="number" step="0.01" defaultValue={palletDeal.price ?? 0} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sort_order">Sort order</Label>
-            <Input id="sort_order" name="sort_order" type="number" defaultValue={palletDeal.sort_order ?? 0} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="image_url">Image URL</Label>
-            <Input id="image_url" name="image_url" defaultValue={palletDeal.image_url ?? ''} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="savings_text">Savings text</Label>
-            <Input id="savings_text" name="savings_text" defaultValue={palletDeal.savings_text ?? ''} />
+
+          <ImageUploadField name="image_url" label="Image" folder="pallets" defaultValue={palletDeal.image_url} />
+
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="is_active" defaultChecked={palletDeal.is_active ?? true} className="h-4 w-4" />
+            Active
+          </label>
+
+          <Button type="submit">Save Deal</Button>
+        </form>
+
+        {/* Right column: Deal contents */}
+        <div className="rounded-lg border p-4 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Contents</h2>
+
+          <div className="space-y-0 max-h-[600px] overflow-y-auto">
+            {(products ?? []).map((product) => {
+              const item = itemByProduct.get(product.id)
+              const hasQty = item && item.quantity > 0
+              return (
+                <form key={product.id} action={updatePalletItem} className="flex items-center gap-3 border-b py-2.5 last:border-0">
+                  <input type="hidden" name="product_id" value={product.id} />
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm truncate ${hasQty ? 'font-medium' : 'text-muted-foreground'}`}>{product.title}</div>
+                    <div className="text-xs text-muted-foreground">{getProductPackLabel(product) ?? 'N/A'}</div>
+                  </div>
+                  <Input className="w-16 h-8 text-xs text-right" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
+                  <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
+                </form>
+              )
+            })}
           </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Input id="description" name="description" defaultValue={palletDeal.description ?? ''} />
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="is_active" defaultChecked={palletDeal.is_active ?? true} className="h-4 w-4" />
-          Active
-        </label>
-        <Button type="submit">Save Deal</Button>
-      </form>
-
-      <Separator />
-
-      {/* Deal contents */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Deal Contents</h2>
-
-        {/* Mobile */}
-        <div className="md:hidden space-y-0">
-          {(products ?? []).map((product) => {
-            const item = itemByProduct.get(product.id)
-            return (
-              <form key={product.id} action={updatePalletItem} className="flex items-center gap-3 border-b py-3 last:border-0">
-                <input type="hidden" name="product_id" value={product.id} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{product.title}</div>
-                  <div className="text-xs text-muted-foreground">{getProductPackLabel(product) ?? 'N/A'}</div>
-                </div>
-                <Input className="w-20 h-8 text-xs" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
-                <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
-              </form>
-            )
-          })}
-        </div>
-
-        {/* Desktop table */}
-        <div className="hidden md:block rounded-lg border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="px-4 py-2 text-left font-medium">Product</th>
-                <th className="px-4 py-2 text-left font-medium">Pack</th>
-                <th className="px-4 py-2 text-right font-medium">Qty</th>
-                <th className="px-4 py-2 w-16"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {(products ?? []).map((product) => {
-                const item = itemByProduct.get(product.id)
-                return (
-                  <tr key={product.id} className="border-b last:border-0">
-                    <td className="px-4 py-2" colSpan={4}>
-                      <form action={updatePalletItem} className="flex items-center gap-4">
-                        <input type="hidden" name="product_id" value={product.id} />
-                        <span className="font-medium flex-1">{product.title}</span>
-                        <span className="text-muted-foreground w-40">{getProductPackLabel(product) ?? 'N/A'}</span>
-                        <Input className="w-20 h-8 text-right text-xs" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
-                        <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
-                      </form>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      </div>
     </div>
   )
 }
