@@ -49,6 +49,7 @@ interface ProductPackFields {
   size_value?: number | null
   size_uom?: string | null
   pack_details?: string | null
+  title?: string | null
 }
 
 export function normalizePackUom(value: string): string {
@@ -67,6 +68,36 @@ export function formatStructuredPack(packCount: number, sizeValue: number, sizeU
   return `${packCount}/${formatSizeValue(sizeValue)} ${normalizePackUom(sizeUom)}`
 }
 
+export function formatStructuredSize(sizeValue: number, sizeUom: string): string {
+  return `${formatSizeValue(sizeValue)} ${normalizePackUom(sizeUom)}`
+}
+
+function parseSizeFromPackDetails(packDetails: string): { sizeValue: number; sizeUom: PackUom } | null {
+  const src = packDetails.trim().toUpperCase()
+  if (!src) return null
+
+  const match = src.match(
+    /^\s*\d+\s*\/\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\.|-|\s)?\s*(OZ|ML|LITER|LITERS|GALLON|GALLONS|CT|ROLLS?|ROLL)\b/i
+  )
+  if (!match) return null
+
+  const sizeValue = Number(match[1])
+  const rawUom = normalizePackUom(match[2]).replace(/\.$/, '')
+  if (!Number.isFinite(sizeValue) || sizeValue <= 0 || !isSupportedPackUom(rawUom)) {
+    return null
+  }
+
+  return { sizeValue, sizeUom: rawUom }
+}
+
+function getAcceptedSizeModifier(value: string | null | undefined): 'CANS' | 'GLASS' | null {
+  const src = (value ?? '').toUpperCase()
+  if (!src) return null
+  if (/\bGLASS\b/.test(src)) return 'GLASS'
+  if (/\bCANS?\b/.test(src)) return 'CANS'
+  return null
+}
+
 export function getProductPackLabel(product: ProductPackFields): string | null {
   if (
     typeof product.pack_count === 'number' &&
@@ -79,6 +110,27 @@ export function getProductPackLabel(product: ProductPackFields): string | null {
 
   const fallback = product.pack_details?.trim()
   return fallback && fallback.length > 0 ? fallback : null
+}
+
+export function getProductSizeLabel(product: ProductPackFields): string | null {
+  const modifier = getAcceptedSizeModifier(product.pack_details) ?? getAcceptedSizeModifier(product.title)
+
+  if (
+    typeof product.size_value === 'number' &&
+    typeof product.size_uom === 'string' &&
+    product.size_uom.trim().length > 0
+  ) {
+    const base = formatStructuredSize(product.size_value, product.size_uom)
+    return modifier ? `${base} ${modifier}` : base
+  }
+
+  const fallback = product.pack_details?.trim()
+  if (!fallback) return null
+
+  const parsed = parseSizeFromPackDetails(fallback)
+  if (!parsed) return null
+  const base = formatStructuredSize(parsed.sizeValue, parsed.sizeUom)
+  return modifier ? `${base} ${modifier}` : base
 }
 
 // ─── Dates ────────────────────────────────────────────────────────────────

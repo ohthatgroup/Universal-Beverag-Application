@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import type { CatalogProduct, Brand } from '@/lib/types'
-import { getProductPackLabel } from '@/lib/utils'
+import { getProductSizeLabel } from '@/lib/utils'
 
 export type CatalogTab = 'new' | 'pallets' | 'all'
 export type GroupBy = 'brand' | 'size'
@@ -57,13 +57,7 @@ export function useCatalog({
     return tabFiltered.filter((product) => {
       if (filters.brandId && product.brand_id !== filters.brandId) return false
 
-      if (
-        filters.sizeFilter &&
-        !getProductPackLabel(product)
-          ?.toLowerCase()
-          .includes(filters.sizeFilter.toLowerCase())
-      )
-        return false
+      if (filters.sizeFilter && getProductSizeLabel(product) !== filters.sizeFilter) return false
 
       if (
         filters.searchQuery &&
@@ -96,10 +90,10 @@ export function useCatalog({
       return Array.from(groups.values())
     }
 
-    // Group by normalized size label.
+    // Group by unit size only (pack count ignored).
     const groups = new Map<string, CatalogGroup>()
     for (const product of filtered) {
-      const sizeKey = getProductPackLabel(product) ?? 'Other'
+      const sizeKey = getProductSizeLabel(product) ?? 'Other'
       if (!groups.has(sizeKey)) {
         groups.set(sizeKey, { key: sizeKey, label: sizeKey, products: [] })
       }
@@ -125,7 +119,7 @@ export function useCatalog({
   const availableSizes = useMemo<string[]>(() => {
     const seen = new Set<string>()
     return tabFiltered
-      .map((p) => getProductPackLabel(p))
+      .map((p) => getProductSizeLabel(p))
       .filter(
         (s): s is string => !!s && !seen.has(s) && !!seen.add(s)
       )
