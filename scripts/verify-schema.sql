@@ -41,7 +41,8 @@ begin
     select unnest(array[
       'idx_one_draft_per_date',
       'idx_order_items_product_conflict',
-      'idx_order_items_pallet_conflict'
+      'idx_order_items_pallet_conflict',
+      'idx_profiles_access_token'
     ]) as name
     except
     select indexname
@@ -206,6 +207,16 @@ begin
       and is_nullable = 'NO'
   ) then
     raise exception 'order_items.order_id must be NOT NULL';
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
+      and column_name = 'access_token'
+  ) then
+    raise exception 'profiles.access_token column must exist';
   end if;
 end
 $$;
