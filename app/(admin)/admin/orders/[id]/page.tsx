@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { createClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate, getProductPackLabel, getStatusIcon, getStatusLabel } from '@/lib/utils'
+import { formatCurrency, formatDeliveryDate, getProductDisplayName, getProductPackLabel, getStatusIcon, getStatusLabel } from '@/lib/utils'
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -35,7 +35,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         .maybeSingle()
     : Promise.resolve({ data: null, error: null })
 
-  const [{ data: customer }, { data: items }, { data: products }, { data: pallets }] =
+  const [{ data: customer }, { data: items }, { data: products }, { data: pallets }, { data: brands }] =
     await Promise.all([
       customerPromise,
       context.supabase
@@ -43,12 +43,14 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         .select('id,product_id,pallet_deal_id,quantity,unit_price,line_total')
         .eq('order_id', order.id)
         .order('id', { ascending: true }),
-      context.supabase.from('products').select('id,title,pack_details,pack_count,size_value,size_uom'),
+      context.supabase.from('products').select('id,title,brand_id,pack_details,pack_count,size_value,size_uom'),
       context.supabase.from('pallet_deals').select('id,title,description'),
+      context.supabase.from('brands').select('id,name'),
     ])
 
   const productById = new Map((products ?? []).map((product) => [product.id, product] as const))
   const palletById = new Map((pallets ?? []).map((pallet) => [pallet.id, pallet] as const))
+  const brandById = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
   const orderStatus = asOrderStatus(order.status)
   const orderId = order.id
   const submittedAt = order.submitted_at
@@ -190,10 +192,13 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               {orderItems.map((item) => {
                 const product = item.product_id ? productById.get(item.product_id) : null
                 const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
+                const brandName = product?.brand_id ? brandById.get(product.brand_id) ?? null : null
                 return (
                   <div key={item.id} className="flex items-center justify-between border-b py-3 last:border-0">
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium text-sm">{product?.title ?? pallet?.title ?? 'Unknown item'}</div>
+                      <div className="font-medium text-sm">
+                        {product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item'}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {(product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''}
                       </div>
@@ -223,10 +228,11 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                   {orderItems.map((item) => {
                     const product = item.product_id ? productById.get(item.product_id) : null
                     const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
+                    const brandName = product?.brand_id ? brandById.get(product.brand_id) ?? null : null
                     return (
                       <tr key={item.id} className="border-b last:border-0">
                         <td className="px-4 py-3 font-medium">
-                          {product?.title ?? pallet?.title ?? 'Unknown item'}
+                          {product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item'}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {(product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''}

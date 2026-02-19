@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePortalOrderAccess, extractPortalToken } from '@/lib/server/customer-order-access'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
-import { buildCsv, getProductPackLabel } from '@/lib/utils'
+import { buildCsv, getProductDisplayName, getProductPackLabel } from '@/lib/utils'
 
 /**
  * GET /api/portal/orders/[id]/csv?token=...
@@ -46,27 +46,35 @@ export async function GET(
       .map((item) => item.pallet_deal_id)
       .filter((idValue): idValue is string => !!idValue)
 
-    const [{ data: products, error: productsError }, { data: pallets, error: palletsError }] =
+    const [
+      { data: products, error: productsError },
+      { data: pallets, error: palletsError },
+      { data: brands, error: brandsError },
+    ] =
       await Promise.all([
         productIds.length
-          ? admin.from('products').select('id,title,pack_details,pack_count,size_value,size_uom').in('id', productIds)
+          ? admin.from('products').select('id,title,brand_id,pack_details,pack_count,size_value,size_uom').in('id', productIds)
           : Promise.resolve({ data: [], error: null }),
         palletIds.length
           ? admin.from('pallet_deals').select('id,title,description').in('id', palletIds)
           : Promise.resolve({ data: [], error: null }),
+        admin.from('brands').select('id,name'),
       ])
 
     if (productsError) throw productsError
     if (palletsError) throw palletsError
+    if (brandsError) throw brandsError
 
     const productMap = new Map((products ?? []).map((p) => [p.id, p] as const))
     const palletMap = new Map((pallets ?? []).map((p) => [p.id, p] as const))
+    const brandMap = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
 
     const rows = itemRows.map((item) => {
       if (item.product_id) {
         const product = productMap.get(item.product_id)
+        const brandName = product?.brand_id ? brandMap.get(product.brand_id) ?? null : null
         return {
-          Product: product?.title ?? 'Unknown Product',
+          Product: product ? getProductDisplayName(product, brandName) : 'Unknown Product',
           'Pack Details': product ? getProductPackLabel(product) ?? '' : '',
           Quantity: item.quantity,
           'Unit Price': Number(item.unit_price).toFixed(2),

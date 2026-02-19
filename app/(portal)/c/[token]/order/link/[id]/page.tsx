@@ -4,7 +4,7 @@ import { CustomerOrderReadonly } from '@/components/orders/customer-order-readon
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Brand, CatalogProduct, CustomerProduct, OrderStatus, PalletDeal, Product } from '@/lib/types'
-import { getProductPackLabel } from '@/lib/utils'
+import { getProductDisplayName, getProductPackLabel } from '@/lib/utils'
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -57,28 +57,36 @@ export default async function PortalOrderLinkPage({
       .map((item) => item.pallet_deal_id)
       .filter((value): value is string => Boolean(value))
 
-    const [{ data: products, error: productsError }, { data: pallets, error: palletsError }] =
+    const [
+      { data: products, error: productsError },
+      { data: pallets, error: palletsError },
+      { data: brands, error: brandsError },
+    ] =
       await Promise.all([
         productIds.length
-          ? admin.from('products').select('id,title,pack_details,pack_count,size_value,size_uom').in('id', productIds)
+          ? admin.from('products').select('id,title,brand_id,pack_details,pack_count,size_value,size_uom').in('id', productIds)
           : Promise.resolve({ data: [], error: null }),
         palletIds.length
           ? admin.from('pallet_deals').select('id,title,description').in('id', palletIds)
           : Promise.resolve({ data: [], error: null }),
+        admin.from('brands').select('id,name'),
       ])
 
     if (productsError) throw productsError
     if (palletsError) throw palletsError
+    if (brandsError) throw brandsError
 
     const productById = new Map((products ?? []).map((product) => [product.id, product] as const))
     const palletById = new Map((pallets ?? []).map((pallet) => [pallet.id, pallet] as const))
+    const brandById = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
 
     const items = orderItems.map((item) => {
       const product = item.product_id ? productById.get(item.product_id) : null
       const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
+      const brandName = product?.brand_id ? brandById.get(product.brand_id) ?? null : null
       return {
         id: item.id,
-        title: product?.title ?? pallet?.title ?? 'Unknown item',
+        title: product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item',
         details: (product ? getProductPackLabel(product) : null) ?? pallet?.description ?? '',
         quantity: item.quantity,
         unitPrice: Number(item.unit_price ?? 0),

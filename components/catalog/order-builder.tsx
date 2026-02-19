@@ -7,7 +7,7 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, Package, Search } from 'lu
 import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
 import { useCatalog, type CatalogTab } from '@/lib/hooks/useCatalog'
 import type { CatalogProduct, GroupByOption, PalletDeal } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate, getProductPackLabel } from '@/lib/utils'
+import { formatCurrency, formatDeliveryDate, getProductDisplayName, getProductPackLabel } from '@/lib/utils'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -153,8 +153,9 @@ export function OrderBuilder({
           if (!product) return null
           const unitPrice = product.effective_price
           const packLabel = getProductPackLabel(product)
+          const displayName = getProductDisplayName(product, product.brand?.name ?? null)
           return {
-            key, label: product.title, details: packLabel ?? '',
+            key, label: displayName, details: packLabel ?? '',
             quantity, unitPrice, lineTotal: unitPrice * quantity, type: 'product', id,
           }
         }
@@ -355,6 +356,7 @@ export function OrderBuilder({
                     const key = itemKey(product.id, null)
                     const quantity = quantities[key] ?? 0
                     const packLabel = getProductPackLabel(product) ?? 'N/A'
+                    const displayName = getProductDisplayName(product, product.brand?.name ?? null)
 
                     if (isCardLayout) {
                       return (
@@ -371,7 +373,7 @@ export function OrderBuilder({
                             </div>
                           )}
                           <div>
-                            <div className="font-semibold">{product.title}</div>
+                            <div className="font-semibold">{displayName}</div>
                             <div className="text-xs text-muted-foreground">{packLabel}</div>
                             {showPrices && (
                               <div className="mt-1 text-sm">{formatCurrency(product.effective_price)}</div>
@@ -388,7 +390,7 @@ export function OrderBuilder({
                     return (
                       <div key={product.id} className="flex items-center justify-between gap-3 border-b px-1 py-2 last:border-b-0">
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium">{product.title}</div>
+                          <div className="font-medium">{displayName}</div>
                           <div className="text-xs text-muted-foreground">
                             {packLabel}
                             {showPrices && <> · {formatCurrency(product.effective_price)}</>}

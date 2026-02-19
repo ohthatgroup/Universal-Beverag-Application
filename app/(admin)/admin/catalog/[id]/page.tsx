@@ -119,7 +119,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">Flavor / Details</Label>
             <Input id="title" name="title" defaultValue={product.title} required />
           </div>
           <div className="space-y-2">

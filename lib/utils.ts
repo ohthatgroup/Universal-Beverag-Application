@@ -133,6 +133,23 @@ export function getProductSizeLabel(product: ProductPackFields): string | null {
   return modifier ? `${base} ${modifier}` : base
 }
 
+export function getProductDisplayName(product: ProductPackFields, brandName?: string | null): string {
+  const brand = (brandName ?? '').trim()
+  const flavorDetails = (product.title ?? '').trim()
+  const size = getProductSizeLabel(product)
+
+  const parts: string[] = []
+  if (brand) parts.push(brand)
+  if (flavorDetails) parts.push(flavorDetails)
+  if (size) parts.push(size)
+
+  if (parts.length > 0) {
+    return parts.join(' - ')
+  }
+
+  return 'Unknown Product'
+}
+
 // ─── Dates ────────────────────────────────────────────────────────────────
 
 // Format ISO date string (YYYY-MM-DD) for display: "Feb 20, 2025"

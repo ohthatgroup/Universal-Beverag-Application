@@ -141,8 +141,8 @@ export default async function CatalogPage() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" required />
+              <Label htmlFor="title">Flavor / Details</Label>
+              <Input id="title" name="title" placeholder="COKE, DIET COKE, LEMON, etc." required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pack_details">Pack details</Label>
@@ -209,7 +209,7 @@ export default async function CatalogPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Title</th>
+                  <th className="px-4 py-3 text-left font-medium">Flavor / Details</th>
                   <th className="px-4 py-3 text-left font-medium">Brand</th>
                   <th className="px-4 py-3 text-left font-medium">Pack</th>
                   <th className="px-4 py-3 text-right font-medium">Price</th>
