@@ -117,10 +117,14 @@ export function OrderBuilder({
     setExpandedGroups((prev) => {
       if (prev.size === 0) return defaultOpen
       const next = new Set(prev)
+      let changed = false
       for (const key of defaultOpen) {
-        next.add(key)
+        if (!next.has(key)) {
+          next.add(key)
+          changed = true
+        }
       }
-      return next
+      return changed ? next : prev
     })
   }, [grouped])
 

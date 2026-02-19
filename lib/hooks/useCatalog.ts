@@ -62,8 +62,11 @@ export function useCatalog({
   }, [tabFiltered, filters.brandId, filters.sizeFilter, filters.searchQuery])
 
   const isFilterActive = Boolean(filters.brandId || filters.sizeFilter)
-  const newItems = filtered.filter((product) => product.is_new)
-  const productsForGroupedView = isFilterActive ? filtered : filtered.filter((product) => !product.is_new)
+  const newItems = useMemo(() => filtered.filter((product) => product.is_new), [filtered])
+  const productsForGroupedView = useMemo(
+    () => (isFilterActive ? filtered : filtered.filter((product) => !product.is_new)),
+    [filtered, isFilterActive]
+  )
 
   // Step 3: Group the filtered products
   const grouped = useMemo<CatalogGroup[]>(() => {
