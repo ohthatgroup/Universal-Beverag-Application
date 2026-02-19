@@ -376,9 +376,9 @@ export type Database = {
           show_prices: boolean
           default_group: string
           custom_pricing: boolean
-          access_token: string | null
           created_at: string
           updated_at: string
+          access_token: string | null
         }
         Insert: {
           id: string
@@ -394,9 +394,9 @@ export type Database = {
           show_prices?: boolean
           default_group?: string
           custom_pricing?: boolean
-          access_token?: string | null
           created_at?: string
           updated_at?: string
+          access_token?: string | null
         }
         Update: {
           id?: string
@@ -412,9 +412,9 @@ export type Database = {
           show_prices?: boolean
           default_group?: string
           custom_pricing?: boolean
-          access_token?: string | null
           created_at?: string
           updated_at?: string
+          access_token?: string | null
         }
         Relationships: [
         ]
