@@ -19,10 +19,13 @@ test('portal with valid token loads customer home', async ({ page }) => {
   const token = await getCustomerToken('CI Customer A')
 
   await page.goto(`/c/${token}`)
-  await expect(page.getByRole('heading', { name: 'Universal Beverages' })).toBeVisible()
+  // Use locator('h1') instead of getByRole('heading') because the Radix dialog
+  // opens immediately (isDialogOpen defaults to true), which sets aria-hidden
+  // on the rest of the page content — hiding the heading from the a11y tree.
+  await expect(page.locator('h1')).toContainText('Universal Beverages')
 })
 
 test('portal with invalid token shows not found', async ({ page }) => {
   await page.goto('/c/00000000deadbeef00000000deadbeef')
-  await expect(page.locator('body')).toContainText(/not found/i)
+  await expect(page.locator('body')).toContainText(/could not be found/i)
 })

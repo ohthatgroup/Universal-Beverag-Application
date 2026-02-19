@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ type ActionType = 'new' | 'continue'
 
 export function DateSelectorCard({ token, initialDate, drafts }: DateSelectorCardProps) {
   const router = useRouter()
+  const dateInputRef = useRef<HTMLInputElement>(null)
   const [date, setDate] = useState(initialDate ?? todayISODate())
   const [isDialogOpen, setIsDialogOpen] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -100,7 +101,25 @@ export function DateSelectorCard({ token, initialDate, drafts }: DateSelectorCar
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <span className="text-lg font-semibold">{formatDeliveryDate(date)}</span>
+              <button
+                type="button"
+                className="relative text-lg font-semibold"
+                onClick={() => dateInputRef.current?.showPicker?.()}
+              >
+                {formatDeliveryDate(date)}
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  value={date}
+                  min={todayISODate()}
+                  onChange={(e) => {
+                    if (e.target.value && e.target.value >= todayISODate()) {
+                      setDate(e.target.value)
+                    }
+                  }}
+                />
+              </button>
               <Button
                 type="button"
                 variant="ghost"

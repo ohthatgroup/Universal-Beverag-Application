@@ -11,9 +11,11 @@ test('customer creates draft through portal link', async ({ page }) => {
   const token = await getCustomerToken('CI Customer A')
 
   await page.goto(`/c/${token}`)
-  await expect(page.getByRole('heading', { name: 'Universal Beverages' })).toBeVisible()
+  // Use locator('h1') instead of getByRole('heading') because the Radix dialog
+  // opens immediately, setting aria-hidden on the rest of the page content.
+  await expect(page.locator('h1')).toContainText('Universal Beverages')
 
-  await page.getByRole('button', { name: 'Select Date' }).click()
+  // Dialog is already open — fill the date input and create a new order
   await page.locator('input[type="date"]').first().fill(draftDate)
   await page.getByRole('button', { name: '+ New Order' }).click()
 
@@ -28,7 +30,7 @@ test('customer submits and sees submitted order in read-only view', async ({ pag
   const token = await getCustomerToken('CI Customer A')
 
   await page.goto(`/c/${token}`)
-  await page.getByRole('button', { name: 'Select Date' }).click()
+  // Dialog is already open — fill the date input and create a new order
   await page.locator('input[type="date"]').first().fill(submittedDate)
   await page.getByRole('button', { name: '+ New Order' }).click()
   await expect(page).toHaveURL(/\/c\/[a-f0-9]+\/order\/link\/[0-9a-f-]+$/i)

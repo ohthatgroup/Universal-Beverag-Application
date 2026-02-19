@@ -10,6 +10,7 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
   webServer: {
     command: 'npx next start -H 0.0.0.0',

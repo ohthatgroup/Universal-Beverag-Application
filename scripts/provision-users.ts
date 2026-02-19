@@ -10,6 +10,8 @@ interface SalesmanSpec {
   role: 'salesman'
   businessName: string
   contactName: string
+  /** When true, don't overwrite the password if the user already exists */
+  skipPasswordUpdate?: boolean
 }
 
 interface CustomerSpec {
@@ -70,14 +72,20 @@ async function ensureSalesman(
 ): Promise<string> {
   const existingId = await findUserIdByEmail(adminClient, spec.email)
   if (existingId) {
-    const { error } = await adminClient.auth.admin.updateUserById(existingId, {
-      password: spec.password,
+    const updatePayload: Parameters<typeof adminClient.auth.admin.updateUserById>[1] = {
       email_confirm: true,
       user_metadata: {
         full_name: spec.contactName,
         role: spec.role,
       },
-    })
+    }
+
+    // Only reset password for CI test accounts, not for real user accounts
+    if (!spec.skipPasswordUpdate) {
+      updatePayload.password = spec.password
+    }
+
+    const { error } = await adminClient.auth.admin.updateUserById(existingId, updatePayload)
 
     if (error) {
       throw new Error(`Failed to update auth user ${spec.email}: ${error.message}`)
@@ -181,6 +189,7 @@ async function main() {
       role: 'salesman',
       businessName: 'Universal Beverages',
       contactName: 'Inbox User',
+      skipPasswordUpdate: true,
     },
   ]
 
