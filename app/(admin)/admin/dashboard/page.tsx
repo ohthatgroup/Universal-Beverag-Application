@@ -50,7 +50,7 @@ export default async function DashboardPage() {
       .limit(200),
     context.supabase
       .from('profiles')
-      .select('id,business_name,contact_name,email')
+      .select('id,business_name,contact_name,email,access_token')
       .eq('role', 'customer')
       .order('business_name', { ascending: true }),
   ])

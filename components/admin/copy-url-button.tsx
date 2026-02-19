@@ -22,11 +22,19 @@ export function CopyUrlButton({
 }: CopyUrlButtonProps) {
   const [copied, setCopied] = useState(false)
 
+  const resolveAbsoluteUrl = (rawUrl: string) => {
+    if (/^https?:\/\//i.test(rawUrl)) {
+      return rawUrl
+    }
+    const normalized = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`
+    return `${window.location.origin}${normalized}`
+  }
+
   const copy = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
 
-    await navigator.clipboard.writeText(url)
+    await navigator.clipboard.writeText(resolveAbsoluteUrl(url))
     setCopied(true)
     setTimeout(() => setCopied(false), 1400)
   }

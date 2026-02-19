@@ -11,9 +11,10 @@ interface ImageUploadProps {
   folder: string
   className?: string
   compact?: boolean
+  iconOnly?: boolean
 }
 
-export function ImageUpload({ value, onChange, folder, className, compact = false }: ImageUploadProps) {
+export function ImageUpload({ value, onChange, folder, className, compact = false, iconOnly = false }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,7 +53,7 @@ export function ImageUpload({ value, onChange, folder, className, compact = fals
           setError('Upload succeeded but no URL returned')
         }
       } catch {
-        setError('Network error — please try again')
+        setError('Network error - please try again')
       } finally {
         setIsUploading(false)
       }
@@ -81,6 +82,54 @@ export function ImageUpload({ value, onChange, folder, className, compact = fals
 
   const handleDragLeave = () => {
     setDragOver(false)
+  }
+
+  if (iconOnly) {
+    return (
+      <div className={cn('space-y-2', className)}>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className={cn(
+              'flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border text-muted-foreground transition-colors hover:border-primary hover:text-primary',
+              isUploading && 'pointer-events-none opacity-60'
+            )}
+          >
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : value ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={value} alt="Uploaded image" className="h-full w-full object-cover" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+          </button>
+          {value ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-9 w-9"
+              onClick={() => onChange(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
+    )
   }
 
   return (
@@ -145,3 +194,4 @@ export function ImageUpload({ value, onChange, folder, className, compact = fals
     </div>
   )
 }
+

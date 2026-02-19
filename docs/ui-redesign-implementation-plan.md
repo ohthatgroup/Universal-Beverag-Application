@@ -231,3 +231,87 @@ Implement the requested UX changes across Admin Dashboard, Orders, Customers, Ca
 - All requested UX changes implemented and verified.
 - New/changed flows covered by tests or documented manual checks.
 - No critical visual regressions in admin or portal layouts.
+
+## Status Update (February 19, 2026)
+
+### What Worked
+- Type safety and build health:
+  - `npm run typecheck` passed.
+  - `npm run test` passed (unit tests).
+  - `npm run build` passed.
+- Core UX delivery (v1) shipped across WS-1 through WS-9:
+  - Inline order status controls near CSV/deep-link actions.
+  - New + Search compact control rows on key admin pages.
+  - Live search behavior added to admin customers/catalog/customer-products.
+  - Dialog-based draft order + create-customer flow wired through new API.
+  - Shared add-product dialog implemented for order and customer catalog contexts.
+  - Portal redesign baseline delivered (`All` left, `New Items` section under `All`, bordered group containers, filter-driven ungrouped list behavior, pallet assist action).
+
+### What Failed / Needs Rework
+- Runtime stability:
+  - User reported `Minified React error #185` in production flow; root cause not yet isolated in non-minified repro.
+- Deep-link semantics:
+  - Deep links currently point to admin order route in places where customer portal deep links are expected.
+- URL copy quality:
+  - Copy actions return relative paths in some flows instead of absolute URLs.
+- Layout polish gaps:
+  - Catalog Settings wrapping still needs refinement on some breakpoints.
+  - Dashboard still shows a date search/filter field that should be removed.
+  - On mobile, add and search controls should be separated onto their own lines.
+  - Add Product dialog frame can be cut off on mobile and must fit within viewport.
+  - Add pallet/create pallet surface is not properly contained on mobile.
+  - Customer manage-products view should include brand name in product titles.
+  - Brand create/edit panel still needs tighter visual structure ("add a line" separator treatment).
+  - Brand upload affordance should be a simpler icon control aligned to input height.
+  - Brand list needs an explicit delete action.
+  - Brand name input is visually too wide on desktop and should be reduced.
+- Sorting/management workflow:
+  - Manual numeric sorting still present; drag + batch move/delete workflow not yet implemented.
+- Pallet deal content UX:
+  - Deal contents still need dedicated search/filter header and full display naming (include brand).
+  - `single` vs `mixed` interaction model not yet matching requested behavior (select-only vs quantity + autosave).
+- Clickable rows scope:
+  - Requirement to make all rows fully clickable has not yet been fully applied to:
+    - admin order items table
+    - admin customers table
+    - other applicable admin tables with row-level navigation.
+
+## WS-10: Post-Feedback Corrections
+
+### Objective
+Close the known gaps from the latest QA/user feedback and bring behavior in line with requested interaction model.
+
+### Tasks
+1. Reproduce and resolve React `#185` in development mode; patch and verify no runtime crash.
+2. Switch deep-link target to customer portal URLs where requested.
+3. Normalize all copy-link actions to absolute URLs.
+4. Fix Catalog Settings wrapping behavior across desktop/tablet/mobile breakpoints.
+5. Replace brand upload affordance with compact input-height icon action.
+6. Implement drag-and-drop ordering + batch actions (move/delete) replacing manual sort-number workflow.
+7. Add search/filter header to deal contents and render full product display names (with brand).
+8. Implement pallet item editing by type:
+   - `single`: select button flow
+   - `mixed`: quantity selector flow
+   - autosave changes (remove explicit Save button)
+9. Apply full-row click behavior across admin tables that represent navigable records, explicitly including:
+   - admin order items table
+   - admin customers table
+10. Remove dashboard date search field from the orders controls.
+11. On mobile breakpoints, enforce add controls and search controls on separate lines.
+12. Fix Add Product dialog sizing/containment so modal frame fully fits mobile viewport.
+13. Ensure customer manage-products list/title includes brand in product naming.
+14. Fix add-pallet/create-pallet surface containment on mobile.
+15. Add stronger visual separators/line treatment to Add Brand panel.
+16. Add delete button/action for brands in the brand list.
+17. Reduce desktop width footprint of brand name field.
+
+### Acceptance Criteria
+- No runtime React crash in affected pages.
+- Portal deep links and copied URLs are absolute and correct.
+- Rows are fully clickable where navigation is expected, with safe interaction exceptions for controls.
+- Pallet editing behavior matches `single`/`mixed` requested model.
+- Sorting is drag/batch based, not manual numeric entry.
+- Dashboard no longer shows a date search field.
+- Mobile layouts keep add and search controls on separate rows where requested.
+- Add Product and Add Pallet surfaces are fully visible/contained on mobile.
+- Brand list supports delete, compact name field sizing, and clearer panel separators.

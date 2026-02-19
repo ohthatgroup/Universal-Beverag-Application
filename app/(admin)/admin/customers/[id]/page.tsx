@@ -153,14 +153,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      {/* Portal Link — prominent at top */}
+      {/* Portal Link - prominent at top */}
       <CustomerPortalLink customerId={customer.id} accessToken={customer.access_token} />
 
       {/* Two-column layout on desktop */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Left column: Customer Info + Catalog Settings */}
         <div className="space-y-6">
-          {/* Customer info form — always visible */}
+          {/* Customer info form - always visible */}
           <form action={updateCustomer} className="space-y-4 rounded-lg border p-4">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Customer Info</h2>
 
@@ -201,8 +201,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Catalog Settings</h2>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-end">
-              <label className="flex items-center justify-between rounded-lg border p-3 md:min-w-56">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+              <label className="flex items-center justify-between rounded-lg border p-3">
                 <span className="text-sm font-medium">Show prices</span>
                 <span className="relative inline-flex h-5 w-9 items-center">
                   <input defaultChecked={customer.show_prices ?? true} name="show_prices" type="checkbox" className="peer sr-only" />
@@ -210,7 +210,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
                 </span>
               </label>
-              <label className="flex items-center justify-between rounded-lg border p-3 md:min-w-56">
+              <label className="flex items-center justify-between rounded-lg border p-3">
                 <span className="text-sm font-medium">Custom pricing</span>
                 <span className="relative inline-flex h-5 w-9 items-center">
                   <input defaultChecked={customer.custom_pricing ?? false} name="custom_pricing" type="checkbox" className="peer sr-only" />
@@ -219,7 +219,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 </span>
               </label>
 
-              <div className="space-y-2 md:min-w-44">
+              <div className="space-y-2">
                 <Label>Default Grouping</Label>
                 <select
                   name="default_group"
@@ -281,7 +281,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                     <div>
                       <div className="font-medium text-sm">{formatDeliveryDate(order.delivery_date)}</div>
                       <div className="text-xs text-muted-foreground">
-                        {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
+                        {order.item_count ?? 0} items - {formatCurrency(order.total ?? 0)}
                       </div>
                     </div>
                     <span className="text-sm">
@@ -297,3 +297,4 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     </div>
   )
 }
+

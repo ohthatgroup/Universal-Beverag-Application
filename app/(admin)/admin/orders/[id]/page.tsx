@@ -31,7 +31,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   const customerPromise = order.customer_id
     ? context.supabase
         .from('profiles')
-        .select('id,business_name,contact_name,email,phone')
+        .select('id,business_name,contact_name,email,phone,access_token')
         .eq('id', order.customer_id)
         .maybeSingle()
     : Promise.resolve({ data: null, error: null })
@@ -59,7 +59,14 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   const orderId = order.id
   const submittedAt = order.submitted_at
   const orderItems = items ?? []
-  const orderDeepLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/orders/${order.id}`
+  const getItemHref = (item: { product_id: string | null; pallet_deal_id: string | null }) => {
+    if (item.product_id) return `/admin/catalog/${item.product_id}`
+    if (item.pallet_deal_id) return `/admin/catalog/pallets/${item.pallet_deal_id}`
+    return null
+  }
+  const orderDeepLink = customer?.access_token
+    ? `/c/${customer.access_token}/order/link/${order.id}`
+    : `/admin/orders/${order.id}`
   const pickerProducts = (products ?? []).map((product) => ({
     id: product.id,
     title: product.title,
@@ -215,20 +222,30 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                 const product = item.product_id ? productById.get(item.product_id) : null
                 const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
                 const brandName = product?.brand_id ? brandById.get(product.brand_id) ?? null : null
-                return (
-                  <div key={item.id} className="flex items-center justify-between border-b py-3 last:border-0">
+                const itemHref = getItemHref(item)
+                const content = (
+                  <>
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium text-sm">
+                      <div className="text-sm font-medium">
                         {product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item'}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {(product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {formatCurrency(item.unit_price)} × {item.quantity}
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {formatCurrency(item.unit_price)} x {item.quantity}
                       </div>
                     </div>
                     <div className="ml-4 text-sm font-medium">{formatCurrency(item.line_total ?? 0)}</div>
+                  </>
+                )
+                return itemHref ? (
+                  <Link key={item.id} href={itemHref} className="flex items-center justify-between border-b py-3 last:border-0 hover:bg-muted/30">
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={item.id} className="flex items-center justify-between border-b py-3 last:border-0">
+                    {content}
                   </div>
                 )
               })}
@@ -251,17 +268,36 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                     const product = item.product_id ? productById.get(item.product_id) : null
                     const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
                     const brandName = product?.brand_id ? brandById.get(product.brand_id) ?? null : null
+                    const itemHref = getItemHref(item)
                     return (
-                      <tr key={item.id} className="border-b last:border-0">
+                      <tr key={item.id} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-3 font-medium">
-                          {product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item'}
+                          {itemHref ? (
+                            <Link href={itemHref} className="block">
+                              {product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item'}
+                            </Link>
+                          ) : (
+                            product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item'
+                          )}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          {(product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''}
+                          {itemHref ? (
+                            <Link href={itemHref} className="block">
+                              {(product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''}
+                            </Link>
+                          ) : (
+                            (product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-right">{item.quantity}</td>
-                        <td className="px-4 py-3 text-right">{formatCurrency(item.unit_price)}</td>
-                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.line_total ?? 0)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {itemHref ? <Link href={itemHref} className="block">{item.quantity}</Link> : item.quantity}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {itemHref ? <Link href={itemHref} className="block">{formatCurrency(item.unit_price)}</Link> : formatCurrency(item.unit_price)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium">
+                          {itemHref ? <Link href={itemHref} className="block">{formatCurrency(item.line_total ?? 0)}</Link> : formatCurrency(item.line_total ?? 0)}
+                        </td>
                       </tr>
                     )
                   })}
@@ -302,3 +338,4 @@ function asOrderStatus(value: string): OrderStatus {
   }
   return 'draft'
 }
+

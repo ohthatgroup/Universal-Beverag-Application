@@ -136,77 +136,80 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         <h1 className="text-2xl font-semibold">Catalog</h1>
       </div>
 
-      <div className="flex flex-wrap items-start gap-2">
-        <details className="group rounded-md border">
-          <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
-            <Plus className="h-3.5 w-3.5" />
-            New Product
-          </summary>
-          <div className="border-t p-4">
-            <form action={createProduct} className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="brand_id">Brand</Label>
-                <select
-                  id="brand_id"
-                  name="brand_id"
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                  defaultValue=""
-                >
-                  <option value="">No brand</option>
-                  {(brands ?? []).map((brand) => (
-                    <option key={brand.id} value={brand.id}>{brand.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Flavor / Details</Label>
-                <Input id="title" name="title" placeholder="COKE, DIET COKE, LEMON, etc." required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pack_details">Pack details</Label>
-                <Input id="pack_details" name="pack_details" placeholder="Optional label, auto-built from structured fields when blank" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pack_count">Pack count</Label>
-                <Input id="pack_count" name="pack_count" type="number" min="1" step="1" placeholder="24" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="size_value">Size value</Label>
-                <Input id="size_value" name="size_value" type="number" min="0" step="0.001" placeholder="12" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="size_uom">Size unit</Label>
-                <select
-                  id="size_uom"
-                  name="size_uom"
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                  defaultValue=""
-                >
-                  <option value="">Select unit</option>
-                  {PACK_UOM_OPTIONS.map((unit) => (
-                    <option key={unit} value={unit}>{unit}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
-                <Input id="price" name="price" type="number" step="0.01" min="0" required />
-              </div>
-              <ImageUploadField name="image_url" label="Image" folder="products" />
-              <label className="flex items-center gap-2 text-sm md:col-span-2">
-                <input type="checkbox" name="is_new" className="h-4 w-4" />
-                Mark as new item
-              </label>
-              <Button type="submit" className="md:col-span-2">Create Product</Button>
-            </form>
-          </div>
-        </details>
-
-        <LiveQueryInput
-          placeholder="Search products..."
-          initialValue={searchQuery}
-          className="w-full sm:w-80"
-        />
+      <div className="space-y-2 sm:flex sm:items-start sm:gap-2 sm:space-y-0">
+        <div className="flex items-center gap-2">
+          <details className="group rounded-md border">
+            <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
+              <Plus className="h-3.5 w-3.5" />
+              New Product
+            </summary>
+            <div className="border-t p-4">
+              <form action={createProduct} className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="brand_id">Brand</Label>
+                  <select
+                    id="brand_id"
+                    name="brand_id"
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    defaultValue=""
+                  >
+                    <option value="">No brand</option>
+                    {(brands ?? []).map((brand) => (
+                      <option key={brand.id} value={brand.id}>{brand.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="title">Flavor / Details</Label>
+                  <Input id="title" name="title" placeholder="COKE, DIET COKE, LEMON, etc." required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pack_details">Pack details</Label>
+                  <Input id="pack_details" name="pack_details" placeholder="Optional label, auto-built from structured fields when blank" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pack_count">Pack count</Label>
+                  <Input id="pack_count" name="pack_count" type="number" min="1" step="1" placeholder="24" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="size_value">Size value</Label>
+                  <Input id="size_value" name="size_value" type="number" min="0" step="0.001" placeholder="12" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="size_uom">Size unit</Label>
+                  <select
+                    id="size_uom"
+                    name="size_uom"
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    defaultValue=""
+                  >
+                    <option value="">Select unit</option>
+                    {PACK_UOM_OPTIONS.map((unit) => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input id="price" name="price" type="number" step="0.01" min="0" required />
+                </div>
+                <ImageUploadField name="image_url" label="Image" folder="products" />
+                <label className="flex items-center gap-2 text-sm md:col-span-2">
+                  <input type="checkbox" name="is_new" className="h-4 w-4" />
+                  Mark as new item
+                </label>
+                <Button type="submit" className="md:col-span-2">Create Product</Button>
+              </form>
+            </div>
+          </details>
+        </div>
+        <div className="flex items-center gap-2">
+          <LiveQueryInput
+            placeholder="Search products..."
+            initialValue={searchQuery}
+            className="w-full sm:w-80"
+          />
+        </div>
       </div>
 
       {productList.length === 0 ? (

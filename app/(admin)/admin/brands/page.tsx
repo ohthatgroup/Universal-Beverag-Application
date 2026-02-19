@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -65,6 +65,30 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
     redirect('/admin/brands')
   }
 
+  async function deleteBrand(formData: FormData) {
+    'use server'
+
+    await requirePageAuth(['salesman'])
+    const id = String(formData.get('id') ?? '').trim()
+    if (!id) throw new Error('Missing brand id')
+
+    const supabaseClient = await createClient()
+    const { error: unlinkError } = await supabaseClient
+      .from('products')
+      .update({ brand_id: null })
+      .eq('brand_id', id)
+
+    if (unlinkError) throw unlinkError
+
+    const { error: deleteError } = await supabaseClient
+      .from('brands')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) throw deleteError
+    redirect('/admin/brands')
+  }
+
   const brandList = (brands ?? []).filter((brand) => {
     if (!searchTerm) return true
     return brand.name.toLowerCase().includes(searchTerm)
@@ -76,35 +100,38 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
         <h1 className="text-2xl font-semibold">Brands</h1>
       </div>
 
-      <div className="flex flex-wrap items-start gap-2">
-        <details className="group rounded-md border">
-          <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
-            <Plus className="h-3.5 w-3.5" />
-            New Brand
-          </summary>
-          <div className="border-t p-4">
-            <form action={createBrand} className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sort_order">Sort order</Label>
-                <Input id="sort_order" name="sort_order" type="number" defaultValue={0} className="w-24" />
-              </div>
-              <ImageUploadField name="logo_url" label="Logo" folder="brands" compact />
-              <div className="flex items-end">
-                <Button type="submit">Create</Button>
-              </div>
-            </form>
-          </div>
-        </details>
-
-        <LiveQueryInput
-          placeholder="Search brands..."
-          initialValue={searchQuery}
-          className="w-full sm:w-80"
-        />
+      <div className="space-y-2 sm:flex sm:items-start sm:gap-2 sm:space-y-0">
+        <div className="flex items-center gap-2">
+          <details className="group rounded-md border">
+            <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
+              <Plus className="h-3.5 w-3.5" />
+              New Brand
+            </summary>
+            <div className="border-t border-dashed p-4">
+              <form action={createBrand} className="grid gap-3 md:grid-cols-[minmax(220px,320px)_auto_auto_auto] md:items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" name="name" required className="h-9" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sort_order">Sort order</Label>
+                  <Input id="sort_order" name="sort_order" type="number" defaultValue={0} className="h-9 w-24" />
+                </div>
+                <ImageUploadField name="logo_url" label="Logo" folder="brands" compact iconOnly />
+                <div className="flex items-end">
+                  <Button type="submit">Create</Button>
+                </div>
+              </form>
+            </div>
+          </details>
+        </div>
+        <div className="flex items-center gap-2">
+          <LiveQueryInput
+            placeholder="Search brands..."
+            initialValue={searchQuery}
+            className="w-full sm:w-80"
+          />
+        </div>
       </div>
 
       {brandList.length === 0 ? (
@@ -114,7 +141,7 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
           {brandList.map((brand) => (
             <form key={brand.id} action={updateBrand} className="rounded-lg border p-4">
               <input type="hidden" name="id" value={brand.id} />
-              <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
+              <div className="grid gap-3 md:grid-cols-[minmax(220px,320px)_auto_auto_auto_auto] md:items-end">
                 <div className="space-y-2">
                   <Label>Name</Label>
                   <Input name="name" defaultValue={brand.name} className="h-9 text-sm" />
@@ -123,9 +150,13 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
                   <Label>Sort</Label>
                   <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} className="h-9 w-20 text-sm" />
                 </div>
-                <ImageUploadField name="logo_url" label="Logo" folder="brands" defaultValue={brand.logo_url} compact />
-                <div className="flex items-end">
+                <ImageUploadField name="logo_url" label="Logo" folder="brands" defaultValue={brand.logo_url} compact iconOnly />
+                <div className="flex items-end gap-2">
                   <Button size="sm" type="submit">Save</Button>
+                  <Button size="sm" type="submit" variant="destructive" formAction={deleteBrand}>
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Delete
+                  </Button>
                 </div>
               </div>
             </form>

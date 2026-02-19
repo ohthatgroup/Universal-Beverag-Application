@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useRef, useState } from 'react'
 import { Copy, Download, ExternalLink, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -23,6 +23,7 @@ interface Customer {
   business_name: string | null
   contact_name: string | null
   email: string | null
+  access_token: string | null
 }
 
 interface OrderRow {
@@ -98,13 +99,15 @@ function StatusPill({ status, orderId }: { status: OrderStatus; orderId: string 
   )
 }
 
-function DeepLinkButton({ orderId }: { orderId: string }) {
+function DeepLinkButton({ orderId, customerToken }: { orderId: string; customerToken: string | null }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const url = `${window.location.origin}/admin/orders/${orderId}`
+    const url = customerToken
+      ? `${window.location.origin}/c/${customerToken}/order/link/${orderId}`
+      : `${window.location.origin}/admin/orders/${orderId}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
@@ -130,7 +133,6 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
 
   // Live search state
   const [localSearch, setLocalSearch] = useState(searchParams.get('q') ?? '')
-  const [localDate, setLocalDate] = useState(searchParams.get('deliveryDate') ?? '')
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // New Draft Order dialog state
@@ -144,14 +146,18 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
 
   const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
   const selectedStatus = normalizeStatus(searchParams.get('status'))
+  const selectedDeliveryDateParam = searchParams.get('deliveryDate') ?? ''
   const selectedDeliveryDate =
-    localDate && isoDateRegex.test(localDate) ? localDate : ''
+    selectedDeliveryDateParam && isoDateRegex.test(selectedDeliveryDateParam) ? selectedDeliveryDateParam : ''
 
   const customerById = new Map(
     customers.map((customer) => [
       customer.id,
       customer.business_name || customer.contact_name || customer.email || customer.id,
     ])
+  )
+  const tokenByCustomerId = new Map(
+    customers.map((customer) => [customer.id, customer.access_token ?? null] as const)
   )
 
   const searchTerm = localSearch.toLowerCase().trim()
@@ -190,6 +196,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     const params = new URLSearchParams()
     const merged = {
       status: selectedStatus !== 'all' ? selectedStatus : undefined,
+      deliveryDate: selectedDeliveryDate || undefined,
       ...overrides,
     }
     for (const [key, value] of Object.entries(merged)) {
@@ -203,16 +210,10 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     setLocalSearch(value)
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
     searchDebounceRef.current = setTimeout(() => {
-      router.push(buildQuery({ q: value.trim() || undefined, deliveryDate: localDate || undefined }), { scroll: false })
+      router.push(buildQuery({ q: value.trim() || undefined }), { scroll: false })
     }, 400)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localDate, selectedStatus, basePath])
-
-  const handleDateChange = useCallback((value: string) => {
-    setLocalDate(value)
-    router.push(buildQuery({ q: localSearch.trim() || undefined, deliveryDate: value || undefined }), { scroll: false })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localSearch, selectedStatus, basePath])
+  }, [selectedStatus, basePath, selectedDeliveryDate])
 
   const handleCreateDraft = async () => {
     if (!draftDeliveryDate || !isoDateRegex.test(draftDeliveryDate)) return
@@ -262,27 +263,25 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     <section className="space-y-4">
       <h2 className="text-lg font-semibold">Orders</h2>
 
-      {/* Top row: New Draft button + search + date filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={() => { setDraftDialogOpen(true); setNewCustomerMode(false); setSelectedCustomerId(''); setNewBizName(''); setNewEmail('') }}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          New Draft Order
-        </Button>
-        <div className="relative flex-1 min-w-48 max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by customer..."
-            value={localSearch}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9 h-9"
-          />
+      {/* Top controls: stacked by row on mobile */}
+      <div className="space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => { setDraftDialogOpen(true); setNewCustomerMode(false); setSelectedCustomerId(''); setNewBizName(''); setNewEmail('') }}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            New Draft Order
+          </Button>
         </div>
-        <Input
-          type="date"
-          value={localDate}
-          onChange={(e) => handleDateChange(e.target.value)}
-          className="h-9 w-40"
-        />
+        <div className="flex items-center gap-2">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by customer..."
+              value={localSearch}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="h-9 pl-9"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Status filter tabs */}
@@ -322,7 +321,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                           {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
+                          {order.item_count ?? 0} items - {formatCurrency(order.total ?? 0)}
                         </div>
                       </div>
                       <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
@@ -334,7 +333,10 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                           CSV
                         </a>
                       </Button>
-                      <DeepLinkButton orderId={order.id} />
+                      <DeepLinkButton
+                        orderId={order.id}
+                        customerToken={order.customer_id ? tokenByCustomerId.get(order.customer_id) ?? null : null}
+                      />
                     </div>
                   </Link>
                 ))}
@@ -376,7 +378,10 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                                 <Download className="h-3.5 w-3.5" />
                               </a>
                             </Button>
-                            <DeepLinkButton orderId={order.id} />
+                            <DeepLinkButton
+                              orderId={order.id}
+                              customerToken={order.customer_id ? tokenByCustomerId.get(order.customer_id) ?? null : null}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -391,9 +396,12 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
 
       {/* New Draft Order dialog */}
       <Dialog open={draftDialogOpen} onOpenChange={setDraftDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>New Draft Order</DialogTitle>
+            <DialogDescription>
+              Create a draft for an existing customer or create a new customer inline.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             {/* Toggle: existing customer vs new customer */}

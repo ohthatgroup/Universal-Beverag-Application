@@ -1,5 +1,6 @@
 import { apiOk, apiError, toErrorResponse, getRequestId, logApiEvent } from '@/lib/server/api'
 import { requireAuthContext } from '@/lib/server/auth'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const ALLOWED_FOLDERS = ['products', 'brands', 'pallets']
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
@@ -9,6 +10,7 @@ export async function POST(request: Request) {
   const requestId = getRequestId(request)
   try {
     const context = await requireAuthContext(['salesman'])
+    const admin = createAdminClient()
 
     const formData = await request.formData()
     const file = formData.get('file')
@@ -52,7 +54,18 @@ export async function POST(request: Request) {
 
     const buffer = await file.arrayBuffer()
 
-    const { error: uploadError } = await context.supabase.storage
+    const { error: bucketError } = await admin.storage.getBucket('images')
+    if (bucketError) {
+      return apiError(
+        500,
+        'storage_not_configured',
+        'Images bucket is not configured. Run the storage migration to create bucket "images".',
+        bucketError.message,
+        requestId
+      )
+    }
+
+    const { error: uploadError } = await admin.storage
       .from('images')
       .upload(path, buffer, {
         contentType: file.type,
@@ -64,7 +77,7 @@ export async function POST(request: Request) {
       throw uploadError
     }
 
-    const { data: publicUrlData } = context.supabase.storage
+    const { data: publicUrlData } = admin.storage
       .from('images')
       .getPublicUrl(path)
 

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 
@@ -93,14 +93,17 @@ export function ProductPickerDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-hidden p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Search and filter products, then add items without leaving this page.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-56">
+        <div className="min-h-0 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
@@ -112,7 +115,7 @@ export function ProductPickerDialog({
             <select
               value={brand}
               onChange={(event) => setBrand(event.target.value)}
-              className="h-9 rounded-md border bg-background px-3 text-sm"
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm sm:w-48"
             >
               <option value="all">All brands</option>
               {brands.map((entry) => (
@@ -125,7 +128,7 @@ export function ProductPickerDialog({
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <div className="max-h-[420px] space-y-0 overflow-y-auto rounded-md border">
+          <div className="max-h-[55vh] space-y-0 overflow-y-auto rounded-md border sm:max-h-[420px]">
             {filtered.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">No products found.</p>
             ) : (

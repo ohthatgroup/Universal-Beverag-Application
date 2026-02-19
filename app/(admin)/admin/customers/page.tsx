@@ -113,32 +113,35 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
         <h1 className="text-2xl font-semibold">Customers</h1>
       </div>
 
-      <div className="flex flex-wrap items-start gap-2">
-        <details className="group rounded-md border">
-          <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
-            <Plus className="h-3.5 w-3.5" />
-            New Customer
-          </summary>
-          <div className="border-t p-4">
-            <form action={createCustomer} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-              <div className="space-y-2">
-                <Label htmlFor="customer-business-name">Business Name</Label>
-                <Input id="customer-business-name" name="business_name" required placeholder="Acme Beverages" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="customer-email">Email (optional)</Label>
-                <Input id="customer-email" name="email" type="email" placeholder="owner@acme.com" />
-              </div>
-              <Button type="submit">Create</Button>
-            </form>
-          </div>
-        </details>
-
-        <LiveQueryInput
-          placeholder="Search customers..."
-          initialValue={searchQuery}
-          className="w-full sm:w-80"
-        />
+      <div className="space-y-2 sm:flex sm:items-start sm:gap-2 sm:space-y-0">
+        <div className="flex items-center gap-2">
+          <details className="group rounded-md border">
+            <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
+              <Plus className="h-3.5 w-3.5" />
+              New Customer
+            </summary>
+            <div className="border-t p-4">
+              <form action={createCustomer} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="customer-business-name">Business Name</Label>
+                  <Input id="customer-business-name" name="business_name" required placeholder="Acme Beverages" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-email">Email (optional)</Label>
+                  <Input id="customer-email" name="email" type="email" placeholder="owner@acme.com" />
+                </div>
+                <Button type="submit">Create</Button>
+              </form>
+            </div>
+          </details>
+        </div>
+        <div className="flex items-center gap-2">
+          <LiveQueryInput
+            placeholder="Search customers..."
+            initialValue={searchQuery}
+            className="w-full sm:w-80"
+          />
+        </div>
       </div>
 
       {customers.length === 0 ? (
@@ -197,14 +200,24 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
                   return (
                     <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3">
-                        <Link href={`/admin/customers/${customer.id}`} className="font-medium hover:underline">
+                        <Link href={`/admin/customers/${customer.id}`} className="block font-medium hover:underline">
                           {customer.business_name || customer.contact_name || customer.email || customer.id}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{customer.email ?? '-'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{customer.phone ?? '-'}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {lastOrderDate ? formatDeliveryDate(lastOrderDate) : '-'}
+                        <Link href={`/admin/customers/${customer.id}`} className="block">
+                          {customer.email ?? '-'}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        <Link href={`/admin/customers/${customer.id}`} className="block">
+                          {customer.phone ?? '-'}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        <Link href={`/admin/customers/${customer.id}`} className="block">
+                          {lastOrderDate ? formatDeliveryDate(lastOrderDate) : '-'}
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-right">
                         {portalUrl ? <CopyUrlButton url={portalUrl} label="Copy URL" /> : <span className="text-muted-foreground">-</span>}

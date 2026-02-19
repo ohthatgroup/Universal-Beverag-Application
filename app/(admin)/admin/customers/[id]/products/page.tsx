@@ -60,6 +60,10 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
   const customerName = customer.business_name || customer.contact_name || 'Customer'
   const overrideByProductId = new Map((overrides ?? []).map((entry) => [entry.product_id, entry] as const))
   const brandById = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
+  const getProductTitleWithBrand = (product: { title: string; brand_id: string | null }) => {
+    const brandLabel = product.brand_id ? brandById.get(product.brand_id) ?? '' : ''
+    return brandLabel ? `${brandLabel} - ${product.title}` : product.title
+  }
 
   const filteredProducts = (products ?? []).filter((product) => {
     if (selectedBrandId && product.brand_id !== selectedBrandId) {
@@ -100,7 +104,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
 
   const pickerProducts = (products ?? []).map((product) => ({
     id: product.id,
-    title: product.title,
+    title: getProductTitleWithBrand(product),
     brandLabel: product.brand_id ? brandById.get(product.brand_id) ?? 'No brand' : 'No brand',
     packLabel: getProductPackLabel(product) ?? 'N/A',
     price: Number(product.price ?? 0),
@@ -162,34 +166,38 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
           <ArrowLeft className="h-4 w-4" />
           {customerName}
         </Link>
-        <h1 className="text-2xl font-semibold">Products</h1>
+        <h1 className="text-2xl font-semibold">Products by Brand</h1>
         {customer.custom_pricing && (
           <p className="mt-1 text-sm text-muted-foreground">Custom pricing enabled</p>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <ProductPickerDialog
-          mode="customer"
-          endpoint={`/api/customers/${id}/products`}
-          title="Add Product to Custom Catalog"
-          triggerLabel="Add Product"
-          products={pickerProducts}
-        />
-        <LiveQueryInput
-          placeholder="Search products..."
-          initialValue={searchQuery}
-          className="w-full sm:w-80"
-        />
-        <LiveQuerySelect
-          paramKey="brand"
-          initialValue={selectedBrandId || 'all'}
-          className="w-full sm:w-48"
-          options={[
-            { value: 'all', label: 'All brands' },
-            ...(brands ?? []).map((brand) => ({ value: brand.id, label: brand.name })),
-          ]}
-        />
+      <div className="space-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:space-y-0">
+        <div className="flex items-center gap-2">
+          <ProductPickerDialog
+            mode="customer"
+            endpoint={`/api/customers/${id}/products`}
+            title="Add Product to Custom Catalog"
+            triggerLabel="Add Product"
+            products={pickerProducts}
+          />
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <LiveQueryInput
+            placeholder="Search products..."
+            initialValue={searchQuery}
+            className="w-full sm:w-80"
+          />
+          <LiveQuerySelect
+            paramKey="brand"
+            initialValue={selectedBrandId || 'all'}
+            className="w-full sm:w-48"
+            options={[
+              { value: 'all', label: 'All brands' },
+              ...(brands ?? []).map((brand) => ({ value: brand.id, label: brand.name })),
+            ]}
+          />
+        </div>
       </div>
 
       {groupedProducts.length === 0 ? (
@@ -213,7 +221,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
                       <input type="hidden" name="product_id" value={product.id} />
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium">{product.title}</div>
+                          <div className="text-sm font-medium">{getProductTitleWithBrand(product)}</div>
                           <div className="text-xs text-muted-foreground">
                             {getProductPackLabel(product) ?? 'N/A'} - {formatCurrency(product.price)}
                           </div>
@@ -270,7 +278,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
                               <input type="hidden" name="product_id" value={product.id} />
                               {!customer.custom_pricing && <input type="hidden" name="custom_price" value="" />}
                             </form>
-                            {product.title}
+                            {getProductTitleWithBrand(product)}
                           </td>
                           <td className="px-4 py-2 text-muted-foreground">{getProductPackLabel(product) ?? 'N/A'}</td>
                           <td className="px-4 py-2 text-right">{formatCurrency(product.price)}</td>

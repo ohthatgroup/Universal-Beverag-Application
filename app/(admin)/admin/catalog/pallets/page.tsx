@@ -65,18 +65,22 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
         <h1 className="text-2xl font-semibold">Pallet Deals</h1>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <form action={createEmptyPallet}>
-          <Button size="sm" type="submit">
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Pallet
-          </Button>
-        </form>
-        <LiveQueryInput
-          placeholder="Search pallets..."
-          initialValue={searchQuery}
-          className="w-full sm:w-80"
-        />
+      <div className="space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
+        <div className="flex items-center gap-2">
+          <form action={createEmptyPallet}>
+            <Button size="sm" type="submit">
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              New Pallet
+            </Button>
+          </form>
+        </div>
+        <div className="flex items-center gap-2">
+          <LiveQueryInput
+            placeholder="Search pallets..."
+            initialValue={searchQuery}
+            className="w-full sm:w-80"
+          />
+        </div>
       </div>
 
       {deals.length === 0 ? (
@@ -109,14 +113,24 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
                 {deals.map((deal) => (
                   <tr key={deal.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="px-4 py-3">
-                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="font-medium hover:underline">{deal.title}</Link>
+                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block font-medium hover:underline">{deal.title}</Link>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground capitalize">{deal.pallet_type}</td>
-                    <td className="px-4 py-3 text-right">{formatCurrency(deal.price)}</td>
+                    <td className="px-4 py-3 text-muted-foreground capitalize">
+                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block">
+                        {deal.pallet_type}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block">
+                        {formatCurrency(deal.price)}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3">
-                      <span className={deal.is_active ? 'text-xs text-green-600' : 'text-xs text-muted-foreground'}>
-                        {deal.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block">
+                        <span className={deal.is_active ? 'text-xs text-green-600' : 'text-xs text-muted-foreground'}>
+                          {deal.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </Link>
                     </td>
                   </tr>
                 ))}
