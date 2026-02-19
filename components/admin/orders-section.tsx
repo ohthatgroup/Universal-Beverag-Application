@@ -2,11 +2,20 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, Search, Download } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
+import { Copy, Download, ExternalLink, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel, todayISODate } from '@/lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { formatCurrency, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import type { OrderStatus } from '@/lib/types'
 
 interface Customer {
@@ -46,18 +55,97 @@ function normalizeStatus(value: string | null): OrderStatus | 'all' {
   return 'all'
 }
 
+const STATUS_VARIANT_CLASSES: Record<string, string> = {
+  draft: 'bg-muted text-muted-foreground border border-border',
+  submitted: 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
+  delivered: 'bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800',
+}
+
+function StatusPill({ status, orderId }: { status: OrderStatus; orderId: string }) {
+  const router = useRouter()
+  const [isOpen, setIsOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleChange = async (newStatus: string) => {
+    setIsSaving(true)
+    try {
+      await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      router.refresh()
+    } finally {
+      setIsSaving(false)
+      setIsOpen(false)
+    }
+  }
+
+  return (
+    <Select open={isOpen} onOpenChange={setIsOpen} value={status} onValueChange={handleChange}>
+      <SelectTrigger
+        className={`h-7 w-auto min-w-0 gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border-0 focus:ring-0 focus:ring-offset-0 ${STATUS_VARIANT_CLASSES[status]} ${isSaving ? 'opacity-60' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        <SelectItem value="draft">Draft</SelectItem>
+        <SelectItem value="submitted">Submitted</SelectItem>
+        <SelectItem value="delivered">Delivered</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+function DeepLinkButton({ orderId }: { orderId: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const url = `${window.location.origin}/admin/orders/${orderId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-7 w-7 p-0"
+      title="Copy order link"
+      onClick={handleCopy}
+    >
+      {copied ? <Copy className="h-3.5 w-3.5 text-green-600" /> : <ExternalLink className="h-3.5 w-3.5" />}
+    </Button>
+  )
+}
+
 export function OrdersSection({ orders, customers, basePath }: OrdersSectionProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const searchQuery = (searchParams.get('q') ?? '').trim()
-  const searchTerm = searchQuery.toLowerCase()
-  const selectedStatus = normalizeStatus(searchParams.get('status'))
+  // Live search state
+  const [localSearch, setLocalSearch] = useState(searchParams.get('q') ?? '')
+  const [localDate, setLocalDate] = useState(searchParams.get('deliveryDate') ?? '')
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // New Draft Order dialog state
+  const [draftDialogOpen, setDraftDialogOpen] = useState(false)
+  const [newCustomerMode, setNewCustomerMode] = useState(false)
+  const [newBizName, setNewBizName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [selectedCustomerId, setSelectedCustomerId] = useState('')
+  const [draftDeliveryDate, setDraftDeliveryDate] = useState(todayISODate())
+  const [isCreating, setIsCreating] = useState(false)
+
   const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
+  const selectedStatus = normalizeStatus(searchParams.get('status'))
   const selectedDeliveryDate =
-    searchParams.get('deliveryDate') && isoDateRegex.test(searchParams.get('deliveryDate')!)
-      ? searchParams.get('deliveryDate')!
-      : ''
+    localDate && isoDateRegex.test(localDate) ? localDate : ''
 
   const customerById = new Map(
     customers.map((customer) => [
@@ -66,6 +154,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     ])
   )
 
+  const searchTerm = localSearch.toLowerCase().trim()
   const filteredOrders = orders.filter((order) => {
     if (selectedStatus !== 'all' && order.status !== selectedStatus) return false
     if (selectedDeliveryDate && order.delivery_date !== selectedDeliveryDate) return false
@@ -101,8 +190,6 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     const params = new URLSearchParams()
     const merged = {
       status: selectedStatus !== 'all' ? selectedStatus : undefined,
-      q: searchQuery || undefined,
-      deliveryDate: selectedDeliveryDate || undefined,
       ...overrides,
     }
     for (const [key, value] of Object.entries(merged)) {
@@ -112,72 +199,91 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     return qs ? `${basePath}?${qs}` : basePath
   }
 
+  const handleSearchChange = useCallback((value: string) => {
+    setLocalSearch(value)
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      router.push(buildQuery({ q: value.trim() || undefined, deliveryDate: localDate || undefined }), { scroll: false })
+    }, 400)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localDate, selectedStatus, basePath])
+
+  const handleDateChange = useCallback((value: string) => {
+    setLocalDate(value)
+    router.push(buildQuery({ q: localSearch.trim() || undefined, deliveryDate: value || undefined }), { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSearch, selectedStatus, basePath])
+
+  const handleCreateDraft = async () => {
+    if (!draftDeliveryDate || !isoDateRegex.test(draftDeliveryDate)) return
+    setIsCreating(true)
+
+    try {
+      let customerId = selectedCustomerId
+
+      // Create new customer if in new customer mode
+      if (newCustomerMode) {
+        if (!newBizName.trim()) { setIsCreating(false); return }
+        const createResp = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ businessName: newBizName.trim(), email: newEmail.trim() || null }),
+        })
+        if (createResp.ok) {
+          const payload = await createResp.json()
+          customerId = payload?.data?.id ?? ''
+        }
+      }
+
+      if (!customerId) { setIsCreating(false); return }
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId, deliveryDate: draftDeliveryDate }),
+      })
+
+      if (response.ok) {
+        const payload = await response.json()
+        const orderId = payload?.data?.order?.id
+        if (orderId) {
+          setDraftDialogOpen(false)
+          router.push(`/admin/orders/${orderId}`)
+          return
+        }
+      }
+      router.refresh()
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   return (
     <section className="space-y-4">
       <h2 className="text-lg font-semibold">Orders</h2>
 
-      {/* Create order — collapsible */}
-      <details className="group rounded-lg border">
-        <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
-          <Plus className="h-4 w-4" />
+      {/* Top row: New Draft button + search + date filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => { setDraftDialogOpen(true); setNewCustomerMode(false); setSelectedCustomerId(''); setNewBizName(''); setNewEmail('') }}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
           New Draft Order
-        </summary>
-        <div className="border-t p-4">
-          <form
-            action={async (formData) => {
-              const customerId = String(formData.get('customer_id') ?? '').trim()
-              const deliveryDate = String(formData.get('delivery_date') ?? '').trim()
-
-              if (!customerId || !isoDateRegex.test(deliveryDate)) return
-
-              const response = await fetch('/api/orders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ customerId, deliveryDate }),
-              })
-
-              if (response.ok) {
-                const payload = await response.json()
-                const orderId = payload?.data?.order?.id
-                if (orderId) {
-                  router.push(`/admin/orders/${orderId}`)
-                  return
-                }
-              }
-
-              router.refresh()
-            }}
-            className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="customer_id">Customer</Label>
-              <select
-                id="customer_id"
-                name="customer_id"
-                required
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Select customer
-                </option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.business_name || customer.contact_name || customer.email || customer.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="delivery_date">Delivery Date</Label>
-              <Input id="delivery_date" name="delivery_date" type="date" required defaultValue={todayISODate()} />
-            </div>
-            <Button type="submit" disabled={customers.length === 0}>
-              {customers.length === 0 ? 'Create a customer first' : 'Create Draft'}
-            </Button>
-          </form>
+        </Button>
+        <div className="relative flex-1 min-w-48 max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by customer..."
+            value={localSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-9 h-9"
+          />
         </div>
-      </details>
+        <Input
+          type="date"
+          value={localDate}
+          onChange={(e) => handleDateChange(e.target.value)}
+          className="h-9 w-40"
+        />
+      </div>
 
       {/* Status filter tabs */}
       <div className="flex flex-wrap gap-2">
@@ -188,38 +294,12 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
             size="sm"
             variant={selectedStatus === tab.value ? 'default' : 'outline'}
           >
-            <Link
-              href={buildQuery({
-                status: tab.value !== 'all' ? tab.value : undefined,
-              })}
-            >
+            <Link href={buildQuery({ status: tab.value !== 'all' ? tab.value : undefined })}>
               {tab.label}
             </Link>
           </Button>
         ))}
       </div>
-
-      {/* Search + date filter */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          const fd = new FormData(e.currentTarget)
-          router.push(
-            buildQuery({
-              q: (fd.get('q') as string)?.trim() || undefined,
-              deliveryDate: (fd.get('deliveryDate') as string) || undefined,
-            })
-          )
-        }}
-        className="flex flex-col gap-2 md:flex-row"
-      >
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" placeholder="Search by customer..." defaultValue={searchQuery} className="pl-9" />
-        </div>
-        <Input name="deliveryDate" type="date" defaultValue={selectedDeliveryDate} className="md:w-44" />
-        <Button type="submit">Apply</Button>
-      </form>
 
       {/* Orders grouped by date */}
       {dateGroups.length === 0 ? (
@@ -235,32 +315,28 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
               {/* Mobile cards */}
               <div className="space-y-0 md:hidden">
                 {dateOrders.map((order) => (
-                  <div key={order.id} className="border-b py-3 last:border-0">
-                    <Link href={`/admin/orders/${order.id}`} className="block">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm truncate">
-                            {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
-                          </div>
+                  <Link key={order.id} href={`/admin/orders/${order.id}`} className="block border-b py-3 last:border-0 hover:bg-muted/30 rounded px-1">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm truncate">
+                          {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
                         </div>
-                        <span className="ml-3 text-sm">
-                          {getStatusIcon(asOrderStatus(order.status))}{' '}
-                          {getStatusLabel(asOrderStatus(order.status))}
-                        </span>
+                        <div className="text-xs text-muted-foreground">
+                          {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
+                        </div>
                       </div>
-                    </Link>
+                      <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
+                    </div>
                     <div className="mt-2 flex gap-2">
                       <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                        <a href={`/api/orders/${order.id}/csv`}>
+                        <a href={`/api/orders/${order.id}/csv`} onClick={(e) => e.stopPropagation()}>
                           <Download className="mr-1 h-3 w-3" />
                           CSV
                         </a>
                       </Button>
+                      <DeepLinkButton orderId={order.id} />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
 
@@ -278,25 +354,29 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                   </thead>
                   <tbody>
                     {dateOrders.map((order) => (
-                      <tr key={order.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <tr
+                        key={order.id}
+                        className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                        onClick={() => router.push(`/admin/orders/${order.id}`)}
+                      >
                         <td className="px-4 py-3">
-                          <Link href={`/admin/orders/${order.id}`} className="font-medium hover:underline">
+                          <span className="font-medium">
                             {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
-                          </Link>
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-right text-muted-foreground">{order.item_count ?? 0}</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(order.total ?? 0)}</td>
-                        <td className="px-4 py-3">
-                          {getStatusIcon(asOrderStatus(order.status))}{' '}
-                          {getStatusLabel(asOrderStatus(order.status))}
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
-                            <Button asChild size="sm" variant="ghost">
+                            <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0" title="Download CSV">
                               <a href={`/api/orders/${order.id}/csv`}>
                                 <Download className="h-3.5 w-3.5" />
                               </a>
                             </Button>
+                            <DeepLinkButton orderId={order.id} />
                           </div>
                         </td>
                       </tr>
@@ -308,6 +388,102 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
           ))}
         </div>
       )}
+
+      {/* New Draft Order dialog */}
+      <Dialog open={draftDialogOpen} onOpenChange={setDraftDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Draft Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {/* Toggle: existing customer vs new customer */}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={!newCustomerMode ? 'default' : 'outline'}
+                onClick={() => setNewCustomerMode(false)}
+              >
+                Existing Customer
+              </Button>
+              <Button
+                size="sm"
+                variant={newCustomerMode ? 'default' : 'outline'}
+                onClick={() => setNewCustomerMode(true)}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                New Customer
+              </Button>
+            </div>
+
+            {newCustomerMode ? (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="dlg-biz-name">Business Name</Label>
+                  <Input
+                    id="dlg-biz-name"
+                    placeholder="Acme Beverages"
+                    value={newBizName}
+                    onChange={(e) => setNewBizName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dlg-email">Email (optional)</Label>
+                  <Input
+                    id="dlg-email"
+                    type="email"
+                    placeholder="owner@acme.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="dlg-customer">Customer</Label>
+                <select
+                  id="dlg-customer"
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={selectedCustomerId}
+                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Select customer</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.business_name || customer.contact_name || customer.email || customer.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="dlg-delivery-date">Delivery Date</Label>
+              <Input
+                id="dlg-delivery-date"
+                type="date"
+                value={draftDeliveryDate}
+                onChange={(e) => setDraftDeliveryDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                className="flex-1"
+                onClick={handleCreateDraft}
+                disabled={isCreating || (!newCustomerMode && !selectedCustomerId) || (newCustomerMode && !newBizName.trim())}
+              >
+                {isCreating ? 'Creating...' : 'Create Draft'}
+              </Button>
+              <Button variant="outline" onClick={() => setDraftDialogOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

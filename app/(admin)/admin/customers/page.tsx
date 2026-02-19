@@ -1,7 +1,9 @@
 import { randomBytes, randomUUID } from 'crypto'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { CopyUrlButton } from '@/components/admin/copy-url-button'
+import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,11 +22,12 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
   const resolvedSearchParams = searchParams ? await searchParams : undefined
   const searchQuery = (resolvedSearchParams?.q ?? '').trim()
   const searchTerm = searchQuery.toLowerCase()
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   const [customersResponse, ordersResponse] = await Promise.all([
     context.supabase
       .from('profiles')
-      .select('id,business_name,contact_name,email,phone,show_prices,custom_pricing,default_group')
+      .select('id,business_name,contact_name,email,phone,show_prices,custom_pricing,default_group,access_token')
       .eq('role', 'customer')
       .order('business_name', { ascending: true }),
     context.supabase
@@ -81,7 +84,6 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
 
     const adminClient = createAdminClient()
 
-    // Generate a new profile ID and access token (no auth user needed)
     const profileId = randomUUID()
     const accessToken = randomBytes(16).toString('hex')
 
@@ -107,75 +109,76 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Customers</h1>
       </div>
 
-      {/* Simplified create — business name + optional email */}
-      <details className="group rounded-lg border">
-        <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
-          <Plus className="h-4 w-4" />
-          New Customer
-        </summary>
-        <div className="border-t p-4">
-          <form action={createCustomer} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-            <div className="space-y-2">
-              <Label htmlFor="customer-business-name">Business Name</Label>
-              <Input id="customer-business-name" name="business_name" required placeholder="Acme Beverages" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-email">Email (optional)</Label>
-              <Input id="customer-email" name="email" type="email" placeholder="owner@acme.com" />
-            </div>
-            <Button type="submit">Create</Button>
-          </form>
-        </div>
-      </details>
+      <div className="flex flex-wrap items-start gap-2">
+        <details className="group rounded-md border">
+          <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
+            <Plus className="h-3.5 w-3.5" />
+            New Customer
+          </summary>
+          <div className="border-t p-4">
+            <form action={createCustomer} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="customer-business-name">Business Name</Label>
+                <Input id="customer-business-name" name="business_name" required placeholder="Acme Beverages" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customer-email">Email (optional)</Label>
+                <Input id="customer-email" name="email" type="email" placeholder="owner@acme.com" />
+              </div>
+              <Button type="submit">Create</Button>
+            </form>
+          </div>
+        </details>
 
-      {/* Search — no Card wrapper */}
-      <form method="GET" className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" placeholder="Search customers..." defaultValue={searchQuery} className="pl-9" />
-        </div>
-        <Button type="submit">Search</Button>
-      </form>
+        <LiveQueryInput
+          placeholder="Search customers..."
+          initialValue={searchQuery}
+          className="w-full sm:w-80"
+        />
+      </div>
 
-      {/* Customer list */}
       {customers.length === 0 ? (
         <p className="text-sm text-muted-foreground">No customers found.</p>
       ) : (
         <>
-          {/* Mobile cards */}
           <div className="space-y-0 md:hidden">
             {customers.map((customer) => {
               const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
+              const portalUrl = customer.access_token ? `${appUrl}/c/${customer.access_token}` : null
               return (
-                <Link
-                  key={customer.id}
-                  href={`/admin/customers/${customer.id}`}
-                  className="flex items-center justify-between border-b py-3 last:border-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm truncate">
-                      {customer.business_name || customer.contact_name || customer.email || customer.id}
+                <div key={customer.id} className="border-b py-3 last:border-0">
+                  <Link
+                    href={`/admin/customers/${customer.id}`}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {customer.business_name || customer.contact_name || customer.email || customer.id}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {customer.email ?? 'No email'}
+                        {customer.phone && ` - ${customer.phone}`}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {customer.email ?? 'No email'}
-                      {customer.phone && ` · ${customer.phone}`}
+                    <div className="ml-3 whitespace-nowrap text-xs text-muted-foreground">
+                      {lastOrderDate ? formatDeliveryDate(lastOrderDate) : 'No orders'}
                     </div>
-                  </div>
-                  <div className="ml-3 text-xs text-muted-foreground whitespace-nowrap">
-                    {lastOrderDate ? formatDeliveryDate(lastOrderDate) : 'No orders'}
-                  </div>
-                </Link>
+                  </Link>
+                  {portalUrl ? (
+                    <div className="mt-2">
+                      <CopyUrlButton url={portalUrl} label="Copy URL" />
+                    </div>
+                  ) : null}
+                </div>
               )
             })}
           </div>
 
-          {/* Desktop table */}
-          <div className="hidden md:block rounded-lg border">
+          <div className="hidden rounded-lg border md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
@@ -183,11 +186,14 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
                   <th className="px-4 py-3 text-left font-medium">Email</th>
                   <th className="px-4 py-3 text-left font-medium">Phone</th>
                   <th className="px-4 py-3 text-left font-medium">Last Order</th>
+                  <th className="px-4 py-3 text-right font-medium">Portal</th>
                 </tr>
               </thead>
               <tbody>
                 {customers.map((customer) => {
                   const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
+                  const portalUrl = customer.access_token ? `${appUrl}/c/${customer.access_token}` : null
+
                   return (
                     <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3">
@@ -195,10 +201,13 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
                           {customer.business_name || customer.contact_name || customer.email || customer.id}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{customer.email ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{customer.phone ?? '—'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{customer.email ?? '-'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{customer.phone ?? '-'}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {lastOrderDate ? formatDeliveryDate(lastOrderDate) : '—'}
+                        {lastOrderDate ? formatDeliveryDate(lastOrderDate) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {portalUrl ? <CopyUrlButton url={portalUrl} label="Copy URL" /> : <span className="text-muted-foreground">-</span>}
                       </td>
                     </tr>
                   )

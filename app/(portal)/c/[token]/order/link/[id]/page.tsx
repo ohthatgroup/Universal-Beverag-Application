@@ -147,9 +147,29 @@ export default async function PortalOrderLinkPage({
   const brands = (brandsResponse.data ?? []) as Brand[]
   const customerProducts = (customerProductsResponse.data ?? []) as CustomerProduct[]
   const palletDeals = (palletDealsResponse.data ?? []) as PalletDeal[]
+  const palletDealIds = palletDeals.map((deal) => deal.id)
+
+  const palletItemsResponse = palletDealIds.length
+    ? await admin
+        .from('pallet_deal_items')
+        .select('pallet_deal_id,product_id')
+        .in('pallet_deal_id', palletDealIds)
+    : { data: [], error: null }
+
+  if (palletItemsResponse.error) throw palletItemsResponse.error
 
   const brandById = new Map(brands.map((brand) => [brand.id, brand]))
   const customerProductById = new Map(customerProducts.map((entry) => [entry.product_id, entry]))
+  const productToPalletDealIds: Record<string, string[]> = {}
+
+  for (const row of palletItemsResponse.data ?? []) {
+    if (!row.product_id || !row.pallet_deal_id) continue
+    const current = productToPalletDealIds[row.product_id] ?? []
+    if (!current.includes(row.pallet_deal_id)) {
+      current.push(row.pallet_deal_id)
+      productToPalletDealIds[row.product_id] = current
+    }
+  }
 
   const catalogProducts: CatalogProduct[] = allProducts
     .filter((product) => !customerProductById.get(product.id)?.excluded)
@@ -174,6 +194,7 @@ export default async function PortalOrderLinkPage({
       showPrices={profile.show_prices}
       defaultGroupBy={profile.default_group}
       initialItems={orderItemsResponse.data ?? []}
+      productToPalletDealIds={productToPalletDealIds}
     />
   )
 }

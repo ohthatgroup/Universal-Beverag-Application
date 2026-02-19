@@ -10,9 +10,10 @@ interface ImageUploadProps {
   onChange: (url: string | null) => void
   folder: string
   className?: string
+  compact?: boolean
 }
 
-export function ImageUpload({ value, onChange, folder, className }: ImageUploadProps) {
+export function ImageUpload({ value, onChange, folder, className, compact = false }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,7 +91,7 @@ export function ImageUpload({ value, onChange, folder, className }: ImageUploadP
           <img
             src={value}
             alt="Uploaded image"
-            className="h-24 w-24 rounded-md border object-cover"
+            className={cn(compact ? 'h-16 w-16' : 'h-24 w-24', 'rounded-md border object-cover')}
           />
           <Button
             type="button"
@@ -111,7 +112,9 @@ export function ImageUpload({ value, onChange, folder, className }: ImageUploadP
           onDragLeave={handleDragLeave}
           disabled={isUploading}
           className={cn(
-            'flex h-24 w-full items-center justify-center rounded-md border-2 border-dashed text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary',
+            compact
+              ? 'flex h-16 w-full items-center justify-center rounded-md border-2 border-dashed text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary'
+              : 'flex h-24 w-full items-center justify-center rounded-md border-2 border-dashed text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary',
             dragOver && 'border-primary bg-primary/5 text-primary',
             isUploading && 'pointer-events-none opacity-60'
           )}

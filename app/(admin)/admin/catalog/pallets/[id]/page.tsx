@@ -1,6 +1,4 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -103,19 +101,13 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/catalog/pallets" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
-          <ArrowLeft className="h-4 w-4" />
-          Pallets
-        </Link>
         <h1 className="text-2xl font-semibold">{palletDeal.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {palletDeal.pallet_type} · {palletDeal.is_active ? 'Active' : 'Inactive'} · {includedCount} products
+        <p className="mt-1 text-sm text-muted-foreground">
+          {palletDeal.pallet_type} - {palletDeal.is_active ? 'Active' : 'Inactive'} - {includedCount} products
         </p>
       </div>
 
-      {/* Two-column layout on desktop */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Left column: Pallet settings */}
         <form action={updatePallet} className="space-y-4 rounded-lg border p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Settings</h2>
 
@@ -159,22 +151,21 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
           <Button type="submit">Save Deal</Button>
         </form>
 
-        {/* Right column: Deal contents */}
-        <div className="rounded-lg border p-4 space-y-4">
+        <div className="space-y-4 rounded-lg border p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Contents</h2>
 
-          <div className="space-y-0 max-h-[600px] overflow-y-auto">
+          <div className="max-h-[600px] space-y-0 overflow-y-auto">
             {(products ?? []).map((product) => {
               const item = itemByProduct.get(product.id)
               const hasQty = item && item.quantity > 0
               return (
                 <form key={product.id} action={updatePalletItem} className="flex items-center gap-3 border-b py-2.5 last:border-0">
                   <input type="hidden" name="product_id" value={product.id} />
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm truncate ${hasQty ? 'font-medium' : 'text-muted-foreground'}`}>{product.title}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className={`truncate text-sm ${hasQty ? 'font-medium' : 'text-muted-foreground'}`}>{product.title}</div>
                     <div className="text-xs text-muted-foreground">{getProductPackLabel(product) ?? 'N/A'}</div>
                   </div>
-                  <Input className="w-16 h-8 text-xs text-right" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
+                  <Input className="h-8 w-16 text-right text-xs" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
                   <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
                 </form>
               )

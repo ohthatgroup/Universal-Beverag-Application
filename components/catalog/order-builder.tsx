@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Package, Search } from 'lucide-react'
 import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 
 interface OrderBuilderProps {
@@ -35,6 +34,7 @@ interface OrderBuilderProps {
     quantity: number
     unit_price: number
   }>
+  productToPalletDealIds: Record<string, string[]>
 }
 
 function itemKey(productId: string | null, palletDealId: string | null) {
@@ -62,6 +62,7 @@ export function OrderBuilder({
   showPrices,
   defaultGroupBy,
   initialItems,
+  productToPalletDealIds,
 }: OrderBuilderProps) {
   const router = useRouter()
 
@@ -71,7 +72,8 @@ export function OrderBuilder({
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['__all__']))
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [palletFilterProductId, setPalletFilterProductId] = useState<string | null>(null)
 
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     const nextState: Record<string, number> = {}
@@ -81,9 +83,8 @@ export function OrderBuilder({
     return nextState
   })
 
-  const { filters, setFilters, grouped, availableBrands, availableSizes } = useCatalog({
+  const { filters, setFilters, grouped, newItems, isFilterActive, availableBrands, availableSizes } = useCatalog({
     products,
-    activeTab,
     defaultGroupBy: defaultGroupBy === 'size' ? 'size' : 'brand',
   })
 
@@ -104,23 +105,24 @@ export function OrderBuilder({
     () => new Map(palletDeals.map((palletDeal) => [palletDeal.id, palletDeal])),
     [palletDeals]
   )
-  const palletGroups = useMemo(
-    () => ({
-      single: palletDeals.filter((deal) => deal.pallet_type === 'single'),
-      mixed: palletDeals.filter((deal) => deal.pallet_type === 'mixed'),
-    }),
-    [palletDeals]
-  )
 
-  // Initialize expanded groups on first render
-  useMemo(() => {
-    const keys = new Set<string>()
-    for (const group of grouped) keys.add(group.key)
-    keys.add('single')
-    keys.add('mixed')
-    setExpandedGroups(keys)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => {
+    const defaultOpen = new Set<string>()
+    defaultOpen.add('new-items')
+    defaultOpen.add('single')
+    defaultOpen.add('mixed')
+    for (const group of grouped) {
+      defaultOpen.add(group.key)
+    }
+    setExpandedGroups((prev) => {
+      if (prev.size === 0) return defaultOpen
+      const next = new Set(prev)
+      for (const key of defaultOpen) {
+        next.add(key)
+      }
+      return next
+    })
+  }, [grouped])
 
   const setProductQuantity = (product: CatalogProduct, quantity: number) => {
     const key = itemKey(product.id, null)
@@ -155,8 +157,14 @@ export function OrderBuilder({
           const packLabel = getProductPackLabel(product)
           const displayName = getProductDisplayName(product, product.brand?.name ?? null)
           return {
-            key, label: displayName, details: packLabel ?? '',
-            quantity, unitPrice, lineTotal: unitPrice * quantity, type: 'product', id,
+            key,
+            label: displayName,
+            details: packLabel ?? '',
+            quantity,
+            unitPrice,
+            lineTotal: unitPrice * quantity,
+            type: 'product' as const,
+            id,
           }
         }
         const id = key.replace('pallet:', '')
@@ -164,8 +172,14 @@ export function OrderBuilder({
         if (!palletDeal) return null
         const unitPrice = palletDeal.price
         return {
-          key, label: palletDeal.title, details: palletDeal.description ?? '',
-          quantity, unitPrice, lineTotal: unitPrice * quantity, type: 'pallet', id,
+          key,
+          label: palletDeal.title,
+          details: palletDeal.description ?? '',
+          quantity,
+          unitPrice,
+          lineTotal: unitPrice * quantity,
+          type: 'pallet' as const,
+          id,
         }
       })
       .filter((item): item is ReviewItem => Boolean(item))
@@ -220,21 +234,108 @@ export function OrderBuilder({
     })
     const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
     setIsSubmitting(false)
-    if (!response.ok) { setError(payload?.error?.message ?? 'Failed to submit order'); return }
+    if (!response.ok) {
+      setError(payload?.error?.message ?? 'Failed to submit order')
+      return
+    }
     setIsReviewOpen(false)
     router.push(`/c/${token}/orders`)
     router.refresh()
   }
 
+  const openPalletsForProduct = (productId: string) => {
+    setPalletFilterProductId(productId)
+    setActiveTab('pallets')
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      next.add('single')
+      next.add('mixed')
+      return next
+    })
+  }
+
+  const renderProductRow = (product: CatalogProduct, isCardLayout: boolean) => {
+    const key = itemKey(product.id, null)
+    const quantity = quantities[key] ?? 0
+    const packLabel = getProductPackLabel(product) ?? 'N/A'
+    const displayName = getProductDisplayName(product, product.brand?.name ?? null)
+    const hasPalletLink = (productToPalletDealIds[product.id] ?? []).length > 0
+
+    if (isCardLayout) {
+      return (
+        <div key={product.id} className="rounded-lg border p-3 space-y-3">
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.title}
+              className="h-40 w-full rounded-md object-cover"
+            />
+          ) : (
+            <div className="flex h-40 w-full items-center justify-center rounded-md bg-muted">
+              <Package className="h-8 w-8 text-muted-foreground" />
+            </div>
+          )}
+          <div>
+            <div className="font-semibold">{displayName}</div>
+            <div className="text-xs text-muted-foreground">{packLabel}</div>
+            {showPrices && (
+              <div className="mt-1 text-sm">{formatCurrency(product.effective_price)}</div>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            {hasPalletLink ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => openPalletsForProduct(product.id)}>
+                Save with a pallet
+              </Button>
+            ) : <span />}
+            <QuantitySelector quantity={quantity} onChange={(value) => setProductQuantity(product, value)} />
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div key={product.id} className="flex items-center justify-between gap-3 border-b px-2 py-2.5 last:border-b-0">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">{displayName}</div>
+          <div className="text-xs text-muted-foreground">
+            {packLabel}
+            {showPrices && <> - {formatCurrency(product.effective_price)}</>}
+          </div>
+          {hasPalletLink && (
+            <Button type="button" size="sm" variant="ghost" className="mt-1 h-7 px-2 text-xs" onClick={() => openPalletsForProduct(product.id)}>
+              Save with a pallet
+            </Button>
+          )}
+        </div>
+        <QuantitySelector quantity={quantity} onChange={(value) => setProductQuantity(product, value)} />
+      </div>
+    )
+  }
+
   const tabs = [
-    { id: 'new' as const, label: 'New Items' },
-    { id: 'pallets' as const, label: 'Pallets' },
     { id: 'all' as const, label: 'All' },
+    { id: 'pallets' as const, label: 'Pallets' },
   ]
+
+  const filteredPalletDeals = useMemo(() => {
+    if (!palletFilterProductId) return palletDeals
+    const allowed = new Set(productToPalletDealIds[palletFilterProductId] ?? [])
+    return palletDeals.filter((deal) => allowed.has(deal.id))
+  }, [palletDeals, palletFilterProductId, productToPalletDealIds])
+
+  const filteredPalletGroups = useMemo(
+    () => ({
+      single: filteredPalletDeals.filter((deal) => deal.pallet_type === 'single'),
+      mixed: filteredPalletDeals.filter((deal) => deal.pallet_type === 'mixed'),
+    }),
+    [filteredPalletDeals]
+  )
+
+  const palletFilterProduct = palletFilterProductId ? productById.get(palletFilterProductId) : null
 
   return (
     <div className="space-y-4 pb-28">
-      {/* Header */}
       <header className="flex items-center justify-between">
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link href={`/c/${token}/orders`}>
@@ -245,7 +346,6 @@ export function OrderBuilder({
         <span className="text-sm font-medium">{formatDeliveryDate(deliveryDate)}</span>
       </header>
 
-      {/* Tab bar */}
       <div className="flex gap-1 rounded-lg bg-muted p-1">
         {tabs.map((tab) => (
           <button
@@ -263,7 +363,6 @@ export function OrderBuilder({
         ))}
       </div>
 
-      {/* Filter/search bar - All tab only */}
       {activeTab === 'all' && (
         <div className="space-y-3">
           <div className="relative">
@@ -323,121 +422,104 @@ export function OrderBuilder({
         </div>
       )}
 
-      {/* Product groups - New Items and All tabs */}
-      {activeTab !== 'pallets' &&
-        grouped.map((group) => {
-          const isExpanded = expandedGroups.has(group.key)
-          const isCardLayout = activeTab === 'new'
+      {activeTab === 'all' && isFilterActive && (
+        <div className="rounded-lg border">
+          <div className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Filtered Results
+          </div>
+          <div className="border-t">
+            {(grouped[0]?.products ?? []).map((product) => renderProductRow(product, false))}
+            {(grouped[0]?.products ?? []).length === 0 && (
+              <div className="px-4 py-3 text-sm text-muted-foreground">No products found.</div>
+            )}
+          </div>
+        </div>
+      )}
 
-          return (
-            <div key={group.key}>
-              {/* Collapsible group header */}
-              <button
-                type="button"
-                onClick={() => toggleGroup(group.key)}
-                className="flex w-full items-center gap-2 py-2"
-              >
-                <Separator className="flex-1" />
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {group.label}
-                </span>
-                {isExpanded
-                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                <Separator className="flex-1" />
-              </button>
-
-              {isExpanded && (
-                <div className={isCardLayout
-                  ? 'grid gap-3 md:grid-cols-2 lg:grid-cols-3'
-                  : 'space-y-px'
-                }>
-                  {group.products.map((product) => {
-                    const key = itemKey(product.id, null)
-                    const quantity = quantities[key] ?? 0
-                    const packLabel = getProductPackLabel(product) ?? 'N/A'
-                    const displayName = getProductDisplayName(product, product.brand?.name ?? null)
-
-                    if (isCardLayout) {
-                      return (
-                        <div key={product.id} className="rounded-lg border p-3 space-y-3">
-                          {product.image_url ? (
-                            <img
-                              src={product.image_url}
-                              alt={product.title}
-                              className="h-40 w-full rounded-md object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-40 w-full items-center justify-center rounded-md bg-muted">
-                              <Package className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-semibold">{displayName}</div>
-                            <div className="text-xs text-muted-foreground">{packLabel}</div>
-                            {showPrices && (
-                              <div className="mt-1 text-sm">{formatCurrency(product.effective_price)}</div>
-                            )}
-                          </div>
-                          <div className="flex justify-end">
-                            <QuantitySelector quantity={quantity} onChange={(value) => setProductQuantity(product, value)} />
-                          </div>
-                        </div>
-                      )
-                    }
-
-                    // Compact row layout
-                    return (
-                      <div key={product.id} className="flex items-center justify-between gap-3 border-b px-1 py-2 last:border-b-0">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium">{displayName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {packLabel}
-                            {showPrices && <> · {formatCurrency(product.effective_price)}</>}
-                          </div>
-                        </div>
-                        <QuantitySelector quantity={quantity} onChange={(value) => setProductQuantity(product, value)} />
-                      </div>
-                    )
-                  })}
-                  {group.products.length === 0 && (
-                    <div className="py-3 text-sm text-muted-foreground">No products in this group.</div>
-                  )}
-                </div>
-              )}
+      {activeTab === 'all' && !isFilterActive && newItems.length > 0 && (
+        <div className="rounded-lg border">
+          <button
+            type="button"
+            onClick={() => toggleGroup('new-items')}
+            className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
+          >
+            <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">New Items</span>
+            {expandedGroups.has('new-items')
+              ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          {expandedGroups.has('new-items') && (
+            <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
+              {newItems.map((product) => renderProductRow(product, true))}
             </div>
-          )
-        })}
+          )}
+        </div>
+      )}
 
-      {/* Pallets tab */}
+      {activeTab === 'all' && !isFilterActive && grouped.map((group) => {
+        const isExpanded = expandedGroups.has(group.key)
+        return (
+          <div key={group.key} className="rounded-lg border">
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.key)}
+              className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
+            >
+              <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </span>
+              {isExpanded
+                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            </button>
+
+            {isExpanded && (
+              <div className="border-t">
+                {group.products.map((product) => renderProductRow(product, false))}
+                {group.products.length === 0 && (
+                  <div className="px-4 py-3 text-sm text-muted-foreground">No products in this group.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
       {activeTab === 'pallets' && (
         <div className="space-y-4">
-          {palletDeals.length > 0 ? (
+          {palletFilterProduct && (
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+              <span>
+                Pallets containing: <span className="font-medium">{getProductDisplayName(palletFilterProduct, palletFilterProduct.brand?.name ?? null)}</span>
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => setPalletFilterProductId(null)}>Clear</Button>
+            </div>
+          )}
+
+          {filteredPalletDeals.length > 0 ? (
             ([
-              { label: 'Single Pallets', key: 'single', deals: palletGroups.single },
-              { label: 'Mixed Pallets', key: 'mixed', deals: palletGroups.mixed },
+              { label: 'Single Pallets', key: 'single', deals: filteredPalletGroups.single },
+              { label: 'Mixed Pallets', key: 'mixed', deals: filteredPalletGroups.mixed },
             ] as const).map((section) => {
               if (section.deals.length === 0) return null
               const isExpanded = expandedGroups.has(section.key)
               return (
-                <div key={section.key}>
+                <div key={section.key} className="rounded-lg border">
                   <button
                     type="button"
                     onClick={() => toggleGroup(section.key)}
-                    className="flex w-full items-center gap-2 py-2"
+                    className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
                   >
-                    <Separator className="flex-1" />
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                       {section.label}
                     </span>
                     {isExpanded
                       ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                       : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                    <Separator className="flex-1" />
                   </button>
 
                   {isExpanded && (
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
                       {section.deals.map((palletDeal) => {
                         const key = itemKey(null, palletDeal.id)
                         const quantity = quantities[key] ?? 0
@@ -483,19 +565,17 @@ export function OrderBuilder({
         </div>
       )}
 
-      {/* Sticky review bar */}
       {totalItems > 0 && (
         <div className="fixed inset-x-0 bottom-16 z-30 border-t bg-background p-3 md:bottom-0 md:left-0">
           <div className="mx-auto max-w-4xl">
             <Button className="w-full" size="lg" onClick={() => setIsReviewOpen(true)}>
               Review Order ({totalItems} items)
-              {showPrices && <span className="ml-2 opacity-80">· {formatCurrency(totalValue)}</span>}
+              {showPrices && <span className="ml-2 opacity-80">- {formatCurrency(totalValue)}</span>}
             </Button>
           </div>
         </div>
       )}
 
-      {/* Review drawer */}
       <Sheet open={isReviewOpen} onOpenChange={setIsReviewOpen}>
         <SheetContent side="bottom" className="mx-auto h-[88vh] w-full max-w-lg rounded-t-xl p-0 [&>button.absolute]:hidden">
           <div className="flex h-full flex-col gap-3 p-4">
@@ -513,24 +593,21 @@ export function OrderBuilder({
 
             <div className="flex-1 space-y-0 overflow-y-auto">
               {reviewItems.length > 0 ? (
-                reviewItems.map((item, index) => (
-                  <div key={item.key}>
-                    {index > 0 && <Separator />}
-                    <div className="py-3">
-                      <div className="font-medium">{item.label}</div>
-                      {item.details && <div className="text-xs text-muted-foreground">{item.details}</div>}
-                      <div className="mt-2 flex items-center justify-between">
-                        {showPrices ? (
-                          <div className="text-sm text-muted-foreground">
-                            {formatCurrency(item.unitPrice)} x {item.quantity}
-                          </div>
-                        ) : (
-                          <div />
-                        )}
-                        <div className="flex items-center gap-3">
-                          {showPrices && <span className="text-sm font-medium">{formatCurrency(item.lineTotal)}</span>}
-                          <QuantitySelector quantity={item.quantity} onChange={(value) => updateReviewQuantity(item, value)} />
+                reviewItems.map((item) => (
+                  <div key={item.key} className="border-b py-3 last:border-0">
+                    <div className="font-medium">{item.label}</div>
+                    {item.details && <div className="text-xs text-muted-foreground">{item.details}</div>}
+                    <div className="mt-2 flex items-center justify-between">
+                      {showPrices ? (
+                        <div className="text-sm text-muted-foreground">
+                          {formatCurrency(item.unitPrice)} x {item.quantity}
                         </div>
+                      ) : (
+                        <div />
+                      )}
+                      <div className="flex items-center gap-3">
+                        {showPrices && <span className="text-sm font-medium">{formatCurrency(item.lineTotal)}</span>}
+                        <QuantitySelector quantity={item.quantity} onChange={(value) => updateReviewQuantity(item, value)} />
                       </div>
                     </div>
                   </div>

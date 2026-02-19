@@ -184,8 +184,12 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
             New item
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="is_discontinued" defaultChecked={product.is_discontinued ?? false} className="h-4 w-4" />
-            Discontinued
+            <span>Discontinued</span>
+            <span className="relative inline-flex h-5 w-9 items-center">
+              <input type="checkbox" name="is_discontinued" defaultChecked={product.is_discontinued ?? false} className="peer sr-only" />
+              <span className="h-5 w-9 rounded-full bg-input transition-colors peer-checked:bg-primary" />
+              <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
+            </span>
           </label>
         </div>
 

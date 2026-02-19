@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import type { CatalogProduct, Brand } from '@/lib/types'
 import { getProductSizeLabel } from '@/lib/utils'
 
-export type CatalogTab = 'new' | 'pallets' | 'all'
+export type CatalogTab = 'pallets' | 'all'
 export type GroupBy = 'brand' | 'size'
 
 export interface FilterState {
@@ -22,13 +22,11 @@ export interface CatalogGroup {
 
 interface UseCatalogOptions {
   products: CatalogProduct[]
-  activeTab: CatalogTab
   defaultGroupBy?: GroupBy
 }
 
 export function useCatalog({
   products,
-  activeTab,
   defaultGroupBy = 'brand',
 }: UseCatalogOptions) {
   const [filters, setFilters] = useState<FilterState>({
@@ -40,20 +38,12 @@ export function useCatalog({
 
   // Step 1: Filter by active tab
   const tabFiltered = useMemo<CatalogProduct[]>(() => {
-    if (activeTab === 'new') {
-      return products.filter((p) => p.is_new)
-    }
     // 'pallets' tab is handled at the page level (different data source)
     return products
-  }, [products, activeTab])
+  }, [products])
 
   // Step 2: Apply search + dropdowns
   const filtered = useMemo<CatalogProduct[]>(() => {
-    if (activeTab === 'new') {
-      // "New Items" is intentionally curated without additional filter controls.
-      return tabFiltered
-    }
-
     return tabFiltered.filter((product) => {
       if (filters.brandId && product.brand_id !== filters.brandId) return false
 
@@ -69,17 +59,21 @@ export function useCatalog({
 
       return true
     })
-  }, [tabFiltered, filters.brandId, filters.sizeFilter, filters.searchQuery, activeTab])
+  }, [tabFiltered, filters.brandId, filters.sizeFilter, filters.searchQuery])
+
+  const isFilterActive = Boolean(filters.brandId || filters.sizeFilter)
+  const newItems = filtered.filter((product) => product.is_new)
+  const productsForGroupedView = isFilterActive ? filtered : filtered.filter((product) => !product.is_new)
 
   // Step 3: Group the filtered products
   const grouped = useMemo<CatalogGroup[]>(() => {
-    if (activeTab === 'new') {
-      return [{ key: 'new', label: 'New Items', products: filtered }]
+    if (isFilterActive) {
+      return [{ key: 'filtered', label: 'Filtered Results', products: filtered }]
     }
 
     if (filters.groupBy === 'brand') {
       const groups = new Map<string, CatalogGroup>()
-      for (const product of filtered) {
+      for (const product of productsForGroupedView) {
         const brandKey = product.brand_id ?? 'uncategorized'
         const brandLabel = product.brand?.name ?? 'Other'
         if (!groups.has(brandKey)) {
@@ -92,7 +86,7 @@ export function useCatalog({
 
     // Group by unit size only (pack count ignored).
     const groups = new Map<string, CatalogGroup>()
-    for (const product of filtered) {
+    for (const product of productsForGroupedView) {
       const sizeKey = getProductSizeLabel(product) ?? 'Other'
       if (!groups.has(sizeKey)) {
         groups.set(sizeKey, { key: sizeKey, label: sizeKey, products: [] })
@@ -100,7 +94,7 @@ export function useCatalog({
       groups.get(sizeKey)!.products.push(product)
     }
     return Array.from(groups.values())
-  }, [filtered, filters.groupBy, activeTab])
+  }, [filtered, filters.groupBy, isFilterActive, productsForGroupedView])
 
   // Derived: unique brands and sizes for filter dropdowns
   const availableBrands = useMemo<Brand[]>(() => {
@@ -129,6 +123,9 @@ export function useCatalog({
     filters,
     setFilters,
     grouped,
+    filteredProducts: filtered,
+    newItems,
+    isFilterActive,
     filteredCount: filtered.length,
     availableBrands,
     availableSizes,

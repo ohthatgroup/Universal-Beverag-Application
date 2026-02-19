@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { OrderStatus } from '@/lib/types'
-import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -23,7 +22,8 @@ export function OrderStatusForm({ orderId, initialStatus }: OrderStatusFormProps
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const save = async () => {
+  const onChange = async (nextStatus: OrderStatus) => {
+    setStatus(nextStatus)
     setIsSaving(true)
     setError(null)
 
@@ -32,7 +32,7 @@ export function OrderStatusForm({ orderId, initialStatus }: OrderStatusFormProps
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status: nextStatus }),
     })
 
     const payload = (await response.json().catch(() => null)) as
@@ -50,10 +50,10 @@ export function OrderStatusForm({ orderId, initialStatus }: OrderStatusFormProps
   }
 
   return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="text-sm font-medium">Order Status</div>
-      <Select value={status} onValueChange={(value: OrderStatus) => setStatus(value)}>
-        <SelectTrigger>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</span>
+      <Select value={status} onValueChange={(value) => onChange(value as OrderStatus)}>
+        <SelectTrigger className="h-8 w-[148px]" disabled={isSaving}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -62,10 +62,8 @@ export function OrderStatusForm({ orderId, initialStatus }: OrderStatusFormProps
           <SelectItem value="delivered">Delivered</SelectItem>
         </SelectContent>
       </Select>
-      <Button onClick={save} disabled={isSaving}>
-        {isSaving ? 'Saving...' : 'Save status'}
-      </Button>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
+      {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   )
 }

@@ -25,7 +25,9 @@
       "Bash(git -C:*)",
       "Bash(NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-test-key SUPABASE_SERVICE_ROLE_KEY=service-role-test-key npm run build)",
       "Bash(npm run test)",
-      "WebFetch(domain:universal-beverag-application.vercel.app)"
+      "WebFetch(domain:universal-beverag-application.vercel.app)",
+      "Bash(cat:*)",
+      "Bash(python -c:*)"
     ]
   }
 }

@@ -104,8 +104,13 @@ export default async function DashboardPage() {
           <Link key={stat.label} href={stat.href}>
             <Card className="transition-colors hover:bg-muted/50">
               <CardContent className="p-4">
-                <div className="text-2xl font-semibold">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-left">
+                    <div className="text-sm text-muted-foreground">{stat.label}</div>
+                    <div className="text-2xl font-semibold leading-tight">{stat.value}</div>
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">Open</span>
+                </div>
               </CardContent>
             </Card>
           </Link>

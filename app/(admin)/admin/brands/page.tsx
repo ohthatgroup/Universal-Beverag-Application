@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,9 +8,19 @@ import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
-export default async function BrandsPage() {
+interface BrandsPageProps {
+  searchParams?: Promise<{
+    q?: string
+  }>
+}
+
+export default async function BrandsPage({ searchParams }: BrandsPageProps) {
   await requirePageAuth(['salesman'])
   const supabase = await createClient()
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+
+  const searchQuery = (resolvedSearchParams?.q ?? '').trim()
+  const searchTerm = searchQuery.toLowerCase()
 
   const { data: brands, error } = await supabase
     .from('brands')
@@ -55,26 +65,25 @@ export default async function BrandsPage() {
     redirect('/admin/brands')
   }
 
-  const brandList = brands ?? []
+  const brandList = (brands ?? []).filter((brand) => {
+    if (!searchTerm) return true
+    return brand.name.toLowerCase().includes(searchTerm)
+  })
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/catalog" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
-          <ArrowLeft className="h-4 w-4" />
-          Catalog
-        </Link>
         <h1 className="text-2xl font-semibold">Brands</h1>
       </div>
 
-      <details className="group rounded-lg border">
-        <summary className="flex cursor-pointer items-center gap-2 p-4 font-medium text-sm">
-          <Plus className="h-4 w-4" />
-          New Brand
-        </summary>
-        <div className="border-t p-4">
-          <form action={createBrand} className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+      <div className="flex flex-wrap items-start gap-2">
+        <details className="group rounded-md border">
+          <summary className="flex h-9 cursor-pointer items-center gap-2 px-3 text-sm font-medium list-none">
+            <Plus className="h-3.5 w-3.5" />
+            New Brand
+          </summary>
+          <div className="border-t p-4">
+            <form action={createBrand} className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" name="name" required />
@@ -83,36 +92,42 @@ export default async function BrandsPage() {
                 <Label htmlFor="sort_order">Sort order</Label>
                 <Input id="sort_order" name="sort_order" type="number" defaultValue={0} className="w-24" />
               </div>
+              <ImageUploadField name="logo_url" label="Logo" folder="brands" compact />
               <div className="flex items-end">
                 <Button type="submit">Create</Button>
               </div>
-            </div>
-            <ImageUploadField name="logo_url" label="Logo" folder="brands" />
-          </form>
-        </div>
-      </details>
+            </form>
+          </div>
+        </details>
+
+        <LiveQueryInput
+          placeholder="Search brands..."
+          initialValue={searchQuery}
+          className="w-full sm:w-80"
+        />
+      </div>
 
       {brandList.length === 0 ? (
         <p className="text-sm text-muted-foreground">No brands found.</p>
       ) : (
         <div className="space-y-4">
           {brandList.map((brand) => (
-            <form key={brand.id} action={updateBrand} className="rounded-lg border p-4 space-y-3">
+            <form key={brand.id} action={updateBrand} className="rounded-lg border p-4">
               <input type="hidden" name="id" value={brand.id} />
-              <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+              <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
                 <div className="space-y-2">
                   <Label>Name</Label>
                   <Input name="name" defaultValue={brand.name} className="h-9 text-sm" />
                 </div>
                 <div className="space-y-2">
                   <Label>Sort</Label>
-                  <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} className="h-9 text-sm w-20" />
+                  <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} className="h-9 w-20 text-sm" />
                 </div>
+                <ImageUploadField name="logo_url" label="Logo" folder="brands" defaultValue={brand.logo_url} compact />
                 <div className="flex items-end">
                   <Button size="sm" type="submit">Save</Button>
                 </div>
               </div>
-              <ImageUploadField name="logo_url" label="Logo" folder="brands" defaultValue={brand.logo_url} />
             </form>
           ))}
         </div>

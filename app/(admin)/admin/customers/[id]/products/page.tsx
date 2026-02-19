@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { LiveQueryInput } from '@/components/admin/live-query-input'
+import { LiveQuerySelect } from '@/components/admin/live-query-select'
+import { ProductPickerDialog } from '@/components/admin/product-picker-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/server'
@@ -95,15 +98,22 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
     products: list,
   }))
 
+  const pickerProducts = (products ?? []).map((product) => ({
+    id: product.id,
+    title: product.title,
+    brandLabel: product.brand_id ? brandById.get(product.brand_id) ?? 'No brand' : 'No brand',
+    packLabel: getProductPackLabel(product) ?? 'N/A',
+    price: Number(product.price ?? 0),
+  }))
+
   async function updateProductSetting(formData: FormData) {
     'use server'
 
     await requirePageAuth(['salesman'])
     const productId = String(formData.get('product_id') ?? '').trim()
-    const included = formData.get('included') === 'on'
+    const hidden = formData.get('hidden') === 'on'
     const customPriceRaw = String(formData.get('custom_price') ?? '').trim()
     const customPrice = customPriceRaw.length > 0 ? Number(customPriceRaw) : null
-    const excluded = !included
 
     if (!productId) {
       throw new Error('Missing product id')
@@ -115,7 +125,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
 
     const supabaseClient = await createClient()
 
-    if (!excluded && customPrice === null) {
+    if (!hidden && customPrice === null) {
       const { error } = await supabaseClient
         .from('customer_products')
         .delete()
@@ -130,7 +140,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
       {
         customer_id: id,
         product_id: productId,
-        excluded,
+        excluded: hidden,
         custom_price: customPrice,
       },
       {
@@ -147,66 +157,65 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <Link href={`/admin/customers/${id}`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
+        <Link href={`/admin/customers/${id}`} className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           {customerName}
         </Link>
         <h1 className="text-2xl font-semibold">Products</h1>
         {customer.custom_pricing && (
-          <p className="text-sm text-muted-foreground mt-1">Custom pricing enabled</p>
+          <p className="mt-1 text-sm text-muted-foreground">Custom pricing enabled</p>
         )}
       </div>
 
-      {/* Search + brand filter — no Card wrapper */}
-      <form method="GET" className="flex flex-col gap-2 md:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" placeholder="Search products..." defaultValue={searchQuery} className="pl-9" />
-        </div>
-        <select
-          name="brand"
-          className="h-9 rounded-md border bg-background px-3 text-sm md:w-44"
-          defaultValue={selectedBrandId || 'all'}
-        >
-          <option value="all">All brands</option>
-          {(brands ?? []).map((brand) => (
-            <option key={brand.id} value={brand.id}>
-              {brand.name}
-            </option>
-          ))}
-        </select>
-        <Button type="submit">Apply</Button>
-      </form>
+      <div className="flex flex-wrap items-center gap-2">
+        <ProductPickerDialog
+          mode="customer"
+          endpoint={`/api/customers/${id}/products`}
+          title="Add Product to Custom Catalog"
+          triggerLabel="Add Product"
+          products={pickerProducts}
+        />
+        <LiveQueryInput
+          placeholder="Search products..."
+          initialValue={searchQuery}
+          className="w-full sm:w-80"
+        />
+        <LiveQuerySelect
+          paramKey="brand"
+          initialValue={selectedBrandId || 'all'}
+          className="w-full sm:w-48"
+          options={[
+            { value: 'all', label: 'All brands' },
+            ...(brands ?? []).map((brand) => ({ value: brand.id, label: brand.name })),
+          ]}
+        />
+      </div>
 
-      {/* Products grouped by brand */}
       {groupedProducts.length === 0 ? (
         <p className="text-sm text-muted-foreground">No products found.</p>
       ) : (
         <div className="space-y-6">
           {groupedProducts.map((group) => (
             <section key={group.brandId} className="space-y-1">
-              <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+              <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {group.label}
               </h2>
 
-              {/* Mobile: list */}
               <div className="md:hidden">
                 {group.products.map((product) => {
                   const override = overrideByProductId.get(product.id)
-                  const included = !(override?.excluded ?? false)
+                  const hidden = override?.excluded ?? false
                   const customPrice = override?.custom_price ?? null
 
                   return (
-                    <form key={product.id} action={updateProductSetting} className={cn('border-b py-3 last:border-0', !included && 'opacity-50')}>
+                    <form key={product.id} action={updateProductSetting} className={cn('border-b py-3 last:border-0', hidden && 'opacity-50')}>
                       <input type="hidden" name="product_id" value={product.id} />
                       <div className="flex items-start gap-3">
-                        <input type="checkbox" name="included" defaultChecked={included} className="mt-1 h-4 w-4" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{product.title}</div>
+                          <div className="text-sm font-medium">{product.title}</div>
                           <div className="text-xs text-muted-foreground">
-                            {getProductPackLabel(product) ?? 'N/A'} · {formatCurrency(product.price)}
+                            {getProductPackLabel(product) ?? 'N/A'} - {formatCurrency(product.price)}
                           </div>
                           {customer.custom_pricing && (
                             <Input
@@ -217,6 +226,13 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
                             />
                           )}
                         </div>
+
+                        <label className="relative inline-flex h-5 w-9 cursor-pointer items-center">
+                          <input type="checkbox" name="hidden" defaultChecked={hidden} className="peer sr-only" />
+                          <span className="h-5 w-9 rounded-full bg-input transition-colors peer-checked:bg-primary" />
+                          <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
+                        </label>
+
                         <Button type="submit" size="sm" variant="ghost" className="h-7 px-2 text-xs">
                           Save
                         </Button>
@@ -226,48 +242,60 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
                 })}
               </div>
 
-              {/* Desktop: table */}
-              <div className="hidden md:block rounded-lg border">
+              <div className="hidden rounded-lg border md:block">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-2 text-left font-medium w-10"></th>
                       <th className="px-4 py-2 text-left font-medium">Product</th>
                       <th className="px-4 py-2 text-left font-medium">Pack</th>
                       <th className="px-4 py-2 text-right font-medium">Default Price</th>
                       {customer.custom_pricing && (
                         <th className="px-4 py-2 text-right font-medium">Custom Price</th>
                       )}
-                      <th className="px-4 py-2 w-16"></th>
+                      <th className="px-4 py-2 text-center font-medium">Hide</th>
+                      <th className="px-4 py-2 text-right font-medium">Save</th>
                     </tr>
                   </thead>
                   <tbody>
                     {group.products.map((product) => {
                       const override = overrideByProductId.get(product.id)
-                      const included = !(override?.excluded ?? false)
+                      const hidden = override?.excluded ?? false
                       const customPrice = override?.custom_price ?? null
+                      const formId = `product-row-${product.id}`
 
                       return (
-                        <tr key={product.id} className={cn('border-b last:border-0', !included && 'opacity-50')}>
-                          <td className="px-4 py-2" colSpan={customer.custom_pricing ? 6 : 5}>
-                            <form action={updateProductSetting} className="flex items-center gap-4">
+                        <tr key={product.id} className={cn('border-b last:border-0', hidden && 'opacity-50')}>
+                          <td className="px-4 py-2 font-medium">
+                            <form id={formId} action={updateProductSetting} className="hidden">
                               <input type="hidden" name="product_id" value={product.id} />
-                              <input type="checkbox" name="included" defaultChecked={included} className="h-4 w-4" />
-                              <span className="font-medium flex-1">{product.title}</span>
-                              <span className="text-muted-foreground w-32">{getProductPackLabel(product) ?? 'N/A'}</span>
-                              <span className="text-right w-24">{formatCurrency(product.price)}</span>
-                              {customer.custom_pricing && (
-                                <Input
-                                  name="custom_price"
-                                  defaultValue={customPrice !== null ? String(customPrice) : ''}
-                                  placeholder="—"
-                                  className="h-8 w-24 text-right text-xs"
-                                />
-                              )}
-                              <Button type="submit" size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                                Save
-                              </Button>
+                              {!customer.custom_pricing && <input type="hidden" name="custom_price" value="" />}
                             </form>
+                            {product.title}
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">{getProductPackLabel(product) ?? 'N/A'}</td>
+                          <td className="px-4 py-2 text-right">{formatCurrency(product.price)}</td>
+                          {customer.custom_pricing ? (
+                            <td className="px-4 py-2 text-right">
+                              <Input
+                                form={formId}
+                                name="custom_price"
+                                defaultValue={customPrice !== null ? String(customPrice) : ''}
+                                placeholder="-"
+                                className="ml-auto h-8 w-28 text-right text-xs"
+                              />
+                            </td>
+                          ) : null}
+                          <td className="px-4 py-2 text-center">
+                            <label className="relative inline-flex h-5 w-9 cursor-pointer items-center">
+                              <input form={formId} type="checkbox" name="hidden" defaultChecked={hidden} className="peer sr-only" />
+                              <span className="h-5 w-9 rounded-full bg-input transition-colors peer-checked:bg-primary" />
+                              <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
+                            </label>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <Button form={formId} type="submit" size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                              Save
+                            </Button>
                           </td>
                         </tr>
                       )

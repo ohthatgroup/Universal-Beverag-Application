@@ -199,30 +199,37 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               </div>
             </div>
 
-            {/* Catalog settings inline in same form */}
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">Catalog Settings</h2>
+            <h2 className="pt-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Catalog Settings</h2>
 
-            <div className="space-y-3">
-              <label className="flex items-center justify-between rounded-lg border p-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end">
+              <label className="flex items-center justify-between rounded-lg border p-3 md:min-w-56">
                 <span className="text-sm font-medium">Show prices</span>
-                <input defaultChecked={customer.show_prices ?? true} name="show_prices" type="checkbox" className="h-4 w-4" />
+                <span className="relative inline-flex h-5 w-9 items-center">
+                  <input defaultChecked={customer.show_prices ?? true} name="show_prices" type="checkbox" className="peer sr-only" />
+                  <span className="h-5 w-9 rounded-full bg-input transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
+                </span>
               </label>
-              <label className="flex items-center justify-between rounded-lg border p-3">
+              <label className="flex items-center justify-between rounded-lg border p-3 md:min-w-56">
                 <span className="text-sm font-medium">Custom pricing</span>
-                <input defaultChecked={customer.custom_pricing ?? false} name="custom_pricing" type="checkbox" className="h-4 w-4" />
+                <span className="relative inline-flex h-5 w-9 items-center">
+                  <input defaultChecked={customer.custom_pricing ?? false} name="custom_pricing" type="checkbox" className="peer sr-only" />
+                  <span className="h-5 w-9 rounded-full bg-input transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
+                </span>
               </label>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Default Grouping</Label>
-              <select
-                name="default_group"
-                defaultValue={customer.default_group ?? 'brand'}
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="brand">Brand</option>
-                <option value="size">Size</option>
-              </select>
+              <div className="space-y-2 md:min-w-44">
+                <Label>Default Grouping</Label>
+                <select
+                  name="default_group"
+                  defaultValue={customer.default_group ?? 'brand'}
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="brand">Brand</option>
+                  <option value="size">Size</option>
+                </select>
+              </div>
             </div>
 
             <Button type="submit">Save</Button>

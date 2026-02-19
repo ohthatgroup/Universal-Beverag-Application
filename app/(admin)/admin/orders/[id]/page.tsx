@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, Check, Download, Mail, Phone, Trash2 } from 'lucide-react'
+import { CopyUrlButton } from '@/components/admin/copy-url-button'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
+import { ProductPickerDialog } from '@/components/admin/product-picker-dialog'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { createClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/types'
@@ -43,7 +44,10 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         .select('id,product_id,pallet_deal_id,quantity,unit_price,line_total')
         .eq('order_id', order.id)
         .order('id', { ascending: true }),
-      context.supabase.from('products').select('id,title,brand_id,pack_details,pack_count,size_value,size_uom'),
+      context.supabase
+        .from('products')
+        .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom,price,is_discontinued')
+        .eq('is_discontinued', false),
       context.supabase.from('pallet_deals').select('id,title,description'),
       context.supabase.from('brands').select('id,name'),
     ])
@@ -55,6 +59,14 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   const orderId = order.id
   const submittedAt = order.submitted_at
   const orderItems = items ?? []
+  const orderDeepLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/orders/${order.id}`
+  const pickerProducts = (products ?? []).map((product) => ({
+    id: product.id,
+    title: product.title,
+    brandLabel: product.brand_id ? brandById.get(product.brand_id) ?? 'No brand' : 'No brand',
+    packLabel: getProductPackLabel(product) ?? 'N/A',
+    price: Number(product.price ?? 0),
+  }))
 
   const customerName = customer?.business_name || customer?.contact_name || 'Unknown customer'
 
@@ -129,21 +141,38 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
       </div>
 
       {/* Action bar */}
-      <div className="flex flex-wrap gap-2">
-        {order.status === 'submitted' && (
-          <form action={markDelivered}>
-            <Button size="sm" type="submit">
-              <Check className="mr-1.5 h-3.5 w-3.5" />
-              Mark Delivered
-            </Button>
-          </form>
-        )}
-        <Button asChild size="sm" variant="outline">
-          <a href={`/api/orders/${order.id}/csv`}>
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            CSV
-          </a>
-        </Button>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+        <OrderStatusForm orderId={order.id} initialStatus={orderStatus} />
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {order.status === 'draft' && (
+            <ProductPickerDialog
+              mode="order"
+              endpoint={`/api/orders/${order.id}/items`}
+              title="Add Product to Order"
+              triggerLabel="Add Product"
+              products={pickerProducts}
+            />
+          )}
+          {order.status === 'submitted' && (
+            <form action={markDelivered}>
+              <Button size="sm" type="submit">
+                <Check className="mr-1.5 h-3.5 w-3.5" />
+                Mark Delivered
+              </Button>
+            </form>
+          )}
+          <Button asChild size="sm" variant="outline">
+            <a href={`/api/orders/${order.id}/csv`}>
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              CSV
+            </a>
+          </Button>
+          <CopyUrlButton
+            iconOnly
+            url={orderDeepLink}
+            title="Copy order deep link"
+          />
+        </div>
       </div>
 
       {/* Customer info */}
@@ -169,13 +198,6 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           </Link>
         </div>
       )}
-
-      <Separator />
-
-      {/* Status form */}
-      <OrderStatusForm orderId={order.id} initialStatus={orderStatus} />
-
-      <Separator />
 
       {/* Order items */}
       <section className="space-y-3">
@@ -255,8 +277,6 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           </>
         )}
       </section>
-
-      <Separator />
 
       {/* Danger zone */}
       <div className="flex flex-wrap gap-2">
