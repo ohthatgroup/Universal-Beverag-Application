@@ -118,6 +118,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      FEATURE_ECWID_PUSH: false
       CI_SALESMAN_EMAIL: ${{ secrets.CI_SALESMAN_EMAIL }}
       CI_SALESMAN_PASSWORD: ${{ secrets.CI_SALESMAN_PASSWORD }}
     steps:
@@ -135,6 +136,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Smoke-test server starts
+        run: |
+          npm run start &
+          SERVER_PID=$!
+          sleep 5
+          curl -sf http://127.0.0.1:3000/auth/login > /dev/null || (echo "::error::Server failed to start" && kill $SERVER_PID 2>/dev/null && exit 1)
+          kill $SERVER_PID 2>/dev/null
+          echo "Server smoke test passed"
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
