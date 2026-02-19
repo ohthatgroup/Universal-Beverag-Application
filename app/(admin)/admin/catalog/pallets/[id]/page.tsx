@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import { getProductPackLabel } from '@/lib/utils'
 
 export default async function PalletDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -15,7 +16,7 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
 
   const [{ data: palletDeal, error: dealError }, { data: products }, { data: items }] = await Promise.all([
     supabase.from('pallet_deals').select('*').eq('id', id).maybeSingle(),
-    supabase.from('products').select('id,title,pack_details').order('title', { ascending: true }),
+    supabase.from('products').select('id,title,pack_details,pack_count,size_value,size_uom').order('title', { ascending: true }),
     supabase
       .from('pallet_deal_items')
       .select('id,product_id,quantity')
@@ -163,7 +164,7 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
                 <input type="hidden" name="product_id" value={product.id} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{product.title}</div>
-                  <div className="text-xs text-muted-foreground">{product.pack_details ?? 'N/A'}</div>
+                  <div className="text-xs text-muted-foreground">{getProductPackLabel(product) ?? 'N/A'}</div>
                 </div>
                 <Input className="w-20 h-8 text-xs" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
                 <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
@@ -192,7 +193,7 @@ export default async function PalletDetailPage({ params }: { params: Promise<{ i
                       <form action={updatePalletItem} className="flex items-center gap-4">
                         <input type="hidden" name="product_id" value={product.id} />
                         <span className="font-medium flex-1">{product.title}</span>
-                        <span className="text-muted-foreground w-40">{product.pack_details ?? 'N/A'}</span>
+                        <span className="text-muted-foreground w-40">{getProductPackLabel(product) ?? 'N/A'}</span>
                         <Input className="w-20 h-8 text-right text-xs" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
                         <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
                       </form>

@@ -21,7 +21,9 @@
       "Bash(npm run ci:prepare-db:*)",
       "Bash(SUPABASE_DB_URL=\"postgresql://postgres.wfcwnanssppbhzkkbqap:eClips%40usa25@aws-1-us-east-1.pooler.supabase.com:5432/postgres\" npm run db:types:generate:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git -C:*)",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-test-key SUPABASE_SERVICE_ROLE_KEY=service-role-test-key npm run build)"
     ]
   }
 }

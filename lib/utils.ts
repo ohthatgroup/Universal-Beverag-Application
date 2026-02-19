@@ -30,6 +30,57 @@ export function formatCurrency(
   }).format(amount)
 }
 
+export const PACK_UOM_OPTIONS = [
+  'OZ',
+  'ML',
+  'LITER',
+  'LITERS',
+  'GALLON',
+  'GALLONS',
+  'CT',
+  'ROLL',
+  'ROLLS',
+] as const
+
+export type PackUom = (typeof PACK_UOM_OPTIONS)[number]
+
+interface ProductPackFields {
+  pack_count?: number | null
+  size_value?: number | null
+  size_uom?: string | null
+  pack_details?: string | null
+}
+
+export function normalizePackUom(value: string): string {
+  return value.trim().toUpperCase()
+}
+
+export function isSupportedPackUom(value: string): value is PackUom {
+  return (PACK_UOM_OPTIONS as readonly string[]).includes(normalizePackUom(value))
+}
+
+export function formatSizeValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(value)
+}
+
+export function formatStructuredPack(packCount: number, sizeValue: number, sizeUom: string): string {
+  return `${packCount}/${formatSizeValue(sizeValue)} ${normalizePackUom(sizeUom)}`
+}
+
+export function getProductPackLabel(product: ProductPackFields): string | null {
+  if (
+    typeof product.pack_count === 'number' &&
+    typeof product.size_value === 'number' &&
+    typeof product.size_uom === 'string' &&
+    product.size_uom.trim().length > 0
+  ) {
+    return formatStructuredPack(product.pack_count, product.size_value, product.size_uom)
+  }
+
+  const fallback = product.pack_details?.trim()
+  return fallback && fallback.length > 0 ? fallback : null
+}
+
 // ─── Dates ────────────────────────────────────────────────────────────────
 
 // Format ISO date string (YYYY-MM-DD) for display: "Feb 20, 2025"

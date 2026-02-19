@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePortalOrderAccess, extractPortalToken } from '@/lib/server/customer-order-access'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
-import { buildCsv } from '@/lib/utils'
+import { buildCsv, getProductPackLabel } from '@/lib/utils'
 
 /**
  * GET /api/portal/orders/[id]/csv?token=...
@@ -49,7 +49,7 @@ export async function GET(
     const [{ data: products, error: productsError }, { data: pallets, error: palletsError }] =
       await Promise.all([
         productIds.length
-          ? admin.from('products').select('id,title,pack_details').in('id', productIds)
+          ? admin.from('products').select('id,title,pack_details,pack_count,size_value,size_uom').in('id', productIds)
           : Promise.resolve({ data: [], error: null }),
         palletIds.length
           ? admin.from('pallet_deals').select('id,title,description').in('id', palletIds)
@@ -67,7 +67,7 @@ export async function GET(
         const product = productMap.get(item.product_id)
         return {
           Product: product?.title ?? 'Unknown Product',
-          'Pack Details': product?.pack_details ?? '',
+          'Pack Details': product ? getProductPackLabel(product) ?? '' : '',
           Quantity: item.quantity,
           'Unit Price': Number(item.unit_price).toFixed(2),
           'Line Total': Number(item.line_total ?? 0).toFixed(2),

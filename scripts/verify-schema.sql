@@ -42,7 +42,8 @@ begin
       'idx_one_draft_per_date',
       'idx_order_items_product_conflict',
       'idx_order_items_pallet_conflict',
-      'idx_profiles_access_token'
+      'idx_profiles_access_token',
+      'idx_products_pack_size'
     ]) as name
     except
     select indexname
@@ -217,6 +218,36 @@ begin
       and column_name = 'access_token'
   ) then
     raise exception 'profiles.access_token column must exist';
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'products'
+      and column_name = 'pack_count'
+  ) then
+    raise exception 'products.pack_count column must exist';
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'products'
+      and column_name = 'size_value'
+  ) then
+    raise exception 'products.size_value column must exist';
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'products'
+      and column_name = 'size_uom'
+  ) then
+    raise exception 'products.size_uom column must exist';
   end if;
 end
 $$;

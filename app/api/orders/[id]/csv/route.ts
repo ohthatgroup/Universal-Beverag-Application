@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getRequestId, logApiEvent, toErrorResponse } from '@/lib/server/api'
 import { requireOrderAccess } from '@/lib/server/auth'
-import { buildCsv } from '@/lib/utils'
+import { buildCsv, getProductPackLabel } from '@/lib/utils'
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
@@ -41,7 +41,7 @@ export async function GET(
         productIds.length
           ? context.supabase
               .from('products')
-              .select('id,title,pack_details')
+              .select('id,title,pack_details,pack_count,size_value,size_uom')
               .in('id', productIds)
           : Promise.resolve({ data: [], error: null }),
         palletIds.length
@@ -68,7 +68,7 @@ export async function GET(
         const product = productMap.get(item.product_id)
         return {
           Product: product?.title ?? 'Unknown Product',
-          'Pack Details': product?.pack_details ?? '',
+          'Pack Details': product ? getProductPackLabel(product) ?? '' : '',
           Quantity: item.quantity,
           'Unit Price': Number(item.unit_price).toFixed(2),
           'Line Total': Number(item.line_total ?? 0).toFixed(2),

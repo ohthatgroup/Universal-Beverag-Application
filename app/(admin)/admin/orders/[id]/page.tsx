@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { createClient } from '@/lib/supabase/server'
 import type { OrderStatus } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel } from '@/lib/utils'
+import { formatCurrency, formatDeliveryDate, getProductPackLabel, getStatusIcon, getStatusLabel } from '@/lib/utils'
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -43,7 +43,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         .select('id,product_id,pallet_deal_id,quantity,unit_price,line_total')
         .eq('order_id', order.id)
         .order('id', { ascending: true }),
-      context.supabase.from('products').select('id,title,pack_details'),
+      context.supabase.from('products').select('id,title,pack_details,pack_count,size_value,size_uom'),
       context.supabase.from('pallet_deals').select('id,title,description'),
     ])
 
@@ -195,7 +195,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm">{product?.title ?? pallet?.title ?? 'Unknown item'}</div>
                       <div className="text-xs text-muted-foreground">
-                        {product?.pack_details ?? pallet?.description ?? ''}
+                        {(product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {formatCurrency(item.unit_price)} × {item.quantity}
@@ -229,7 +229,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                           {product?.title ?? pallet?.title ?? 'Unknown item'}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          {product?.pack_details ?? pallet?.description ?? ''}
+                          {(product ? getProductPackLabel(product) : null) ?? pallet?.description ?? ''}
                         </td>
                         <td className="px-4 py-3 text-right">{item.quantity}</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(item.unit_price)}</td>

@@ -7,7 +7,7 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, Package, Search } from 'lu
 import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
 import { useCatalog, type CatalogTab } from '@/lib/hooks/useCatalog'
 import type { CatalogProduct, GroupByOption, PalletDeal } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
+import { formatCurrency, formatDeliveryDate, getProductPackLabel } from '@/lib/utils'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -152,8 +152,9 @@ export function OrderBuilder({
           const product = productById.get(id)
           if (!product) return null
           const unitPrice = product.effective_price
+          const packLabel = getProductPackLabel(product)
           return {
-            key, label: product.title, details: product.pack_details ?? '',
+            key, label: product.title, details: packLabel ?? '',
             quantity, unitPrice, lineTotal: unitPrice * quantity, type: 'product', id,
           }
         }
@@ -353,6 +354,7 @@ export function OrderBuilder({
                   {group.products.map((product) => {
                     const key = itemKey(product.id, null)
                     const quantity = quantities[key] ?? 0
+                    const packLabel = getProductPackLabel(product) ?? 'N/A'
 
                     if (isCardLayout) {
                       return (
@@ -370,7 +372,7 @@ export function OrderBuilder({
                           )}
                           <div>
                             <div className="font-semibold">{product.title}</div>
-                            <div className="text-xs text-muted-foreground">{product.pack_details ?? 'N/A'}</div>
+                            <div className="text-xs text-muted-foreground">{packLabel}</div>
                             {showPrices && (
                               <div className="mt-1 text-sm">{formatCurrency(product.effective_price)}</div>
                             )}
@@ -388,7 +390,7 @@ export function OrderBuilder({
                         <div className="min-w-0 flex-1">
                           <div className="font-medium">{product.title}</div>
                           <div className="text-xs text-muted-foreground">
-                            {product.pack_details ?? 'N/A'}
+                            {packLabel}
                             {showPrices && <> · {formatCurrency(product.effective_price)}</>}
                           </div>
                         </div>

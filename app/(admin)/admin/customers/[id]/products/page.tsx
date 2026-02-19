@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, getProductPackLabel } from '@/lib/utils'
 
 interface CustomerProductsPageProps {
   params: Promise<{ id: string }>
@@ -36,7 +36,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
         .maybeSingle(),
       supabase
         .from('products')
-        .select('id,title,pack_details,price,brand_id,is_discontinued')
+        .select('id,title,pack_details,pack_count,size_value,size_uom,price,brand_id,is_discontinued')
         .eq('is_discontinued', false)
         .order('title', { ascending: true }),
       supabase
@@ -69,7 +69,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
 
     const haystack = [
       product.title ?? '',
-      product.pack_details ?? '',
+      getProductPackLabel(product) ?? '',
       product.brand_id ? brandById.get(product.brand_id) ?? '' : '',
     ]
       .join(' ')
@@ -206,7 +206,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm">{product.title}</div>
                           <div className="text-xs text-muted-foreground">
-                            {product.pack_details ?? 'N/A'} · {formatCurrency(product.price)}
+                            {getProductPackLabel(product) ?? 'N/A'} · {formatCurrency(product.price)}
                           </div>
                           {customer.custom_pricing && (
                             <Input
@@ -254,7 +254,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
                               <input type="hidden" name="product_id" value={product.id} />
                               <input type="checkbox" name="included" defaultChecked={included} className="h-4 w-4" />
                               <span className="font-medium flex-1">{product.title}</span>
-                              <span className="text-muted-foreground w-32">{product.pack_details ?? 'N/A'}</span>
+                              <span className="text-muted-foreground w-32">{getProductPackLabel(product) ?? 'N/A'}</span>
                               <span className="text-right w-24">{formatCurrency(product.price)}</span>
                               {customer.custom_pricing && (
                                 <Input

@@ -4,6 +4,7 @@ import { CustomerOrderReadonly } from '@/components/orders/customer-order-readon
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Brand, CatalogProduct, CustomerProduct, OrderStatus, PalletDeal, Product } from '@/lib/types'
+import { getProductPackLabel } from '@/lib/utils'
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -59,7 +60,7 @@ export default async function PortalOrderLinkPage({
     const [{ data: products, error: productsError }, { data: pallets, error: palletsError }] =
       await Promise.all([
         productIds.length
-          ? admin.from('products').select('id,title,pack_details').in('id', productIds)
+          ? admin.from('products').select('id,title,pack_details,pack_count,size_value,size_uom').in('id', productIds)
           : Promise.resolve({ data: [], error: null }),
         palletIds.length
           ? admin.from('pallet_deals').select('id,title,description').in('id', palletIds)
@@ -78,7 +79,7 @@ export default async function PortalOrderLinkPage({
       return {
         id: item.id,
         title: product?.title ?? pallet?.title ?? 'Unknown item',
-        details: product?.pack_details ?? pallet?.description ?? '',
+        details: (product ? getProductPackLabel(product) : null) ?? pallet?.description ?? '',
         quantity: item.quantity,
         unitPrice: Number(item.unit_price ?? 0),
         lineTotal: Number(item.line_total ?? 0),

@@ -6,6 +6,27 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import { formatStructuredPack, isSupportedPackUom, normalizePackUom, PACK_UOM_OPTIONS } from '@/lib/utils'
+
+function parseOptionalPositiveInteger(raw: string): number | null {
+  const value = raw.trim()
+  if (!value) return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('Pack count must be a positive whole number')
+  }
+  return parsed
+}
+
+function parseOptionalPositiveNumber(raw: string): number | null {
+  const value = raw.trim()
+  if (!value) return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error('Size value must be a positive number')
+  }
+  return parsed
+}
 
 export default async function CatalogItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -26,16 +47,39 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
 
     const supabaseClient = await createClient()
     const price = Number((formData.get('price') as string) || 0)
+    const packDetailsInput = (formData.get('pack_details') as string).trim()
+    const packCount = parseOptionalPositiveInteger((formData.get('pack_count') as string) || '')
+    const sizeValue = parseOptionalPositiveNumber((formData.get('size_value') as string) || '')
+    const sizeUomInput = (formData.get('size_uom') as string).trim()
+    const sizeUom = sizeUomInput ? normalizePackUom(sizeUomInput) : null
+
     if (!Number.isFinite(price) || price < 0) {
       throw new Error('Price must be a valid non-negative number')
     }
+
+    const hasStructuredInput = packCount !== null || sizeValue !== null || sizeUom !== null
+    if (hasStructuredInput && (packCount === null || sizeValue === null || sizeUom === null)) {
+      throw new Error('Pack count, size value, and unit must all be set together')
+    }
+    if (sizeUom && !isSupportedPackUom(sizeUom)) {
+      throw new Error('Unsupported unit of measure')
+    }
+
+    const inferredPackDetails =
+      packCount !== null && sizeValue !== null && sizeUom
+        ? formatStructuredPack(packCount, sizeValue, sizeUom)
+        : null
+    const packDetails = packDetailsInput || inferredPackDetails || null
 
     const { error } = await supabaseClient
       .from('products')
       .update({
         brand_id: (formData.get('brand_id') as string) || null,
         title: (formData.get('title') as string).trim(),
-        pack_details: (formData.get('pack_details') as string) || null,
+        pack_details: packDetails,
+        pack_count: packCount,
+        size_value: sizeValue,
+        size_uom: sizeUom,
         price,
         image_url: (formData.get('image_url') as string) || null,
         tags: ((formData.get('tags') as string) || '')
@@ -80,6 +124,42 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
           <div className="space-y-2">
             <Label htmlFor="pack_details">Pack details</Label>
             <Input id="pack_details" name="pack_details" defaultValue={product.pack_details ?? ''} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pack_count">Pack count</Label>
+            <Input
+              id="pack_count"
+              name="pack_count"
+              type="number"
+              min="1"
+              step="1"
+              defaultValue={product.pack_count ?? ''}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="size_value">Size value</Label>
+            <Input
+              id="size_value"
+              name="size_value"
+              type="number"
+              min="0"
+              step="0.001"
+              defaultValue={product.size_value ?? ''}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="size_uom">Size unit</Label>
+            <select
+              id="size_uom"
+              name="size_uom"
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              defaultValue={product.size_uom ?? ''}
+            >
+              <option value="">Select unit</option>
+              {PACK_UOM_OPTIONS.map((unit) => (
+                <option key={unit} value={unit}>{unit}</option>
+              ))}
+            </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="price">Price</Label>

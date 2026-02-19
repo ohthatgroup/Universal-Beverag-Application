@@ -69,6 +69,9 @@ export interface Product {
   brand_id: string | null
   title: string
   pack_details: string | null
+  pack_count: number | null
+  size_value: number | null
+  size_uom: string | null
   price: number
   image_url: string | null
   is_new: boolean
@@ -87,6 +90,9 @@ export interface ProductInsert {
   brand_id?: string | null
   title: string
   pack_details?: string | null
+  pack_count?: number | null
+  size_value?: number | null
+  size_uom?: string | null
   price: number
   image_url?: string | null
   is_new?: boolean

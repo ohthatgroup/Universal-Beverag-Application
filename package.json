@@ -14,7 +14,7 @@
     "db:types:generate": "node scripts/generate-db-types.cjs",
     "db:types:check": "node scripts/generate-db-types.cjs --check",
     "db:reset": "bash scripts/run-psql.sh -f scripts/reset-public.sql",
-    "db:migrate": "bash scripts/run-psql.sh -f supabase/migrations/202602180001_init.sql && bash scripts/run-psql.sh -f supabase/migrations/202602180002_seed.sql && bash scripts/run-psql.sh -f supabase/migrations/202602190001_customer_portal_tokens.sql",
+    "db:migrate": "bash scripts/run-psql.sh -f supabase/migrations/202602180001_init.sql && bash scripts/run-psql.sh -f supabase/migrations/202602180002_seed.sql && bash scripts/run-psql.sh -f supabase/migrations/202602190001_customer_portal_tokens.sql && bash scripts/run-psql.sh -f supabase/migrations/202602190002_product_pack_fields.sql && bash scripts/run-psql.sh -f supabase/migrations/202602190003_pack_backfill_cleanup.sql",
     "db:verify": "bash scripts/run-psql.sh -f scripts/verify-schema.sql",
     "db:provision": "tsx scripts/provision-users.ts",
     "verify:rls": "tsx scripts/verify-rls.ts",
