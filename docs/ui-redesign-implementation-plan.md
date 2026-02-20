@@ -15,6 +15,7 @@ Ship remaining WS-10 and WS-11 corrections so admin and customer portal ordering
 - Search is constrained width on desktop and does not consume full row by default.
 - On mobile, add controls and search controls split to separate rows where requested.
 - Copy URL actions should return full absolute customer portal URLs.
+- Pallet view in customer portal is only entered from the order page flow. When entered via `Save with a pallet`, the header return action must read `Purchase Catalog` and return to the same order page catalog view (`All` tab), not an alternate toggle state.
 
 ## Live Workstreams
 
@@ -253,6 +254,25 @@ Ship remaining WS-10 and WS-11 corrections so admin and customer portal ordering
 - [~] WS-11 delivered with regression coverage in place; full e2e validation still blocked by missing local env secrets.
 
 ### Open Rework Queue
+- [ ] Brand management redesign (new):
+  - Replace current per-brand label/field card layout with a table-first layout on desktop.
+  - Each brand row should support:
+    - inline name editing
+    - compact upload control
+    - `View file` action for existing attached logo/file
+    - `Delete file` action that removes only the attachment (not the brand row)
+    - `Delete brand` action
+    - no always-visible `Save` action
+    - show row-level save action only when that row has unsaved changes, positioned near `Name`
+  - Mobile should collapse into stacked row cards while preserving the same actions.
+- [ ] Portal pallet return-action semantics (reopened):
+  - In portal order flow, after `Save with a pallet`, the header return action text must be `Purchase Catalog`.
+  - Clicking that action must always return the user to the order page catalog view (`All`), clearing pallet-filter context.
+  - Do not rely on a two-state toggle label model for this flow.
+- [ ] Pallet `single` type selection semantics (reopened):
+  - On pallet item page, when type is `single`, only one item can be selected at any time.
+  - Selecting a new item must automatically clear the previously selected item.
+  - UI selected state must reflect only the latest selected item.
 - [x] Deep-link semantics fixed:
   - Deep-link actions now target customer portal URLs where requested.
 - [x] URL copy quality fixed:
@@ -306,6 +326,13 @@ Close the known gaps from the latest QA/user feedback and bring behavior in line
 15. [x] Add stronger visual separators/line treatment to Add Brand panel.
 16. [x] Add delete button/action for brands in the brand list.
 17. [x] Reduce desktop width footprint of brand name field.
+18. [~] Redesign brand management into table-first UI:
+   - replace current card/field layout with table rows per brand (desktop)
+   - include `View file` and `Delete file` actions for brand attachment
+   - preserve `Delete brand` flow
+   - remove always-visible save button; show row-level save control only when row is dirty
+   - place conditional save control near `Name`
+   - maintain mobile-safe stacked fallback
 
 ### Acceptance Criteria
 - No runtime React crash in affected pages.
@@ -317,6 +344,13 @@ Close the known gaps from the latest QA/user feedback and bring behavior in line
 - Mobile layouts keep add and search controls on separate rows where requested.
 - Add Product and Add Pallet surfaces are fully visible/contained on mobile.
 - Brand list supports delete, compact name field sizing, and clearer panel separators.
+- Brand page uses row/table interaction on desktop instead of per-brand field cards.
+- For brands with attachments, users can explicitly `View file` and `Delete file` without deleting the brand.
+- Attachment actions and brand delete/save actions are clearly separated to prevent accidental destructive actions.
+- Brand save behavior is conditional:
+  - no persistent/global save button
+  - row-level save control appears only when the row has edits
+  - save control is visually anchored near the `Name` field
 
 ## WS-11: Catalog + Portal Ordering Interaction Pass (Current)
 
@@ -343,19 +377,20 @@ Implement the latest ordering and bulk-edit UX behavior across admin catalog tab
    - move selected to index
    - move selected to top/bottom
 3. [x] Replace manual sort-number-first workflow with drag-first plus batch move controls.
-4. [x] Update pallet type behavior:
-   - `single`: show `Select` action
+4. [~] Update pallet type behavior:
+   - `single`: show `Select` action with strict single-selection enforcement (latest selection wins, prior selection cleared)
    - `mixed`: show quantity controls
    - auto-save immediately on quantity entry (no explicit Save button)
 5. [x] Make products and pallets item-table rows fully clickable while preserving independent checkbox/control interactions.
 6. [x] Add-product action should insert a new editable row at the top of the table under the button/search row, without resizing or shifting the controls row.
 7. [x] On desktop ordering pages, make the review summary bar a sticky sidebar.
-8. [x] In customer portal:
+8. [~] In customer portal:
    - make current orders table rows fully clickable
    - default all groups collapsed except `New Items` on initial load
    - show a large top-right context CTA:
-     - `Save With Pallets` on pallets flow
-     - `Purchase Catalog` on all-items flow
+     - `Save With Pallets` while viewing order catalog
+     - `Purchase Catalog` as explicit return action after entering pallets via `Save with a pallet`
+   - ensure `Purchase Catalog` returns to the order page catalog view (`All`) and clears pallet-filter context
 9. [x] Fix portal order-link persistence/submission flow so item changes are saved to backend and included in `Review and Send`.
 10. [~] Add regression coverage for row-click + checkbox coexistence, reorder workflows, type-specific autosave behavior, and portal order-link save/send persistence.
    - Added unit coverage for reorder primitives, row-click interactive guards, portal save request generation, deep-link helpers, and copy-url normalization.
@@ -365,10 +400,13 @@ Implement the latest ordering and bulk-edit UX behavior across admin catalog tab
 - Bulk edit can be completed entirely via multi-select controls without manual index typing as the primary path.
 - Row click navigation works across catalog and current-orders tables with no accidental navigation from checkbox/action clicks.
 - `single` and `mixed` item behavior matches requested UI and saves automatically when quantity is entered.
+- `single` type enforces one selected item at a time; selecting another item removes previous selection state.
 - Add-product inline row appears at table top and does not shift control-row layout.
 - Desktop review panel stays visible as sticky sidebar while scrolling order content.
 - Initial portal load opens only `New Items`; all other groups remain collapsed until expanded.
-- Top-right portal CTA text changes correctly based on page context.
+- Top-right portal CTA/return action is deterministic in order flow:
+  - `Save With Pallets` to enter pallets
+  - `Purchase Catalog` to return to order catalog (`All`) after pallet entry
 - From customer order links, added/edited items persist to backend before submit, and `Review and Send` includes the persisted items in the final payload.
 
 ## Current Execution Order (1 through 9)
@@ -379,6 +417,8 @@ Implement the latest ordering and bulk-edit UX behavior across admin catalog tab
 5. [x] Apply full-row click + checkbox-safe event handling to admin products/pallets tables and portal current-orders table.
 6. [x] Implement add-product inline top-row insertion under the control row, with fixed controls sizing.
 7. [x] Convert desktop order review area to sticky sidebar layout and verify responsive fallback.
-8. [x] Apply portal default-collapse logic (only `New Items` expanded) and top-right large context CTA text switching.
+8. [~] Apply portal default-collapse logic (only `New Items` expanded) and top-right return action behavior:
+   - enter pallets via `Save With Pallets`
+   - return via `Purchase Catalog` to order catalog (`All`) with pallet-filter context cleared
 9. [~] Fix portal order-link save/send persistence and run regression pass (unit + e2e + mobile/desktop checks) including this flow.
    - Build/typecheck/unit tests passed; e2e blocked by missing local Supabase/env secrets in current test environment.

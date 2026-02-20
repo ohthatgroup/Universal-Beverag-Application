@@ -102,6 +102,14 @@ export function PalletDealContentsEditor({
     timersRef.current.set(productId, timer)
   }
 
+  const persistUpdates = async (updates: Array<{ productId: string; quantity: number }>) => {
+    for (const update of updates) {
+      // Sequential writes keep UI and DB consistent for single-selection updates.
+      // eslint-disable-next-line no-await-in-loop
+      await persistQuantity(update.productId, update.quantity)
+    }
+  }
+
   const flushPersist = (productId: string) => {
     const pending = timersRef.current.get(productId)
     if (pending) {
@@ -113,9 +121,30 @@ export function PalletDealContentsEditor({
 
   const toggleSingle = (rowId: string) => {
     const current = quantities[rowId] ?? 0
-    const nextQuantity = current > 0 ? 0 : 1
-    setQuantities((prev) => ({ ...prev, [rowId]: nextQuantity }))
-    void persistQuantity(rowId, nextQuantity)
+    const currentlySelectedOtherIds = Object.entries(quantities)
+      .filter(([id, quantity]) => id !== rowId && quantity > 0)
+      .map(([id]) => id)
+
+    if (current > 0) {
+      setQuantities((prev) => ({ ...prev, [rowId]: 0 }))
+      void persistQuantity(rowId, 0)
+      return
+    }
+
+    setQuantities((prev) => {
+      const next = { ...prev, [rowId]: 1 }
+      for (const [id, quantity] of Object.entries(next)) {
+        if (id !== rowId && quantity > 0) {
+          next[id] = 0
+        }
+      }
+      return next
+    })
+
+    void persistUpdates([
+      ...currentlySelectedOtherIds.map((id) => ({ productId: id, quantity: 0 })),
+      { productId: rowId, quantity: 1 },
+    ])
   }
 
   const updateMixed = (rowId: string, rawValue: string) => {

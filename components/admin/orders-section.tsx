@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useRef, useState } from 'react'
-import { Copy, Download, ExternalLink, Plus, Search } from 'lucide-react'
+import { Copy, Download, ExternalLink, Plus, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
+import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import type { OrderStatus } from '@/lib/types'
 
@@ -143,6 +144,9 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
   // Live search state
   const [localSearch, setLocalSearch] = useState(searchParams.get('q') ?? '')
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
+  const [isBulkApplying, setIsBulkApplying] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
 
   // New Draft Order dialog state
   const [draftDialogOpen, setDraftDialogOpen] = useState(false)
@@ -179,6 +183,11 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     }
     return true
   })
+
+  const visibleOrderIds = filteredOrders.map((order) => order.id)
+  const selectedOrderCount = selectedOrderIds.size
+  const allVisibleSelected =
+    visibleOrderIds.length > 0 && visibleOrderIds.every((id) => selectedOrderIds.has(id))
 
   const ordersByDate = new Map<string, typeof filteredOrders>()
   for (const order of filteredOrders) {
@@ -268,6 +277,66 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     }
   }
 
+  const toggleSelectOrder = (orderId: string, checked: boolean) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(orderId)
+      else next.delete(orderId)
+      return next
+    })
+  }
+
+  const toggleSelectAllVisible = (checked: boolean) => {
+    if (!checked) {
+      setSelectedOrderIds(new Set())
+      return
+    }
+    setSelectedOrderIds(new Set(visibleOrderIds))
+  }
+
+  const applyBulkAction = async (
+    action: 'delete' | 'set_status',
+    status?: OrderStatus
+  ) => {
+    const ids = Array.from(selectedOrderIds)
+    if (ids.length === 0) return
+
+    if (action === 'delete') {
+      const confirmed = window.confirm(`Delete ${ids.length} selected order(s)?`)
+      if (!confirmed) return
+    }
+
+    setBulkError(null)
+    setIsBulkApplying(true)
+    try {
+      const response = await fetch('/api/admin/orders/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          action === 'delete' ? { action, ids } : { action, ids, status }
+        ),
+      })
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Failed to apply bulk action')
+      }
+
+      setSelectedOrderIds(new Set())
+      router.refresh()
+    } catch (bulkApplyError) {
+      setBulkError(
+        bulkApplyError instanceof Error
+          ? bulkApplyError.message
+          : 'Failed to apply bulk action'
+      )
+    } finally {
+      setIsBulkApplying(false)
+    }
+  }
+
   return (
     <section className="space-y-4">
       <h2 className="text-lg font-semibold">Orders</h2>
@@ -309,6 +378,53 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
         ))}
       </div>
 
+      {selectedOrderCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
+          <span className="text-sm text-muted-foreground">{selectedOrderCount} selected</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isBulkApplying}
+            onClick={() => applyBulkAction('set_status', 'draft')}
+          >
+            Mark Draft
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isBulkApplying}
+            onClick={() => applyBulkAction('set_status', 'submitted')}
+          >
+            Mark Submitted
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isBulkApplying}
+            onClick={() => applyBulkAction('set_status', 'delivered')}
+          >
+            Mark Delivered
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            disabled={isBulkApplying}
+            onClick={() => applyBulkAction('delete')}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Delete
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedOrderIds(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
+      {bulkError && <p className="text-sm text-destructive">{bulkError}</p>}
+
       {/* Orders grouped by date */}
       {dateGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No orders found.</p>
@@ -322,33 +438,49 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
 
               {/* Mobile cards */}
               <div className="space-y-0 md:hidden">
-                {dateOrders.map((order) => (
-                  <Link key={order.id} href={`/admin/orders/${order.id}`} className="block border-b py-3 last:border-0 hover:bg-muted/30 rounded px-1">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sm truncate">
-                          {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {order.item_count ?? 0} items - {formatCurrency(order.total ?? 0)}
+                {dateOrders.map((order) => {
+                  const checked = selectedOrderIds.has(order.id)
+                  return (
+                    <div
+                      key={order.id}
+                      className={`border-b py-3 last:border-0 ${checked ? 'bg-muted/30' : ''}`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4"
+                          checked={checked}
+                          onChange={(event) => toggleSelectOrder(order.id, event.target.checked)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <Link href={`/admin/orders/${order.id}`} className="min-w-0 flex-1">
+                              <div className="font-medium text-sm truncate">
+                                {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {order.item_count ?? 0} items - {formatCurrency(order.total ?? 0)}
+                              </div>
+                            </Link>
+                            <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                              <a href={`/api/orders/${order.id}/csv`}>
+                                <Download className="mr-1 h-3 w-3" />
+                                CSV
+                              </a>
+                            </Button>
+                            <DeepLinkButton
+                              orderId={order.id}
+                              customerToken={order.customer_id ? tokenByCustomerId.get(order.customer_id) ?? null : null}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
                     </div>
-                    <div className="mt-2 flex gap-2">
-                      <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                        <a href={`/api/orders/${order.id}/csv`} onClick={(e) => e.stopPropagation()}>
-                          <Download className="mr-1 h-3 w-3" />
-                          CSV
-                        </a>
-                      </Button>
-                      <DeepLinkButton
-                        orderId={order.id}
-                        customerToken={order.customer_id ? tokenByCustomerId.get(order.customer_id) ?? null : null}
-                      />
-                    </div>
-                  </Link>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Desktop table */}
@@ -356,6 +488,13 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
+                      <th className="w-10 px-2 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          onChange={(event) => toggleSelectAllVisible(event.target.checked)}
+                        />
+                      </th>
                       <th className="px-4 py-3 text-left font-medium">Customer</th>
                       <th className="px-4 py-3 text-right font-medium">Items</th>
                       <th className="px-4 py-3 text-right font-medium">Total</th>
@@ -364,12 +503,24 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                     </tr>
                   </thead>
                   <tbody>
-                    {dateOrders.map((order) => (
+                    {dateOrders.map((order) => {
+                      const checked = selectedOrderIds.has(order.id)
+                      return (
                       <tr
                         key={order.id}
-                        className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                        onClick={() => router.push(`/admin/orders/${order.id}`)}
+                        className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer ${checked ? 'bg-muted/30' : ''}`}
+                        onClick={(event) => {
+                          if (isInteractiveRowTarget(event.target)) return
+                          router.push(`/admin/orders/${order.id}`)
+                        }}
                       >
+                        <td className="px-2 py-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => toggleSelectOrder(order.id, event.target.checked)}
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <span className="font-medium">
                             {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
@@ -377,10 +528,10 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                         </td>
                         <td className="px-4 py-3 text-right text-muted-foreground">{order.item_count ?? 0}</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(order.total ?? 0)}</td>
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-4 py-3">
                           <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
                         </td>
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0" title="Download CSV">
                               <a href={`/api/orders/${order.id}/csv`}>
@@ -394,7 +545,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

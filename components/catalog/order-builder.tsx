@@ -315,8 +315,6 @@ export function OrderBuilder({
     )
   }
 
-  const catalogToggleLabel = activeTab === 'all' ? 'Save With Pallets' : 'Purchase Catalog'
-
   const filteredPalletDeals = useMemo(() => {
     if (!palletFilterProductId) return palletDeals
     const allowed = new Set(productToPalletDealIds[palletFilterProductId] ?? [])
@@ -339,29 +337,40 @@ export function OrderBuilder({
         <div className="space-y-4">
           <header className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Button asChild variant="ghost" size="sm" className="-ml-2">
-                <Link href={`/c/${token}/orders`}>
+              {activeTab === 'pallets' ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-2"
+                  onClick={() => {
+                    setPalletFilterProductId(null)
+                    setActiveTab('all')
+                  }}
+                >
                   <ArrowLeft className="mr-1 h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
+                  Purchase Catalog
+                </Button>
+              ) : (
+                <Button asChild variant="ghost" size="sm" className="-ml-2">
+                  <Link href={`/c/${token}/orders`}>
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Back
+                  </Link>
+                </Button>
+              )}
               <span className="text-sm font-medium">{formatDeliveryDate(deliveryDate)}</span>
             </div>
-            <Button
-              type="button"
-              size="lg"
-              className="h-11 px-5"
-              onClick={() => {
-                if (activeTab === 'all') {
-                  setActiveTab('pallets')
-                  return
-                }
-                setPalletFilterProductId(null)
-                setActiveTab('all')
-              }}
-            >
-              {catalogToggleLabel}
-            </Button>
+            {activeTab === 'all' ? (
+              <Button
+                type="button"
+                size="lg"
+                className="h-11 px-5"
+                onClick={() => setActiveTab('pallets')}
+              >
+                Save With Pallets
+              </Button>
+            ) : null}
           </header>
 
           {activeTab === 'all' && (

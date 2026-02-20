@@ -1,15 +1,13 @@
 import { randomBytes, randomUUID } from 'crypto'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Plus } from 'lucide-react'
-import { CopyUrlButton } from '@/components/admin/copy-url-button'
+import { CustomersTableManager, type CustomerListRow } from '@/components/admin/customers-table-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { formatDeliveryDate } from '@/lib/utils'
 
 interface CustomersPageProps {
   searchParams?: Promise<{
@@ -143,92 +141,22 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
         </div>
       </div>
 
-      {customers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No customers found.</p>
-      ) : (
-        <>
-          <div className="space-y-0 md:hidden">
-            {customers.map((customer) => {
-              const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
-              const portalUrl = customer.access_token ? `/c/${customer.access_token}` : null
-              return (
-                <div key={customer.id} className="border-b py-3 last:border-0">
-                  <Link
-                    href={`/admin/customers/${customer.id}`}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">
-                        {customer.business_name || customer.contact_name || customer.email || customer.id}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {customer.email ?? 'No email'}
-                        {customer.phone && ` - ${customer.phone}`}
-                      </div>
-                    </div>
-                    <div className="ml-3 whitespace-nowrap text-xs text-muted-foreground">
-                      {lastOrderDate ? formatDeliveryDate(lastOrderDate) : 'No orders'}
-                    </div>
-                  </Link>
-                  {portalUrl ? (
-                    <div className="mt-2">
-                      <CopyUrlButton url={portalUrl} label="Copy URL" />
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="hidden rounded-lg border md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Business Name</th>
-                  <th className="px-4 py-3 text-left font-medium">Email</th>
-                  <th className="px-4 py-3 text-left font-medium">Phone</th>
-                  <th className="px-4 py-3 text-left font-medium">Last Order</th>
-                  <th className="px-4 py-3 text-right font-medium">Portal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((customer) => {
-                  const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
-                  const portalUrl = customer.access_token ? `/c/${customer.access_token}` : null
-
-                  return (
-                    <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/customers/${customer.id}`} className="block font-medium">
-                          {customer.business_name || customer.contact_name || customer.email || customer.id}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        <Link href={`/admin/customers/${customer.id}`} className="block">
-                          {customer.email ?? '-'}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        <Link href={`/admin/customers/${customer.id}`} className="block">
-                          {customer.phone ?? '-'}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        <Link href={`/admin/customers/${customer.id}`} className="block">
-                          {lastOrderDate ? formatDeliveryDate(lastOrderDate) : '-'}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {portalUrl ? <CopyUrlButton url={portalUrl} label="Copy URL" /> : <span className="text-muted-foreground">-</span>}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+      <CustomersTableManager
+        rows={customers.map((customer) => {
+          const businessName =
+            customer.business_name || customer.contact_name || customer.email || customer.id
+          const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) ?? null : null
+          const portalUrl = customer.access_token ? `/c/${customer.access_token}` : null
+          return {
+            id: customer.id,
+            businessName,
+            email: customer.email,
+            phone: customer.phone,
+            lastOrderDate,
+            portalUrl,
+          } satisfies CustomerListRow
+        })}
+      />
     </div>
   )
 }
