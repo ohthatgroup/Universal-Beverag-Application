@@ -72,7 +72,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
         : null
     const packDetails = packDetailsInput || inferredPackDetails || null
 
-    const { error } = await supabaseClient
+        const { error } = await supabaseClient
       .from('products')
       .update({
         brand_id: (formData.get('brand_id') as string) || null,
@@ -89,7 +89,6 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
           .filter(Boolean),
         is_new: formData.get('is_new') === 'on',
         is_discontinued: formData.get('is_discontinued') === 'on',
-        sort_order: Number((formData.get('sort_order') as string) || 0),
       })
       .eq('id', id)
 
@@ -165,10 +164,6 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
           <div className="space-y-2">
             <Label htmlFor="price">Price</Label>
             <Input id="price" name="price" type="number" step="0.01" defaultValue={product.price ?? 0} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sort_order">Sort order</Label>
-            <Input id="sort_order" name="sort_order" type="number" defaultValue={product.sort_order ?? 0} />
           </div>
           <ImageUploadField name="image_url" label="Image" folder="products" defaultValue={product.image_url} />
         </div>

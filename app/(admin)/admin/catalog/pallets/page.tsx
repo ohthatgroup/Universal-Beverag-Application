@@ -1,11 +1,10 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Plus } from 'lucide-react'
+import { PalletDealsManager, type PalletDealRow } from '@/components/admin/pallet-deals-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { formatCurrency } from '@/lib/utils'
 
 interface PalletsPageProps {
   searchParams?: Promise<{
@@ -59,6 +58,14 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
     return haystack.includes(searchTerm)
   })
 
+  const rows: PalletDealRow[] = deals.map((deal) => ({
+    id: deal.id,
+    title: deal.title,
+    palletType: deal.pallet_type === 'mixed' ? 'mixed' : 'single',
+    price: Number(deal.price ?? 0),
+    isActive: Boolean(deal.is_active),
+  }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -83,62 +90,7 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
         </div>
       </div>
 
-      {deals.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No pallet deals.</p>
-      ) : (
-        <>
-          <div className="space-y-0 md:hidden">
-            {deals.map((deal) => (
-              <Link key={deal.id} href={`/admin/catalog/pallets/${deal.id}`} className="flex items-center justify-between border-b py-3 last:border-0">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{deal.title}</div>
-                  <div className="text-xs text-muted-foreground">{deal.pallet_type} - {deal.is_active ? 'Active' : 'Inactive'}</div>
-                </div>
-                <div className="ml-3 text-sm">{formatCurrency(deal.price)}</div>
-              </Link>
-            ))}
-          </div>
-
-          <div className="hidden rounded-lg border md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Title</th>
-                  <th className="px-4 py-3 text-left font-medium">Type</th>
-                  <th className="px-4 py-3 text-right font-medium">Price</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deals.map((deal) => (
-                  <tr key={deal.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="px-4 py-3">
-                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block font-medium hover:underline">{deal.title}</Link>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground capitalize">
-                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block">
-                        {deal.pallet_type}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block">
-                        {formatCurrency(deal.price)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link href={`/admin/catalog/pallets/${deal.id}`} className="block">
-                        <span className={deal.is_active ? 'text-xs text-green-600' : 'text-xs text-muted-foreground'}>
-                          {deal.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+      <PalletDealsManager deals={rows} searchQuery={searchQuery} />
     </div>
   )
 }

@@ -93,7 +93,7 @@ export function ProductPickerDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-hidden p-4 sm:p-6">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-2xl overflow-hidden p-3 sm:w-[calc(100vw-1.5rem)] sm:p-6">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -128,7 +128,7 @@ export function ProductPickerDialog({
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <div className="max-h-[55vh] space-y-0 overflow-y-auto rounded-md border sm:max-h-[420px]">
+          <div className="max-h-[58vh] space-y-0 overflow-y-auto rounded-md border sm:max-h-[420px]">
             {filtered.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">No products found.</p>
             ) : (

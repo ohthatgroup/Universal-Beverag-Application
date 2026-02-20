@@ -5,8 +5,8 @@ import { requirePortalOrderAccess, requirePortalToken } from '@/lib/server/custo
 const upsertItemSchema = z.object({
   productId: z.string().uuid().nullable().optional(),
   palletDealId: z.string().uuid().nullable().optional(),
-  quantity: z.number().int().min(0),
-  unitPrice: z.number().min(0),
+  quantity: z.coerce.number().int().min(0),
+  unitPrice: z.coerce.number().min(0),
 })
 
 const deleteItemSchema = z.object({

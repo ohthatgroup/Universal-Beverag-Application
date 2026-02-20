@@ -61,6 +61,12 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
     setReorderDate((prev) => addDays(prev, days))
   }
 
+  const getOrderHref = (orderId: string) => `/c/${token}/order/link/${orderId}`
+
+  const navigateToOrder = (orderId: string) => {
+    router.push(getOrderHref(orderId))
+  }
+
   const openReorderDialog = (orderId: string) => {
     setError(null)
     setSelectedReorderOrderId(orderId)
@@ -230,7 +236,19 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
         </thead>
         <tbody>
           {orders.map((order) => (
-            <tr key={order.id} className="border-b last:border-0 hover:bg-muted/30">
+            <tr
+              key={order.id}
+              className="cursor-pointer border-b last:border-0 hover:bg-muted/30"
+              onClick={() => navigateToOrder(order.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  navigateToOrder(order.id)
+                }
+              }}
+              tabIndex={0}
+              role="button"
+            >
               <td className="px-4 py-3 font-medium">{formatDeliveryDate(order.delivery_date)}</td>
               <td className="px-4 py-3 text-muted-foreground">{order.item_count}</td>
               {showPrices && (
@@ -239,11 +257,11 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
               <td className="px-4 py-3">
                 <StatusText status={order.status} />
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                 <div className="flex items-center justify-end gap-1">
                   {order.status === 'draft' && (
                     <Button asChild size="sm" variant="ghost">
-                      <Link href={`/c/${token}/order/link/${order.id}`}>
+                      <Link href={getOrderHref(order.id)}>
                         <Pencil className="mr-1.5 h-3.5 w-3.5" />
                         Edit
                       </Link>

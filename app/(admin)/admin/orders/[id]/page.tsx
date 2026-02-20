@@ -7,6 +7,7 @@ import { ProductPickerDialog } from '@/components/admin/product-picker-dialog'
 import { Button } from '@/components/ui/button'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { createClient } from '@/lib/supabase/server'
+import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import type { OrderStatus } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate, getProductDisplayName, getProductPackLabel, getStatusIcon, getStatusLabel } from '@/lib/utils'
 
@@ -64,9 +65,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
     if (item.pallet_deal_id) return `/admin/catalog/pallets/${item.pallet_deal_id}`
     return null
   }
-  const orderDeepLink = customer?.access_token
-    ? `/c/${customer.access_token}/order/link/${order.id}`
-    : `/admin/orders/${order.id}`
+  const orderDeepLink = buildCustomerOrderDeepLink(customer?.access_token ?? null, order.id)
   const pickerProducts = (products ?? []).map((product) => ({
     id: product.id,
     title: product.title,
@@ -174,11 +173,17 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               CSV
             </a>
           </Button>
-          <CopyUrlButton
-            iconOnly
-            url={orderDeepLink}
-            title="Copy order deep link"
-          />
+          {orderDeepLink ? (
+            <CopyUrlButton
+              iconOnly
+              url={orderDeepLink}
+              title="Copy customer portal order link"
+            />
+          ) : (
+            <Button size="sm" variant="outline" disabled title="Customer has no portal token">
+              No Link
+            </Button>
+          )}
         </div>
       </div>
 

@@ -22,7 +22,6 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
   const resolvedSearchParams = searchParams ? await searchParams : undefined
   const searchQuery = (resolvedSearchParams?.q ?? '').trim()
   const searchTerm = searchQuery.toLowerCase()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   const [customersResponse, ordersResponse] = await Promise.all([
     context.supabase
@@ -151,7 +150,7 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
           <div className="space-y-0 md:hidden">
             {customers.map((customer) => {
               const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
-              const portalUrl = customer.access_token ? `${appUrl}/c/${customer.access_token}` : null
+              const portalUrl = customer.access_token ? `/c/${customer.access_token}` : null
               return (
                 <div key={customer.id} className="border-b py-3 last:border-0">
                   <Link
@@ -195,12 +194,12 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
               <tbody>
                 {customers.map((customer) => {
                   const lastOrderDate = customer.id ? lastOrderByCustomer.get(customer.id) : null
-                  const portalUrl = customer.access_token ? `${appUrl}/c/${customer.access_token}` : null
+                  const portalUrl = customer.access_token ? `/c/${customer.access_token}` : null
 
                   return (
                     <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3">
-                        <Link href={`/admin/customers/${customer.id}`} className="block font-medium hover:underline">
+                        <Link href={`/admin/customers/${customer.id}`} className="block font-medium">
                           {customer.business_name || customer.contact_name || customer.email || customer.id}
                         </Link>
                       </td>

@@ -13,6 +13,14 @@ interface CopyUrlButtonProps {
   className?: string
 }
 
+export function toAbsoluteUrl(rawUrl: string, origin: string): string {
+  if (/^https?:\/\//i.test(rawUrl)) {
+    return rawUrl
+  }
+  const normalized = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`
+  return `${origin}${normalized}`
+}
+
 export function CopyUrlButton({
   url,
   label = 'Copy URL',
@@ -22,19 +30,11 @@ export function CopyUrlButton({
 }: CopyUrlButtonProps) {
   const [copied, setCopied] = useState(false)
 
-  const resolveAbsoluteUrl = (rawUrl: string) => {
-    if (/^https?:\/\//i.test(rawUrl)) {
-      return rawUrl
-    }
-    const normalized = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`
-    return `${window.location.origin}${normalized}`
-  }
-
   const copy = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
 
-    await navigator.clipboard.writeText(resolveAbsoluteUrl(url))
+    await navigator.clipboard.writeText(toAbsoluteUrl(url, window.location.origin))
     setCopied(true)
     setTimeout(() => setCopied(false), 1400)
   }

@@ -201,8 +201,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
             <h2 className="pt-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Catalog Settings</h2>
 
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
-              <label className="flex items-center justify-between rounded-lg border p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap">
+              <label className="flex min-h-[52px] flex-1 items-center justify-between rounded-lg border p-3 lg:min-w-[220px]">
                 <span className="text-sm font-medium">Show prices</span>
                 <span className="relative inline-flex h-5 w-9 items-center">
                   <input defaultChecked={customer.show_prices ?? true} name="show_prices" type="checkbox" className="peer sr-only" />
@@ -210,7 +210,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
                 </span>
               </label>
-              <label className="flex items-center justify-between rounded-lg border p-3">
+              <label className="flex min-h-[52px] flex-1 items-center justify-between rounded-lg border p-3 lg:min-w-[220px]">
                 <span className="text-sm font-medium">Custom pricing</span>
                 <span className="relative inline-flex h-5 w-9 items-center">
                   <input defaultChecked={customer.custom_pricing ?? false} name="custom_pricing" type="checkbox" className="peer sr-only" />
@@ -219,7 +219,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 </span>
               </label>
 
-              <div className="space-y-2">
+              <div className="space-y-2 lg:min-w-[220px] lg:flex-1">
                 <Label>Default Grouping</Label>
                 <select
                   name="default_group"

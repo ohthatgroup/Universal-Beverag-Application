@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import { PalletDealContentsEditor } from '@/components/admin/pallet-deal-contents-editor'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { LiveQuerySelect } from '@/components/admin/live-query-select'
 import { Button } from '@/components/ui/button'
@@ -83,47 +84,8 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
         savings_text: (formData.get('savings_text') as string) || null,
         description: (formData.get('description') as string) || null,
         is_active: formData.get('is_active') === 'on',
-        sort_order: Number((formData.get('sort_order') as string) || 0),
       })
       .eq('id', id)
-
-    if (error) throw error
-    redirect(`/admin/catalog/pallets/${id}`)
-  }
-
-  async function updatePalletItem(formData: FormData) {
-    'use server'
-
-    const productId = formData.get('product_id') as string
-    const quantity = Number((formData.get('quantity') as string) || 0)
-
-    const supabaseClient = await createClient()
-
-    if (!Number.isFinite(quantity) || quantity < 0) {
-      throw new Error('Quantity must be zero or greater')
-    }
-
-    if (quantity === 0) {
-      const { error } = await supabaseClient
-        .from('pallet_deal_items')
-        .delete()
-        .eq('pallet_deal_id', id)
-        .eq('product_id', productId)
-
-      if (error) throw error
-      redirect(`/admin/catalog/pallets/${id}`)
-    }
-
-    const { error } = await supabaseClient.from('pallet_deal_items').upsert(
-      {
-        pallet_deal_id: id,
-        product_id: productId,
-        quantity,
-      },
-      {
-        onConflict: 'pallet_deal_id,product_id',
-      }
-    )
 
     if (error) throw error
     redirect(`/admin/catalog/pallets/${id}`)
@@ -139,7 +101,7 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <form action={updatePallet} className="space-y-4 rounded-lg border p-4">
+        <form action={updatePallet} className="min-w-0 space-y-4 rounded-lg border p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Settings</h2>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -157,10 +119,6 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
             <div className="space-y-2">
               <Label htmlFor="price">Price</Label>
               <Input id="price" name="price" type="number" step="0.01" defaultValue={palletDeal.price ?? 0} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sort_order">Sort order</Label>
-              <Input id="sort_order" name="sort_order" type="number" defaultValue={palletDeal.sort_order ?? 0} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="savings_text">Savings text</Label>
@@ -182,7 +140,7 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
           <Button type="submit">Save Deal</Button>
         </form>
 
-        <div className="space-y-4 overflow-hidden rounded-lg border p-4">
+        <div className="min-w-0 space-y-4 overflow-hidden rounded-lg border p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Contents</h2>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <LiveQueryInput
@@ -202,26 +160,16 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
             />
           </div>
 
-          <div className="max-h-[600px] space-y-0 overflow-y-auto">
-            {filteredProducts.map((product) => {
-              const item = itemByProduct.get(product.id)
-              const hasQty = item && item.quantity > 0
-              return (
-                <form key={product.id} action={updatePalletItem} className="flex flex-wrap items-center gap-2 border-b py-2.5 last:border-0">
-                  <input type="hidden" name="product_id" value={product.id} />
-                  <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-                    <div className={`truncate text-sm ${hasQty ? 'font-medium' : 'text-muted-foreground'}`}>{getProductTitleWithBrand(product)}</div>
-                    <div className="text-xs text-muted-foreground">{getProductPackLabel(product) ?? 'N/A'}</div>
-                  </div>
-                  <Input className="h-8 w-20 text-right text-xs" name="quantity" type="number" min="0" defaultValue={item?.quantity ?? 0} />
-                  <Button size="sm" type="submit" variant="ghost" className="h-8 px-2 text-xs">Save</Button>
-                </form>
-              )
-            })}
-            {filteredProducts.length === 0 && (
-              <div className="py-4 text-sm text-muted-foreground">No deal items found.</div>
-            )}
-          </div>
+          <PalletDealContentsEditor
+            palletDealId={id}
+            palletType={palletDeal.pallet_type === 'mixed' ? 'mixed' : 'single'}
+            rows={filteredProducts.map((product) => ({
+              id: product.id,
+              title: getProductTitleWithBrand(product),
+              packLabel: getProductPackLabel(product) ?? 'N/A',
+              quantity: itemByProduct.get(product.id)?.quantity ?? 0,
+            }))}
+          />
         </div>
       </div>
     </div>

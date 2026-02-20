@@ -72,7 +72,7 @@ export function OrderBuilder({
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(['new-items']))
   const [palletFilterProductId, setPalletFilterProductId] = useState<string | null>(null)
 
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
@@ -88,7 +88,7 @@ export function OrderBuilder({
     defaultGroupBy: defaultGroupBy === 'size' ? 'size' : 'brand',
   })
 
-  const { save } = useAutoSavePortal({
+  const { save, flush } = useAutoSavePortal({
     orderId,
     token,
     onError: (saveError) => {
@@ -107,24 +107,20 @@ export function OrderBuilder({
   )
 
   useEffect(() => {
-    const defaultOpen = new Set<string>()
-    defaultOpen.add('new-items')
-    defaultOpen.add('single')
-    defaultOpen.add('mixed')
+    const allowed = new Set<string>(['new-items', 'single', 'mixed'])
     for (const group of grouped) {
-      defaultOpen.add(group.key)
+      allowed.add(group.key)
     }
     setExpandedGroups((prev) => {
-      if (prev.size === 0) return defaultOpen
-      const next = new Set(prev)
-      let changed = false
-      for (const key of defaultOpen) {
-        if (!next.has(key)) {
-          next.add(key)
-          changed = true
-        }
+      const next = new Set<string>()
+      for (const key of prev) {
+        if (allowed.has(key)) next.add(key)
       }
-      return changed ? next : prev
+      if (!next.has('new-items')) next.add('new-items')
+      if (next.size === prev.size && Array.from(next).every((key) => prev.has(key))) {
+        return prev
+      }
+      return next
     })
   }, [grouped])
 
@@ -228,6 +224,14 @@ export function OrderBuilder({
   const submitOrder = async () => {
     setIsSubmitting(true)
     setError(null)
+    try {
+      await flush()
+    } catch (flushError) {
+      setIsSubmitting(false)
+      setError(flushError instanceof Error ? flushError.message : 'Failed to save all changes before submit')
+      return
+    }
+
     const response = await fetch(`/api/portal/orders/${orderId}/status`, {
       method: 'PATCH',
       headers: {
@@ -250,12 +254,6 @@ export function OrderBuilder({
   const openPalletsForProduct = (productId: string) => {
     setPalletFilterProductId(productId)
     setActiveTab('pallets')
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      next.add('single')
-      next.add('mixed')
-      return next
-    })
   }
 
   const renderProductRow = (product: CatalogProduct, isCardLayout: boolean) => {
@@ -317,10 +315,7 @@ export function OrderBuilder({
     )
   }
 
-  const tabs = [
-    { id: 'all' as const, label: 'All' },
-    { id: 'pallets' as const, label: 'Pallets' },
-  ]
+  const catalogToggleLabel = activeTab === 'all' ? 'Save With Pallets' : 'Purchase Catalog'
 
   const filteredPalletDeals = useMemo(() => {
     if (!palletFilterProductId) return palletDeals
@@ -339,238 +334,276 @@ export function OrderBuilder({
   const palletFilterProduct = palletFilterProductId ? productById.get(palletFilterProductId) : null
 
   return (
-    <div className="space-y-4 pb-28">
-      <header className="flex items-center justify-between">
-        <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link href={`/c/${token}/orders`}>
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Back
-          </Link>
-        </Button>
-        <span className="text-sm font-medium">{formatDeliveryDate(deliveryDate)}</span>
-      </header>
-
-      <div className="flex gap-1 rounded-lg bg-muted p-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'all' && (
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search products..."
-              className="pl-9"
-              value={filters.searchQuery}
-              onChange={(event) => setFilters((prev) => ({ ...prev, searchQuery: event.target.value }))}
-            />
-          </div>
-          <div className="flex gap-2">
-            <Select
-              value={filters.brandId ?? 'all'}
-              onValueChange={(value) => setFilters((prev) => ({ ...prev, brandId: value === 'all' ? null : value }))}
+    <div className="pb-28 md:pb-0">
+      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_20rem] md:gap-6">
+        <div className="space-y-4">
+          <header className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Button asChild variant="ghost" size="sm" className="-ml-2">
+                <Link href={`/c/${token}/orders`}>
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  Back
+                </Link>
+              </Button>
+              <span className="text-sm font-medium">{formatDeliveryDate(deliveryDate)}</span>
+            </div>
+            <Button
+              type="button"
+              size="lg"
+              className="h-11 px-5"
+              onClick={() => {
+                if (activeTab === 'all') {
+                  setActiveTab('pallets')
+                  return
+                }
+                setPalletFilterProductId(null)
+                setActiveTab('all')
+              }}
             >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Brand" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All brands</SelectItem>
-                {availableBrands.map((brand) => (
-                  <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.sizeFilter ?? 'all'}
-              onValueChange={(value) => setFilters((prev) => ({ ...prev, sizeFilter: value === 'all' ? null : value }))}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Size" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All sizes</SelectItem>
-                {availableSizes.map((size) => (
-                  <SelectItem key={size} value={size}>{size}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Group:</span>
-            <Select
-              value={filters.groupBy}
-              onValueChange={(value: 'brand' | 'size') => setFilters((prev) => ({ ...prev, groupBy: value }))}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="brand">Brand</SelectItem>
-                <SelectItem value="size">Size</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
+              {catalogToggleLabel}
+            </Button>
+          </header>
 
-      {activeTab === 'all' && isFilterActive && (
-        <div className="rounded-lg border">
-          <div className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Filtered Results
-          </div>
-          <div className="border-t">
-            {(grouped[0]?.products ?? []).map((product) => renderProductRow(product, false))}
-            {(grouped[0]?.products ?? []).length === 0 && (
-              <div className="px-4 py-3 text-sm text-muted-foreground">No products found.</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'all' && !isFilterActive && newItems.length > 0 && (
-        <div className="rounded-lg border">
-          <button
-            type="button"
-            onClick={() => toggleGroup('new-items')}
-            className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
-          >
-            <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">New Items</span>
-            {expandedGroups.has('new-items')
-              ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-          </button>
-          {expandedGroups.has('new-items') && (
-            <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
-              {newItems.map((product) => renderProductRow(product, true))}
+          {activeTab === 'all' && (
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  className="pl-9"
+                  value={filters.searchQuery}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, searchQuery: event.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select
+                  value={filters.brandId ?? 'all'}
+                  onValueChange={(value) => setFilters((prev) => ({ ...prev, brandId: value === 'all' ? null : value }))}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All brands</SelectItem>
+                    {availableBrands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.sizeFilter ?? 'all'}
+                  onValueChange={(value) => setFilters((prev) => ({ ...prev, sizeFilter: value === 'all' ? null : value }))}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All sizes</SelectItem>
+                    {availableSizes.map((size) => (
+                      <SelectItem key={size} value={size}>{size}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Group:</span>
+                <Select
+                  value={filters.groupBy}
+                  onValueChange={(value: 'brand' | 'size') => setFilters((prev) => ({ ...prev, groupBy: value }))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="brand">Brand</SelectItem>
+                    <SelectItem value="size">Size</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {activeTab === 'all' && !isFilterActive && grouped.map((group) => {
-        const isExpanded = expandedGroups.has(group.key)
-        return (
-          <div key={group.key} className="rounded-lg border">
-            <button
-              type="button"
-              onClick={() => toggleGroup(group.key)}
-              className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
-            >
-              <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {group.label}
-              </span>
-              {isExpanded
-                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-            </button>
-
-            {isExpanded && (
+          {activeTab === 'all' && isFilterActive && (
+            <div className="rounded-lg border">
+              <div className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Filtered Results
+              </div>
               <div className="border-t">
-                {group.products.map((product) => renderProductRow(product, false))}
-                {group.products.length === 0 && (
-                  <div className="px-4 py-3 text-sm text-muted-foreground">No products in this group.</div>
+                {(grouped[0]?.products ?? []).map((product) => renderProductRow(product, false))}
+                {(grouped[0]?.products ?? []).length === 0 && (
+                  <div className="px-4 py-3 text-sm text-muted-foreground">No products found.</div>
                 )}
               </div>
-            )}
-          </div>
-        )
-      })}
-
-      {activeTab === 'pallets' && (
-        <div className="space-y-4">
-          {palletFilterProduct && (
-            <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-              <span>
-                Pallets containing: <span className="font-medium">{getProductDisplayName(palletFilterProduct, palletFilterProduct.brand?.name ?? null)}</span>
-              </span>
-              <Button size="sm" variant="ghost" onClick={() => setPalletFilterProductId(null)}>Clear</Button>
             </div>
           )}
 
-          {filteredPalletDeals.length > 0 ? (
-            ([
-              { label: 'Single Pallets', key: 'single', deals: filteredPalletGroups.single },
-              { label: 'Mixed Pallets', key: 'mixed', deals: filteredPalletGroups.mixed },
-            ] as const).map((section) => {
-              if (section.deals.length === 0) return null
-              const isExpanded = expandedGroups.has(section.key)
-              return (
-                <div key={section.key} className="rounded-lg border">
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(section.key)}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
-                  >
-                    <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                      {section.label}
-                    </span>
-                    {isExpanded
-                      ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
-                      {section.deals.map((palletDeal) => {
-                        const key = itemKey(null, palletDeal.id)
-                        const quantity = quantities[key] ?? 0
-                        return (
-                          <div key={palletDeal.id} className="rounded-lg border p-3 space-y-3">
-                            {palletDeal.image_url ? (
-                              <img
-                                src={palletDeal.image_url}
-                                alt={palletDeal.title}
-                                className="h-40 w-full rounded-md object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-40 w-full items-center justify-center rounded-md bg-muted">
-                                <Package className="h-8 w-8 text-muted-foreground" />
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-semibold">{palletDeal.title}</div>
-                              {palletDeal.description && (
-                                <div className="text-xs text-muted-foreground">{palletDeal.description}</div>
-                              )}
-                              {palletDeal.savings_text && (
-                                <div className="text-xs text-emerald-600">{palletDeal.savings_text}</div>
-                              )}
-                              {showPrices && (
-                                <div className="mt-1 text-sm">{formatCurrency(palletDeal.price)}</div>
-                              )}
-                            </div>
-                            <div className="flex justify-end">
-                              <QuantitySelector quantity={quantity} onChange={(value) => setPalletQuantity(palletDeal, value)} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
+          {activeTab === 'all' && !isFilterActive && newItems.length > 0 && (
+            <div className="rounded-lg border">
+              <button
+                type="button"
+                onClick={() => toggleGroup('new-items')}
+                className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
+              >
+                <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">New Items</span>
+                {expandedGroups.has('new-items')
+                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {expandedGroups.has('new-items') && (
+                <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
+                  {newItems.map((product) => renderProductRow(product, true))}
                 </div>
-              )
-            })
-          ) : (
-            <div className="py-4 text-sm text-muted-foreground">No active pallet deals.</div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'all' && !isFilterActive && grouped.map((group) => {
+            const isExpanded = expandedGroups.has(group.key)
+            return (
+              <div key={group.key} className="rounded-lg border">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.key)}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
+                >
+                  <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {group.label}
+                  </span>
+                  {isExpanded
+                    ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t">
+                    {group.products.map((product) => renderProductRow(product, false))}
+                    {group.products.length === 0 && (
+                      <div className="px-4 py-3 text-sm text-muted-foreground">No products in this group.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {activeTab === 'pallets' && (
+            <div className="space-y-4">
+              {palletFilterProduct && (
+                <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                  <span>
+                    Pallets containing: <span className="font-medium">{getProductDisplayName(palletFilterProduct, palletFilterProduct.brand?.name ?? null)}</span>
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => setPalletFilterProductId(null)}>Clear</Button>
+                </div>
+              )}
+
+              {filteredPalletDeals.length > 0 ? (
+                ([
+                  { label: 'Single Pallets', key: 'single', deals: filteredPalletGroups.single },
+                  { label: 'Mixed Pallets', key: 'mixed', deals: filteredPalletGroups.mixed },
+                ] as const).map((section) => {
+                  if (section.deals.length === 0) return null
+                  const isExpanded = expandedGroups.has(section.key)
+                  return (
+                    <div key={section.key} className="rounded-lg border">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(section.key)}
+                        className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
+                      >
+                        <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          {section.label}
+                        </span>
+                        {isExpanded
+                          ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
+                          {section.deals.map((palletDeal) => {
+                            const key = itemKey(null, palletDeal.id)
+                            const quantity = quantities[key] ?? 0
+                            const isSingle = palletDeal.pallet_type === 'single'
+                            return (
+                              <div key={palletDeal.id} className="rounded-lg border p-3 space-y-3">
+                                {palletDeal.image_url ? (
+                                  <img
+                                    src={palletDeal.image_url}
+                                    alt={palletDeal.title}
+                                    className="h-40 w-full rounded-md object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-40 w-full items-center justify-center rounded-md bg-muted">
+                                    <Package className="h-8 w-8 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-semibold">{palletDeal.title}</div>
+                                  {palletDeal.description && (
+                                    <div className="text-xs text-muted-foreground">{palletDeal.description}</div>
+                                  )}
+                                  {palletDeal.savings_text && (
+                                    <div className="text-xs text-emerald-600">{palletDeal.savings_text}</div>
+                                  )}
+                                  {showPrices && (
+                                    <div className="mt-1 text-sm">{formatCurrency(palletDeal.price)}</div>
+                                  )}
+                                </div>
+                                <div className="flex justify-end">
+                                  {isSingle ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={quantity > 0 ? 'default' : 'outline'}
+                                      onClick={() => setPalletQuantity(palletDeal, quantity > 0 ? 0 : 1)}
+                                    >
+                                      {quantity > 0 ? 'Selected' : 'Select'}
+                                    </Button>
+                                  ) : (
+                                    <QuantitySelector quantity={quantity} onChange={(value) => setPalletQuantity(palletDeal, value)} />
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="py-4 text-sm text-muted-foreground">No active pallet deals.</div>
+              )}
+            </div>
           )}
         </div>
-      )}
+
+        <aside className="hidden md:block">
+          <div className="sticky top-4 space-y-3 rounded-lg border bg-background p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Review</div>
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center justify-between">
+                <span>Items</span>
+                <span className="font-medium">{totalItems}</span>
+              </div>
+              {showPrices && (
+                <div className="flex items-center justify-between">
+                  <span>Total</span>
+                  <span className="font-medium">{formatCurrency(totalValue)}</span>
+                </div>
+              )}
+            </div>
+            <Button className="w-full" size="lg" onClick={() => setIsReviewOpen(true)} disabled={totalItems === 0}>
+              Review Order
+            </Button>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+        </aside>
+      </div>
 
       {totalItems > 0 && (
-        <div className="fixed inset-x-0 bottom-16 z-30 border-t bg-background p-3 md:bottom-0 md:left-0">
+        <div className="fixed inset-x-0 bottom-16 z-30 border-t bg-background p-3 md:hidden">
           <div className="mx-auto max-w-4xl">
             <Button className="w-full" size="lg" onClick={() => setIsReviewOpen(true)}>
               Review Order ({totalItems} items)

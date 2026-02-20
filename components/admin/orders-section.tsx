@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import { formatCurrency, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import type { OrderStatus } from '@/lib/types'
 
@@ -101,13 +102,16 @@ function StatusPill({ status, orderId }: { status: OrderStatus; orderId: string 
 
 function DeepLinkButton({ orderId, customerToken }: { orderId: string; customerToken: string | null }) {
   const [copied, setCopied] = useState(false)
+  const canCopy = Boolean(customerToken)
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const url = customerToken
-      ? `${window.location.origin}/c/${customerToken}/order/link/${orderId}`
-      : `${window.location.origin}/admin/orders/${orderId}`
+    const path = buildCustomerOrderDeepLink(customerToken, orderId)
+    if (!path) {
+      return
+    }
+    const url = `${window.location.origin}${path}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
@@ -119,10 +123,15 @@ function DeepLinkButton({ orderId, customerToken }: { orderId: string; customerT
       size="sm"
       variant="ghost"
       className="h-7 w-7 p-0"
-      title="Copy order link"
+      title={canCopy ? 'Copy customer portal order link' : 'Customer has no portal token'}
+      disabled={!canCopy}
       onClick={handleCopy}
     >
-      {copied ? <Copy className="h-3.5 w-3.5 text-green-600" /> : <ExternalLink className="h-3.5 w-3.5" />}
+      {copied ? (
+        <Copy className="h-3.5 w-3.5 text-green-600" />
+      ) : (
+        <ExternalLink className={`h-3.5 w-3.5 ${canCopy ? '' : 'text-muted-foreground'}`} />
+      )}
     </Button>
   )
 }

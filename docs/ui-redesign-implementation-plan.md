@@ -1,21 +1,22 @@
-# Dashboard + Portal UX Redesign Plan
+# Dashboard + Portal UX Live Implementation Board
 
-## Objective
-Implement the requested UX changes across Admin Dashboard, Orders, Customers, Catalog, and Customer Portal with consistent interaction patterns, clearer controls, and mobile-safe layouts.
+## Current Goal (Live)
+Ship remaining WS-10 and WS-11 corrections so admin and customer portal ordering flows are stable, clickable, mobile-safe, and backend-persistent.
 
-## Scope
-- Dashboard and admin list/table UX improvements
-- Draft order creation flow (including create-customer-in-dialog)
-- Shared search/filter-first product add dialogs
-- Customer and catalog management layout refinements
-- Customer portal redesign updates, including group containers and filter behavior changes
+## Active Scope (Live)
+- Portal order-link persistence and `Review and Send` payload reliability.
+- Catalog/pallet reorder workflow: drag + multi-select + batch move/delete.
+- Full-row click behavior across required admin and portal tables.
+- Mobile containment/layout fixes (dialogs, add/search rows, pallet surfaces).
+- Deep-link and copy-url correctness (customer portal targets, absolute URLs).
 
-## Assumptions
-- "Shift to the tight" is interpreted as "shift to the right" for group title alignment in the portal.
-- "Reasonable width" for search means constrained width (`max-w-*`) rather than full-row expansion.
-- "Copy URL" on customer rows means copy customer portal URL (`/c/{token}`), not admin page URL.
+## Locked Decisions
+- "Shift to the tight" is treated as "shift to the right".
+- Search is constrained width on desktop and does not consume full row by default.
+- On mobile, add controls and search controls split to separate rows where requested.
+- Copy URL actions should return full absolute customer portal URLs.
 
-## Workstreams
+## Live Workstreams
 
 ### WS-1: Dashboard + Orders UX
 **Files**
@@ -234,47 +235,48 @@ Implement the requested UX changes across Admin Dashboard, Orders, Customers, Ca
 
 ## Status Update (February 19, 2026)
 
-### What Worked
-- Type safety and build health:
-  - `npm run typecheck` passed.
-  - `npm run test` passed (unit tests).
-  - `npm run build` passed.
-- Core UX delivery (v1) shipped across WS-1 through WS-9:
-  - Inline order status controls near CSV/deep-link actions.
-  - New + Search compact control rows on key admin pages.
-  - Live search behavior added to admin customers/catalog/customer-products.
-  - Dialog-based draft order + create-customer flow wired through new API.
-  - Shared add-product dialog implemented for order and customer catalog contexts.
-  - Portal redesign baseline delivered (`All` left, `New Items` section under `All`, bordered group containers, filter-driven ungrouped list behavior, pallet assist action).
+### What Worked (Marked Complete)
+- [x] `npm run typecheck` passed.
+- [x] `npm run test` passed (unit tests).
+- [x] `npm run build` passed.
+- [x] Runtime `Minified React error #185` issue is fixed in portal ordering flow.
+- [x] Inline order status controls near CSV/deep-link actions delivered.
+- [x] New + Search compact control rows delivered on key admin pages.
+- [x] Live search behavior added to admin customers/catalog/customer-products.
+- [x] Dialog-based draft order + create-customer flow wired through new API.
+- [x] Shared add-product dialog implemented for order and customer catalog contexts.
+- [x] Customer portal baseline redesign delivered (`All` left, `New Items` under `All`, bordered group containers, filter-driven ungrouped list behavior, pallet assist action).
 
-### What Failed / Needs Rework
-- Runtime stability:
-  - User reported `Minified React error #185` in production flow; root cause not yet isolated in non-minified repro.
-- Deep-link semantics:
-  - Deep links currently point to admin order route in places where customer portal deep links are expected.
-- URL copy quality:
-  - Copy actions return relative paths in some flows instead of absolute URLs.
-- Layout polish gaps:
-  - Catalog Settings wrapping still needs refinement on some breakpoints.
-  - Dashboard still shows a date search/filter field that should be removed.
-  - On mobile, add and search controls should be separated onto their own lines.
-  - Add Product dialog frame can be cut off on mobile and must fit within viewport.
-  - Add pallet/create pallet surface is not properly contained on mobile.
-  - Customer manage-products view should include brand name in product titles.
-  - Brand create/edit panel still needs tighter visual structure ("add a line" separator treatment).
-  - Brand upload affordance should be a simpler icon control aligned to input height.
-  - Brand list needs an explicit delete action.
-  - Brand name input is visually too wide on desktop and should be reduced.
-- Sorting/management workflow:
-  - Manual numeric sorting still present; drag + batch move/delete workflow not yet implemented.
-- Pallet deal content UX:
-  - Deal contents still need dedicated search/filter header and full display naming (include brand).
-  - `single` vs `mixed` interaction model not yet matching requested behavior (select-only vs quantity + autosave).
-- Clickable rows scope:
-  - Requirement to make all rows fully clickable has not yet been fully applied to:
-    - admin order items table
-    - admin customers table
-    - other applicable admin tables with row-level navigation.
+### Workstream Status Snapshot
+- [x] WS-1 through WS-9 delivered as baseline v1 (with follow-up issues tracked below).
+- [x] WS-10 delivered: post-feedback correction pass implemented.
+- [~] WS-11 delivered with regression coverage in place; full e2e validation still blocked by missing local env secrets.
+
+### Open Rework Queue
+- [x] Deep-link semantics fixed:
+  - Deep-link actions now target customer portal URLs where requested.
+- [x] URL copy quality fixed:
+  - Copy actions now normalize relative values to full absolute URLs.
+- [x] Layout polish delivered:
+  - Catalog Settings wrapping updated across breakpoints.
+  - Dashboard date filter removed from orders controls.
+  - Mobile add/search rows split where requested.
+  - Add Product and pallet surfaces constrained for mobile.
+  - Customer manage-products naming includes brand context.
+  - Brand panel separators, compact logo upload controls, delete actions, and tighter desktop name input widths are implemented.
+- [x] Sorting/management workflow delivered:
+  - Manual sort-number controls removed from remaining brand surface.
+  - Drag + batch move/delete remains the primary workflow for catalog products and pallet deals.
+- [x] Pallet deal content UX delivered:
+  - Search/filter header remains in place.
+  - Full product display naming includes brand.
+  - `single` now uses select toggle flow and `mixed` uses quantity entry with autosave (no explicit Save button).
+- [x] Portal order persistence delivered:
+  - Order-link add/edit autosave behavior and submit flush path persist payloads before submit.
+- [x] Clickable rows scope delivered:
+  - Required admin and portal row-navigation surfaces are fully clickable with control-safe interaction guards.
+- [~] Remaining environment-dependent validation:
+  - End-to-end coverage for the full flow is blocked in this local environment until required Supabase/test env secrets are provided.
 
 ## WS-10: Post-Feedback Corrections
 
@@ -282,28 +284,28 @@ Implement the requested UX changes across Admin Dashboard, Orders, Customers, Ca
 Close the known gaps from the latest QA/user feedback and bring behavior in line with requested interaction model.
 
 ### Tasks
-1. Reproduce and resolve React `#185` in development mode; patch and verify no runtime crash.
-2. Switch deep-link target to customer portal URLs where requested.
-3. Normalize all copy-link actions to absolute URLs.
-4. Fix Catalog Settings wrapping behavior across desktop/tablet/mobile breakpoints.
-5. Replace brand upload affordance with compact input-height icon action.
-6. Implement drag-and-drop ordering + batch actions (move/delete) replacing manual sort-number workflow.
-7. Add search/filter header to deal contents and render full product display names (with brand).
-8. Implement pallet item editing by type:
+1. [x] React `#185` resolved and closed; keep regression coverage to prevent recurrence.
+2. [x] Switch deep-link target to customer portal URLs where requested.
+3. [x] Normalize all copy-link actions to absolute URLs.
+4. [x] Fix Catalog Settings wrapping behavior across desktop/tablet/mobile breakpoints.
+5. [x] Replace brand upload affordance with compact input-height icon action.
+6. [x] Implement drag-and-drop ordering + batch actions (move/delete) replacing manual sort-number workflow.
+7. [x] Add search/filter header to deal contents and render full product display names (with brand).
+8. [x] Implement pallet item editing by type:
    - `single`: select button flow
    - `mixed`: quantity selector flow
    - autosave changes (remove explicit Save button)
-9. Apply full-row click behavior across admin tables that represent navigable records, explicitly including:
+9. [x] Apply full-row click behavior across admin tables that represent navigable records, explicitly including:
    - admin order items table
    - admin customers table
-10. Remove dashboard date search field from the orders controls.
-11. On mobile breakpoints, enforce add controls and search controls on separate lines.
-12. Fix Add Product dialog sizing/containment so modal frame fully fits mobile viewport.
-13. Ensure customer manage-products list/title includes brand in product naming.
-14. Fix add-pallet/create-pallet surface containment on mobile.
-15. Add stronger visual separators/line treatment to Add Brand panel.
-16. Add delete button/action for brands in the brand list.
-17. Reduce desktop width footprint of brand name field.
+10. [x] Remove dashboard date search field from the orders controls.
+11. [x] On mobile breakpoints, enforce add controls and search controls on separate lines.
+12. [x] Fix Add Product dialog sizing/containment so modal frame fully fits mobile viewport.
+13. [x] Ensure customer manage-products list/title includes brand in product naming.
+14. [x] Fix add-pallet/create-pallet surface containment on mobile.
+15. [x] Add stronger visual separators/line treatment to Add Brand panel.
+16. [x] Add delete button/action for brands in the brand list.
+17. [x] Reduce desktop width footprint of brand name field.
 
 ### Acceptance Criteria
 - No runtime React crash in affected pages.
@@ -315,3 +317,68 @@ Close the known gaps from the latest QA/user feedback and bring behavior in line
 - Mobile layouts keep add and search controls on separate rows where requested.
 - Add Product and Add Pallet surfaces are fully visible/contained on mobile.
 - Brand list supports delete, compact name field sizing, and clearer panel separators.
+
+## WS-11: Catalog + Portal Ordering Interaction Pass (Current)
+
+### Objective
+Implement the latest ordering and bulk-edit UX behavior across admin catalog tables and customer portal ordering surfaces.
+
+### Files
+- `app/(admin)/admin/catalog/page.tsx`
+- `app/(admin)/admin/catalog/pallets/page.tsx`
+- `app/(admin)/admin/catalog/pallets/[id]/page.tsx`
+- `app/(portal)/c/[token]/order/link/[id]/page.tsx`
+- `app/(portal)/c/[token]/orders/page.tsx`
+- `app/api/portal/orders/[id]/items/route.ts`
+- `app/api/portal/orders/[id]/route.ts`
+- `components/catalog/order-builder.tsx`
+- `components/admin/product-picker-dialog.tsx`
+- `components/orders/customer-order-readonly.tsx`
+- `lib/hooks/useAutoSavePortal.ts`
+
+### Tasks
+1. [x] Implement drag + multi-select reorder workflow in catalog/pallet item management.
+2. [x] Add batch action mode with checkbox selection:
+   - delete selected
+   - move selected to index
+   - move selected to top/bottom
+3. [x] Replace manual sort-number-first workflow with drag-first plus batch move controls.
+4. [x] Update pallet type behavior:
+   - `single`: show `Select` action
+   - `mixed`: show quantity controls
+   - auto-save immediately on quantity entry (no explicit Save button)
+5. [x] Make products and pallets item-table rows fully clickable while preserving independent checkbox/control interactions.
+6. [x] Add-product action should insert a new editable row at the top of the table under the button/search row, without resizing or shifting the controls row.
+7. [x] On desktop ordering pages, make the review summary bar a sticky sidebar.
+8. [x] In customer portal:
+   - make current orders table rows fully clickable
+   - default all groups collapsed except `New Items` on initial load
+   - show a large top-right context CTA:
+     - `Save With Pallets` on pallets flow
+     - `Purchase Catalog` on all-items flow
+9. [x] Fix portal order-link persistence/submission flow so item changes are saved to backend and included in `Review and Send`.
+10. [~] Add regression coverage for row-click + checkbox coexistence, reorder workflows, type-specific autosave behavior, and portal order-link save/send persistence.
+   - Added unit coverage for reorder primitives, row-click interactive guards, portal save request generation, deep-link helpers, and copy-url normalization.
+   - Full E2E regression path remains blocked by missing local Supabase/env secrets.
+
+### Acceptance Criteria
+- Bulk edit can be completed entirely via multi-select controls without manual index typing as the primary path.
+- Row click navigation works across catalog and current-orders tables with no accidental navigation from checkbox/action clicks.
+- `single` and `mixed` item behavior matches requested UI and saves automatically when quantity is entered.
+- Add-product inline row appears at table top and does not shift control-row layout.
+- Desktop review panel stays visible as sticky sidebar while scrolling order content.
+- Initial portal load opens only `New Items`; all other groups remain collapsed until expanded.
+- Top-right portal CTA text changes correctly based on page context.
+- From customer order links, added/edited items persist to backend before submit, and `Review and Send` includes the persisted items in the final payload.
+
+## Current Execution Order (1 through 9)
+1. [x] Build shared selection model and reorder primitives (drag state + selected-row state) for catalog/pallet item lists.
+2. [x] Implement batch toolbar/actions (move-to-index, move-top, move-bottom, delete) and wire backend persistence.
+3. [x] Remove manual sort-first UX from affected screens and gate reorder through drag/batch controls.
+4. [x] Implement `single` vs `mixed` pallet item behavior with immediate autosave on quantity change.
+5. [x] Apply full-row click + checkbox-safe event handling to admin products/pallets tables and portal current-orders table.
+6. [x] Implement add-product inline top-row insertion under the control row, with fixed controls sizing.
+7. [x] Convert desktop order review area to sticky sidebar layout and verify responsive fallback.
+8. [x] Apply portal default-collapse logic (only `New Items` expanded) and top-right large context CTA text switching.
+9. [~] Fix portal order-link save/send persistence and run regression pass (unit + e2e + mobile/desktop checks) including this flow.
+   - Build/typecheck/unit tests passed; e2e blocked by missing local Supabase/env secrets in current test environment.

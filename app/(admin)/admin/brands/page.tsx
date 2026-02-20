@@ -36,10 +36,19 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
     if (!name) throw new Error('Brand name is required')
 
     const supabaseClient = await createClient()
+    const { data: highestSort, error: sortError } = await supabaseClient
+      .from('brands')
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (sortError) throw sortError
+
     const { error: insertError } = await supabaseClient.from('brands').insert({
       name,
       logo_url: (formData.get('logo_url') as string) || null,
-      sort_order: Number((formData.get('sort_order') as string) || 0),
+      sort_order: Number(highestSort?.sort_order ?? -1) + 1,
     })
 
     if (insertError) throw insertError
@@ -57,7 +66,6 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
       .update({
         name: (formData.get('name') as string).trim(),
         logo_url: (formData.get('logo_url') as string) || null,
-        sort_order: Number((formData.get('sort_order') as string) || 0),
       })
       .eq('id', id)
 
@@ -108,14 +116,10 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
               New Brand
             </summary>
             <div className="border-t border-dashed p-4">
-              <form action={createBrand} className="grid gap-3 md:grid-cols-[minmax(220px,320px)_auto_auto_auto] md:items-end">
+              <form action={createBrand} className="grid gap-3 md:grid-cols-[minmax(180px,260px)_auto_auto] md:items-end">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
                   <Input id="name" name="name" required className="h-9" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sort_order">Sort order</Label>
-                  <Input id="sort_order" name="sort_order" type="number" defaultValue={0} className="h-9 w-24" />
                 </div>
                 <ImageUploadField name="logo_url" label="Logo" folder="brands" compact iconOnly />
                 <div className="flex items-end">
@@ -141,14 +145,10 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
           {brandList.map((brand) => (
             <form key={brand.id} action={updateBrand} className="rounded-lg border p-4">
               <input type="hidden" name="id" value={brand.id} />
-              <div className="grid gap-3 md:grid-cols-[minmax(220px,320px)_auto_auto_auto_auto] md:items-end">
+              <div className="grid gap-3 md:grid-cols-[minmax(180px,260px)_auto_auto] md:items-end">
                 <div className="space-y-2">
                   <Label>Name</Label>
                   <Input name="name" defaultValue={brand.name} className="h-9 text-sm" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Sort</Label>
-                  <Input name="sort_order" type="number" defaultValue={brand.sort_order ?? 0} className="h-9 w-20 text-sm" />
                 </div>
                 <ImageUploadField name="logo_url" label="Logo" folder="brands" defaultValue={brand.logo_url} compact iconOnly />
                 <div className="flex items-end gap-2">

@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useRef } from 'react'
-import { debounce } from '@/lib/utils'
+import { useCallback, useEffect, useRef } from 'react'
+import { buildPortalItemSaveRequest } from '@/lib/portal-order-save'
 
 interface UseAutoSavePortalOptions {
   orderId: string
@@ -18,61 +18,85 @@ export function useAutoSavePortal({
   onSuccess,
   debounceMs = 300,
 }: UseAutoSavePortalOptions) {
-  const saveRef = useRef(
-    debounce(
-      async ({
-        productId,
-        palletDealId,
-        quantity,
-        unitPrice,
-      }: {
-        productId?: string | null
-        palletDealId?: string | null
-        quantity: number
-        unitPrice: number
-      }) => {
-        if (!productId && !palletDealId) {
-          onError?.(new Error('Autosave requires either productId or palletDealId'))
-          return
-        }
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPayloadRef = useRef<{
+    productId?: string | null
+    palletDealId?: string | null
+    quantity: number
+    unitPrice: number
+  } | null>(null)
+  const inFlightRef = useRef<Set<Promise<void>>>(new Set())
+  const flushRef = useRef<() => Promise<void>>(async () => {})
 
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'X-Customer-Token': token,
-        }
+  const persist = useCallback(
+    async ({
+      productId,
+      palletDealId,
+      quantity,
+      unitPrice,
+    }: {
+      productId?: string | null
+      palletDealId?: string | null
+      quantity: number
+      unitPrice: number
+    }) => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Customer-Token': token,
+      }
+      let requestData: ReturnType<typeof buildPortalItemSaveRequest>
+      try {
+        requestData = buildPortalItemSaveRequest({
+          productId,
+          palletDealId,
+          quantity,
+          unitPrice,
+        })
+      } catch (buildError) {
+        const error =
+          buildError instanceof Error
+            ? buildError
+            : new Error('Failed to prepare autosave request')
+        onError?.(error)
+        throw error
+      }
 
-        if (quantity === 0) {
-          // Delete the row when quantity reaches zero
-          const response = await fetch(`/api/portal/orders/${orderId}/items`, {
-            method: 'DELETE',
-            headers,
-            body: JSON.stringify({ productId, palletDealId }),
-          })
+      const response = await fetch(`/api/portal/orders/${orderId}/items`, {
+        method: requestData.method,
+        headers,
+        body: JSON.stringify(requestData.body),
+      })
 
-          if (!response.ok) {
-            const payload = await response.json().catch(() => null)
-            onError?.(new Error(payload?.error?.message ?? 'Failed to delete item'))
-          } else {
-            onSuccess?.()
-          }
-        } else {
-          // Upsert the item
-          const response = await fetch(`/api/portal/orders/${orderId}/items`, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify({ productId, palletDealId, quantity, unitPrice }),
-          })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const fallbackMessage =
+          requestData.method === 'DELETE' ? 'Failed to delete item' : 'Failed to save item'
+        const error = new Error(payload?.error?.message ?? fallbackMessage)
+        onError?.(error)
+        throw error
+      }
 
-          if (!response.ok) {
-            const payload = await response.json().catch(() => null)
-            onError?.(new Error(payload?.error?.message ?? 'Failed to save item'))
-          } else {
-            onSuccess?.()
-          }
-        }
-      },
-      debounceMs
-    )
+      onSuccess?.()
+    },
+    [onError, onSuccess, orderId, token]
+  )
+
+  const runPersist = useCallback(
+    async (payload: {
+      productId?: string | null
+      palletDealId?: string | null
+      quantity: number
+      unitPrice: number
+    }) => {
+      const operation = persist(payload)
+      inFlightRef.current.add(operation)
+      try {
+        await operation
+      } finally {
+        inFlightRef.current.delete(operation)
+      }
+    },
+    [persist]
   )
 
   const save = useCallback(
@@ -82,10 +106,49 @@ export function useAutoSavePortal({
       quantity: number
       unitPrice: number
     }) => {
-      saveRef.current(args)
+      pendingPayloadRef.current = args
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+
+      timerRef.current = setTimeout(() => {
+        const payload = pendingPayloadRef.current
+        pendingPayloadRef.current = null
+        timerRef.current = null
+        if (!payload) return
+        void runPersist(payload).catch(() => undefined)
+      }, debounceMs)
     },
-    []
+    [debounceMs, runPersist]
   )
 
-  return { save }
+  const flush = useCallback(async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+
+    const pendingPayload = pendingPayloadRef.current
+    pendingPayloadRef.current = null
+
+    if (pendingPayload) {
+      await runPersist(pendingPayload)
+    }
+
+    await Promise.allSettled(Array.from(inFlightRef.current))
+  }, [runPersist])
+
+  flushRef.current = flush
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+      void flushRef.current().catch(() => undefined)
+    }
+  }, [])
+
+  return { save, flush }
 }

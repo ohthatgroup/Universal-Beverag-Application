@@ -15,7 +15,7 @@ export function CustomerPortalLink({ customerId, accessToken }: CustomerPortalLi
   const [token, setToken] = useState(accessToken)
   const [error, setError] = useState<string | null>(null)
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://universal-beverag-application.vercel.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
   const portalUrl = token ? `${appUrl}/c/${token}` : null
 
   const copyLink = async () => {
