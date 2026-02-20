@@ -256,12 +256,35 @@ export function OrderBuilder({
     setActiveTab('pallets')
   }
 
+  const renderBrandLogo = (
+    logoUrl: string | null | undefined,
+    brandName: string | null | undefined,
+    className: string
+  ) => {
+    if (!logoUrl) return null
+    return (
+      <img
+        src={logoUrl}
+        alt={`${brandName ?? 'Brand'} logo`}
+        className={className}
+      />
+    )
+  }
+
   const renderProductRow = (product: CatalogProduct, isCardLayout: boolean) => {
     const key = itemKey(product.id, null)
     const quantity = quantities[key] ?? 0
     const packLabel = getProductPackLabel(product) ?? 'N/A'
     const displayName = getProductDisplayName(product, product.brand?.name ?? null)
     const hasPalletLink = (productToPalletDealIds[product.id] ?? []).length > 0
+    const showInlineBrandLogo = filters.groupBy === 'size'
+    const brandLogo = showInlineBrandLogo
+      ? renderBrandLogo(
+          product.brand?.logo_url,
+          product.brand?.name,
+          'h-8 w-8 rounded-sm border object-cover'
+        )
+      : null
 
     if (isCardLayout) {
       return (
@@ -278,7 +301,14 @@ export function OrderBuilder({
             </div>
           )}
           <div>
-            <div className="font-semibold">{displayName}</div>
+            {showInlineBrandLogo ? (
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                {brandLogo}
+                <div className="font-semibold">{displayName}</div>
+              </div>
+            ) : (
+              <div className="font-semibold">{displayName}</div>
+            )}
             <div className="text-xs text-muted-foreground">{packLabel}</div>
             {showPrices && (
               <div className="mt-1 text-sm">{formatCurrency(product.effective_price)}</div>
@@ -299,7 +329,14 @@ export function OrderBuilder({
     return (
       <div key={product.id} className="flex items-center justify-between gap-3 border-b px-2 py-2.5 last:border-b-0">
         <div className="min-w-0 flex-1">
-          <div className="font-medium">{displayName}</div>
+          {showInlineBrandLogo ? (
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+              {brandLogo}
+              <div className="font-medium">{displayName}</div>
+            </div>
+          ) : (
+            <div className="font-medium">{displayName}</div>
+          )}
           <div className="text-xs text-muted-foreground">
             {packLabel}
             {showPrices && <> - {formatCurrency(product.effective_price)}</>}
@@ -468,6 +505,12 @@ export function OrderBuilder({
 
           {activeTab === 'all' && !isFilterActive && grouped.map((group) => {
             const isExpanded = expandedGroups.has(group.key)
+            const groupBrandName = filters.groupBy === 'brand'
+              ? group.products[0]?.brand?.name ?? null
+              : null
+            const groupBrandLogo = filters.groupBy === 'brand'
+              ? group.products[0]?.brand?.logo_url ?? null
+              : null
             return (
               <div key={group.key} className="rounded-lg border">
                 <button
@@ -475,8 +518,11 @@ export function OrderBuilder({
                   onClick={() => toggleGroup(group.key)}
                   className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
                 >
-                  <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    {group.label}
+                  <span className="ml-auto flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {filters.groupBy === 'brand' && groupBrandLogo
+                      ? renderBrandLogo(groupBrandLogo, groupBrandName, 'h-6 w-6 rounded-sm border object-cover')
+                      : null}
+                    <span>{group.label}</span>
                   </span>
                   {isExpanded
                     ? <ChevronDown className="h-4 w-4 text-muted-foreground" />

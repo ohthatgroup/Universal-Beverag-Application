@@ -47,7 +47,7 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
         className="w-full sm:w-80"
       />
 
-      <BrandsTableManager brands={brandRows} />
+      <BrandsTableManager brands={brandRows} searchQuery={searchQuery} />
     </div>
   )
 }
