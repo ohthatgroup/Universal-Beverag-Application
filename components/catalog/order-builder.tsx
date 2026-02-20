@@ -335,7 +335,7 @@ export function OrderBuilder({
 
   return (
     <div className="pb-28 md:pb-0">
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_20rem] md:gap-6">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6">
         <div className="space-y-4">
           <header className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -580,24 +580,52 @@ export function OrderBuilder({
         </div>
 
         <aside className="hidden md:block">
-          <div className="sticky top-4 space-y-3 rounded-lg border bg-background p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Review</div>
-            <div className="space-y-1 text-sm">
-              <div className="flex items-center justify-between">
-                <span>Items</span>
-                <span className="font-medium">{totalItems}</span>
-              </div>
-              {showPrices && (
-                <div className="flex items-center justify-between">
-                  <span>Total</span>
-                  <span className="font-medium">{formatCurrency(totalValue)}</span>
-                </div>
+          <div className="sticky top-4 flex max-h-[calc(100vh-1rem)] flex-col rounded-lg border bg-background p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Review</div>
+              <Button type="button" size="sm" variant="ghost" onClick={resetAll} disabled={isResetting || totalItems === 0}>
+                {isResetting ? 'Resetting...' : 'Reset All'}
+              </Button>
+            </div>
+
+            <div className="mt-3 min-h-0 flex-1 space-y-0 overflow-y-auto pr-1">
+              {reviewItems.length > 0 ? (
+                reviewItems.map((item) => (
+                  <div key={item.key} className="border-b py-3 last:border-0">
+                    <div className="font-medium">{item.label}</div>
+                    {item.details && <div className="text-xs text-muted-foreground">{item.details}</div>}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      {showPrices ? (
+                        <div className="text-xs text-muted-foreground">
+                          {formatCurrency(item.unitPrice)} x {item.quantity}
+                        </div>
+                      ) : (
+                        <div />
+                      )}
+                      <div className="flex items-center gap-2">
+                        {showPrices && <span className="text-sm font-medium">{formatCurrency(item.lineTotal)}</span>}
+                        <QuantitySelector quantity={item.quantity} onChange={(value) => updateReviewQuantity(item, value)} />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-4 text-sm text-muted-foreground">No items added yet.</div>
               )}
             </div>
-            <Button className="w-full" size="lg" onClick={() => setIsReviewOpen(true)} disabled={totalItems === 0}>
-              Review Order
-            </Button>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+
+            <div className="mt-3 space-y-3 border-t pt-3">
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              <div className="flex items-center justify-between text-sm">
+                <span>{totalItems} items</span>
+                {showPrices && <span className="font-semibold">{formatCurrency(totalValue)}</span>}
+              </div>
+              <Button className="w-full" size="lg" onClick={submitOrder} disabled={totalItems === 0 || isSubmitting}>
+                {isSubmitting ? 'Submitting...' : (
+                  <>Submit Order <Check className="ml-1 h-4 w-4" /></>
+                )}
+              </Button>
+            </div>
           </div>
         </aside>
       </div>
