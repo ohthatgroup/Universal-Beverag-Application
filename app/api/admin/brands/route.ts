@@ -40,7 +40,16 @@ export async function POST(request: Request) {
       throw createError
     }
 
-    return apiOk(created, 201, requestId)
+    return apiOk(
+      {
+        id: created.id,
+        name: created.name,
+        logoUrl: created.logo_url,
+        sortOrder: created.sort_order,
+      },
+      201,
+      requestId
+    )
   } catch (error) {
     return toErrorResponse(error, requestId)
   }

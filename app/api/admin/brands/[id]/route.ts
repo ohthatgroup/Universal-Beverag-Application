@@ -41,7 +41,16 @@ export async function PATCH(
       throw updateError
     }
 
-    return apiOk(updated, 200, requestId)
+    return apiOk(
+      {
+        id: updated.id,
+        name: updated.name,
+        logoUrl: updated.logo_url,
+        sortOrder: updated.sort_order,
+      },
+      200,
+      requestId
+    )
   } catch (error) {
     return toErrorResponse(error, requestId)
   }

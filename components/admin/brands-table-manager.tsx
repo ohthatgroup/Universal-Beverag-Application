@@ -12,6 +12,13 @@ export interface BrandTableRow {
   logoUrl: string | null
 }
 
+interface BrandApiRow {
+  id: string
+  name: string
+  logo_url?: string | null
+  logoUrl?: string | null
+}
+
 interface BrandRowState extends BrandTableRow {
   draftName: string
   draftLogoUrl: string | null
@@ -31,6 +38,14 @@ function toRowState(row: BrandTableRow): BrandRowState {
     ...row,
     draftName: row.name,
     draftLogoUrl: row.logoUrl,
+  }
+}
+
+function normalizeBrandApiRow(row: BrandApiRow): BrandTableRow {
+  return {
+    id: row.id,
+    name: row.name,
+    logoUrl: row.logoUrl ?? row.logo_url ?? null,
   }
 }
 
@@ -79,14 +94,14 @@ export function BrandsTableManager({ brands }: BrandsTableManagerProps) {
         }),
       })
       const payload = (await response.json().catch(() => null)) as
-        | { data?: BrandTableRow; error?: { message?: string } }
+        | { data?: BrandApiRow; error?: { message?: string } }
         | null
 
       if (!response.ok || !payload?.data) {
         throw new Error(payload?.error?.message ?? 'Failed to save brand')
       }
 
-      const saved = payload.data
+      const saved = normalizeBrandApiRow(payload.data)
       updateRow(row.id, {
         name: saved.name,
         logoUrl: saved.logoUrl,
@@ -153,13 +168,13 @@ export function BrandsTableManager({ brands }: BrandsTableManagerProps) {
         }),
       })
       const payload = (await response.json().catch(() => null)) as
-        | { data?: BrandTableRow; error?: { message?: string } }
+        | { data?: BrandApiRow; error?: { message?: string } }
         | null
       if (!response.ok || !payload?.data) {
         throw new Error(payload?.error?.message ?? 'Failed to create brand')
       }
 
-      const created = payload.data
+      const created = normalizeBrandApiRow(payload.data)
       setRows((prev) => [...prev, toRowState(created)])
       setCreateName('')
       setCreateLogoUrl(null)
