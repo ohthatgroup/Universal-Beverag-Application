@@ -1,7 +1,7 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import process from 'node:process'
-import { Client } from 'pg'
+const fs = require('node:fs')
+const path = require('node:path')
+const process = require('node:process')
+const { Client } = require('pg')
 
 function resolveDbUrl() {
   return (
