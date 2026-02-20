@@ -67,6 +67,7 @@ export type BrandUpdate = Partial<BrandInsert>
 export interface Product {
   id: string
   brand_id: string | null
+  customer_id: string | null
   title: string
   pack_details: string | null
   pack_count: number | null
@@ -88,6 +89,7 @@ export interface Product {
 export interface ProductInsert {
   id?: string
   brand_id?: string | null
+  customer_id?: string | null
   title: string
   pack_details?: string | null
   pack_count?: number | null

@@ -29,6 +29,7 @@ export async function POST(request: Request) {
           .from('products')
           .update({ sort_order: index })
           .eq('id', id)
+          .is('customer_id', null)
 
         if (error) {
           throw error
@@ -39,7 +40,11 @@ export async function POST(request: Request) {
     }
 
     const ids = Array.from(new Set(payload.ids))
-    const { error } = await admin.from('products').delete().in('id', ids)
+    const { error } = await admin
+      .from('products')
+      .delete()
+      .is('customer_id', null)
+      .in('id', ids)
 
     if (error) {
       if (error.code === '23503') {

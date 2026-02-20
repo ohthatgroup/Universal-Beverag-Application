@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { createClient } from '@/lib/supabase/server'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { formatStructuredPack, isSupportedPackUom, normalizePackUom, PACK_UOM_OPTIONS } from '@/lib/utils'
+import { formatStructuredPack, normalizePackUom, PACK_UOM_OPTIONS } from '@/lib/utils'
 
 function parseOptionalPositiveInteger(raw: string): number | null {
   const value = raw.trim()
@@ -35,13 +35,18 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
   const supabase = await createClient()
 
   const [{ data: product, error: productError }, { data: brands, error: brandsError }] = await Promise.all([
-    supabase.from('products').select('*').eq('id', id).maybeSingle(),
+    supabase.from('products').select('*').eq('id', id).is('customer_id', null).maybeSingle(),
     supabase.from('brands').select('id,name').order('sort_order', { ascending: true }),
   ])
 
   if (productError) throw productError
   if (brandsError) throw brandsError
   if (!product) notFound()
+
+  const normalizedProductSizeUnit = product.size_uom ? normalizePackUom(product.size_uom) : null
+  const sizeUnitOptions = normalizedProductSizeUnit
+    ? [normalizedProductSizeUnit, ...PACK_UOM_OPTIONS.filter((unit) => unit !== normalizedProductSizeUnit)]
+    : [...PACK_UOM_OPTIONS]
 
   async function updateProduct(formData: FormData) {
     'use server'
@@ -61,9 +66,6 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
     const hasStructuredInput = packCount !== null || sizeValue !== null || sizeUom !== null
     if (hasStructuredInput && (packCount === null || sizeValue === null || sizeUom === null)) {
       throw new Error('Pack count, size value, and unit must all be set together')
-    }
-    if (sizeUom && !isSupportedPackUom(sizeUom)) {
-      throw new Error('Unsupported unit of measure')
     }
 
     const inferredPackDetails =
@@ -91,6 +93,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
         is_discontinued: formData.get('is_discontinued') === 'on',
       })
       .eq('id', id)
+      .is('customer_id', null)
 
     if (error) throw error
     redirect(`/admin/catalog/${id}`)
@@ -153,10 +156,10 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
               id="size_uom"
               name="size_uom"
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              defaultValue={product.size_uom ?? ''}
+              defaultValue={normalizedProductSizeUnit ?? ''}
             >
               <option value="">Select unit</option>
-              {PACK_UOM_OPTIONS.map((unit) => (
+              {sizeUnitOptions.map((unit) => (
                 <option key={unit} value={unit}>{unit}</option>
               ))}
             </select>

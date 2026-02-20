@@ -14,6 +14,30 @@ const deleteItemSchema = z.object({
   palletDealId: z.string().uuid().nullable().optional(),
 })
 
+function isUniqueViolation(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string' &&
+    (error as { code: string }).code === '23505'
+  )
+}
+
+function resolveIdentity(payload: { productId?: string | null; palletDealId?: string | null }) {
+  if (payload.productId && payload.palletDealId) {
+    return null
+  }
+  if (!payload.productId && !payload.palletDealId) {
+    return null
+  }
+
+  if (payload.productId) {
+    return { column: 'product_id' as const, value: payload.productId }
+  }
+  return { column: 'pallet_deal_id' as const, value: payload.palletDealId as string }
+}
+
 /**
  * PUT /api/portal/orders/[id]/items
  * Upsert an order item (auto-save). Quantity 0 is handled by DELETE.
@@ -38,33 +62,78 @@ export async function PUT(
     const body = await request.json().catch(() => null)
     const payload = upsertItemSchema.parse(body)
 
-    if (!payload.productId && !payload.palletDealId) {
+    const identity = resolveIdentity(payload)
+    if (!identity) {
       return Response.json(
-        { error: { code: 'validation_error', message: 'Either productId or palletDealId is required' } },
+        { error: { code: 'validation_error', message: 'Provide either productId or palletDealId' } },
         { status: 400 }
       )
     }
 
     const admin = createAdminClient()
 
-    const { error } = await admin
+    const existingQuery = admin
       .from('order_items')
-      .upsert(
-        {
+      .select('id')
+      .eq('order_id', order.id)
+      .eq(identity.column, identity.value)
+
+    const { data: existing, error: existingError } =
+      identity.column === 'product_id'
+        ? await existingQuery.is('pallet_deal_id', null).maybeSingle()
+        : await existingQuery.is('product_id', null).maybeSingle()
+
+    if (existingError) throw existingError
+
+    if (existing) {
+      const { error: updateError } = await admin
+        .from('order_items')
+        .update({
+          quantity: payload.quantity,
+          unit_price: payload.unitPrice,
+        })
+        .eq('id', existing.id)
+
+      if (updateError) throw updateError
+    } else {
+      const { error: insertError } = await admin
+        .from('order_items')
+        .insert({
           order_id: order.id,
           quantity: payload.quantity,
           unit_price: payload.unitPrice,
           product_id: payload.productId ?? null,
           pallet_deal_id: payload.palletDealId ?? null,
-        },
-        {
-          onConflict: payload.productId
-            ? 'order_id,product_id'
-            : 'order_id,pallet_deal_id',
-        }
-      )
+        })
 
-    if (error) throw error
+      if (insertError && isUniqueViolation(insertError)) {
+        const retryQuery = admin
+          .from('order_items')
+          .select('id')
+          .eq('order_id', order.id)
+          .eq(identity.column, identity.value)
+
+        const { data: retriedExisting, error: retryError } =
+          identity.column === 'product_id'
+            ? await retryQuery.is('pallet_deal_id', null).maybeSingle()
+            : await retryQuery.is('product_id', null).maybeSingle()
+
+        if (retryError) throw retryError
+        if (!retriedExisting) throw insertError
+
+        const { error: retryUpdateError } = await admin
+          .from('order_items')
+          .update({
+            quantity: payload.quantity,
+            unit_price: payload.unitPrice,
+          })
+          .eq('id', retriedExisting.id)
+
+        if (retryUpdateError) throw retryUpdateError
+      } else if (insertError) {
+        throw insertError
+      }
+    }
 
     return Response.json({ data: { saved: true } })
   } catch (error) {

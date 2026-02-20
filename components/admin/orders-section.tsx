@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useRef, useState } from 'react'
 import { Copy, Download, ExternalLink, Plus, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -139,6 +139,7 @@ function DeepLinkButton({ orderId, customerToken }: { orderId: string; customerT
 
 export function OrdersSection({ orders, customers, basePath }: OrdersSectionProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
 
   // Live search state
@@ -162,6 +163,12 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
   const selectedDeliveryDateParam = searchParams.get('deliveryDate') ?? ''
   const selectedDeliveryDate =
     selectedDeliveryDateParam && isoDateRegex.test(selectedDeliveryDateParam) ? selectedDeliveryDateParam : ''
+  const returnTo = (() => {
+    const qs = searchParams.toString()
+    return qs ? `${pathname}?${qs}` : pathname
+  })()
+  const orderDetailHref = (orderId: string) =>
+    `/admin/orders/${orderId}?returnTo=${encodeURIComponent(returnTo)}`
 
   const customerById = new Map(
     customers.map((customer) => [
@@ -267,7 +274,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
         const orderId = payload?.data?.order?.id
         if (orderId) {
           setDraftDialogOpen(false)
-          router.push(`/admin/orders/${orderId}`)
+          router.push(orderDetailHref(orderId))
           return
         }
       }
@@ -454,7 +461,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <Link href={`/admin/orders/${order.id}`} className="min-w-0 flex-1">
+                            <Link href={orderDetailHref(order.id)} className="min-w-0 flex-1">
                               <div className="font-medium text-sm truncate">
                                 {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
                               </div>
@@ -511,7 +518,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                         className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer ${checked ? 'bg-muted/30' : ''}`}
                         onClick={(event) => {
                           if (isInteractiveRowTarget(event.target)) return
-                          router.push(`/admin/orders/${order.id}`)
+                          router.push(orderDetailHref(order.id))
                         }}
                       >
                         <td className="px-2 py-3">

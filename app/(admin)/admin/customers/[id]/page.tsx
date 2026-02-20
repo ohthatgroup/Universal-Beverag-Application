@@ -92,7 +92,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     if (existingDraftError) throw existingDraftError
 
     if (existingDraft?.id) {
-      redirect(`/admin/orders/${existingDraft.id}`)
+      redirect(`/admin/orders/${existingDraft.id}?returnTo=${encodeURIComponent(`/admin/customers/${id}`)}`)
     }
 
     const { data: createdOrder, error: createOrderError } = await supabaseClient
@@ -109,7 +109,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       throw createOrderError ?? new Error('Unable to create draft order')
     }
 
-    redirect(`/admin/orders/${createdOrder.id}`)
+    redirect(`/admin/orders/${createdOrder.id}?returnTo=${encodeURIComponent(`/admin/customers/${id}`)}`)
   }
 
   async function deleteCustomer() {
@@ -275,7 +275,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 {orders.map((order) => (
                   <Link
                     key={order.id}
-                    href={`/admin/orders/${order.id}`}
+                    href={`/admin/orders/${order.id}?returnTo=${encodeURIComponent(`/admin/customers/${id}`)}`}
                     className="flex items-center justify-between border-b py-3 last:border-0"
                   >
                     <div>

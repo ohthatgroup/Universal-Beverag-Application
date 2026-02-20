@@ -9,7 +9,7 @@ const paramsSchema = z.object({
 const upsertItemSchema = z.object({
   productId: z.string().uuid().nullable().optional(),
   palletDealId: z.string().uuid().nullable().optional(),
-  quantity: z.number().int().min(0),
+  quantity: z.number().int().min(1),
   unitPrice: z.number().min(0),
 })
 
@@ -17,6 +17,31 @@ const deleteItemSchema = z.object({
   productId: z.string().uuid().nullable().optional(),
   palletDealId: z.string().uuid().nullable().optional(),
 })
+
+function isUniqueViolation(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string' &&
+    (error as { code: string }).code === '23505'
+  )
+}
+
+function resolveIdentity(payload: { productId?: string | null; palletDealId?: string | null }) {
+  if (payload.productId && payload.palletDealId) {
+    throw new RouteError(400, 'validation_error', 'Provide either productId or palletDealId, not both')
+  }
+  if (!payload.productId && !payload.palletDealId) {
+    throw new RouteError(400, 'validation_error', 'Either productId or palletDealId is required')
+  }
+
+  if (payload.productId) {
+    return { column: 'product_id' as const, value: payload.productId }
+  }
+
+  return { column: 'pallet_deal_id' as const, value: payload.palletDealId as string }
+}
 
 export async function PUT(
   request: Request,
@@ -36,33 +61,89 @@ export async function PUT(
       throw new RouteError(409, 'order_not_draft', 'Can only modify draft orders')
     }
 
-    if (!payload.productId && !payload.palletDealId) {
-      throw new RouteError(400, 'validation_error', 'Either productId or palletDealId is required')
+    const identity = resolveIdentity(payload)
+    const existingQuery = context.supabase
+      .from('order_items')
+      .select('id,quantity')
+      .eq('order_id', context.order.id)
+      .eq(identity.column, identity.value)
+
+    const { data: existing, error: existingError } =
+      identity.column === 'product_id'
+        ? await existingQuery.is('pallet_deal_id', null).maybeSingle()
+        : await existingQuery.is('product_id', null).maybeSingle()
+
+    if (existingError) {
+      throw existingError
     }
 
-    const { error } = await context.supabase
-      .from('order_items')
-      .upsert(
-        {
+    let operation: 'inserted' | 'incremented' = 'inserted'
+
+    if (existing) {
+      const { error: updateError } = await context.supabase
+        .from('order_items')
+        .update({
+          quantity: existing.quantity + payload.quantity,
+          unit_price: payload.unitPrice,
+        })
+        .eq('id', existing.id)
+
+      if (updateError) {
+        throw updateError
+      }
+      operation = 'incremented'
+    } else {
+      const { error: insertError } = await context.supabase
+        .from('order_items')
+        .insert({
           order_id: context.order.id,
           quantity: payload.quantity,
           unit_price: payload.unitPrice,
           product_id: payload.productId ?? null,
           pallet_deal_id: payload.palletDealId ?? null,
-        },
-        {
-          onConflict: payload.productId ? 'order_id,product_id' : 'order_id,pallet_deal_id',
-        }
-      )
+        })
 
-    if (error) {
-      throw error
+      if (insertError && isUniqueViolation(insertError)) {
+        const retryQuery = context.supabase
+          .from('order_items')
+          .select('id,quantity')
+          .eq('order_id', context.order.id)
+          .eq(identity.column, identity.value)
+
+        const { data: retriedExisting, error: retryError } =
+          identity.column === 'product_id'
+            ? await retryQuery.is('pallet_deal_id', null).maybeSingle()
+            : await retryQuery.is('product_id', null).maybeSingle()
+
+        if (retryError) {
+          throw retryError
+        }
+        if (!retriedExisting) {
+          throw insertError
+        }
+
+        const { error: retryUpdateError } = await context.supabase
+          .from('order_items')
+          .update({
+            quantity: retriedExisting.quantity + payload.quantity,
+            unit_price: payload.unitPrice,
+          })
+          .eq('id', retriedExisting.id)
+
+        if (retryUpdateError) {
+          throw retryUpdateError
+        }
+        operation = 'incremented'
+      } else if (insertError) {
+        throw insertError
+      }
     }
 
     logApiEvent(requestId, 'order_item_upserted', {
       orderId: context.order.id,
       productId: payload.productId ?? null,
       palletDealId: payload.palletDealId ?? null,
+      operation,
       userId: context.userId,
     })
 

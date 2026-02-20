@@ -282,7 +282,9 @@ export function OrderBuilder({
       ? renderBrandLogo(
           product.brand?.logo_url,
           product.brand?.name,
-          'h-8 w-8 rounded-sm border object-cover'
+          isCardLayout
+            ? 'h-12 w-full object-contain object-left'
+            : 'h-10 w-full object-contain object-left'
         )
       : null
 
@@ -301,14 +303,8 @@ export function OrderBuilder({
             </div>
           )}
           <div>
-            {showInlineBrandLogo ? (
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                {brandLogo}
-                <div className="font-semibold">{displayName}</div>
-              </div>
-            ) : (
-              <div className="font-semibold">{displayName}</div>
-            )}
+            {showInlineBrandLogo && brandLogo ? <div className="mb-1">{brandLogo}</div> : null}
+            <div className="font-semibold">{displayName}</div>
             <div className="text-xs text-muted-foreground">{packLabel}</div>
             {showPrices && (
               <div className="mt-1 text-sm">{formatCurrency(product.effective_price)}</div>
@@ -329,14 +325,8 @@ export function OrderBuilder({
     return (
       <div key={product.id} className="flex items-center justify-between gap-3 border-b px-2 py-2.5 last:border-b-0">
         <div className="min-w-0 flex-1">
-          {showInlineBrandLogo ? (
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-              {brandLogo}
-              <div className="font-medium">{displayName}</div>
-            </div>
-          ) : (
-            <div className="font-medium">{displayName}</div>
-          )}
+          {showInlineBrandLogo && brandLogo ? <div className="mb-1">{brandLogo}</div> : null}
+          <div className="font-medium">{displayName}</div>
           <div className="text-xs text-muted-foreground">
             {packLabel}
             {showPrices && <> - {formatCurrency(product.effective_price)}</>}
@@ -496,7 +486,7 @@ export function OrderBuilder({
                   : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
               </button>
               {expandedGroups.has('new-items') && (
-                <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 border-t p-3 md:grid-cols-2">
                   {newItems.map((product) => renderProductRow(product, true))}
                 </div>
               )}
@@ -516,13 +506,13 @@ export function OrderBuilder({
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.key)}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
+                  className="flex w-full items-center gap-2 px-4 py-3 hover:bg-muted/30"
                 >
-                  <span className="ml-auto flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                     {filters.groupBy === 'brand' && groupBrandLogo
-                      ? renderBrandLogo(groupBrandLogo, groupBrandName, 'h-6 w-6 rounded-sm border object-cover')
+                      ? renderBrandLogo(groupBrandLogo, groupBrandName, 'h-7 w-auto max-w-[7rem] object-contain object-left')
                       : null}
-                    <span>{group.label}</span>
+                    <span className="truncate">{group.label}</span>
                   </span>
                   {isExpanded
                     ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -575,7 +565,7 @@ export function OrderBuilder({
                       </button>
 
                       {isExpanded && (
-                        <div className="grid gap-3 border-t p-3 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-3 border-t p-3 md:grid-cols-2">
                           {section.deals.map((palletDeal) => {
                             const key = itemKey(null, palletDeal.id)
                             const quantity = quantities[key] ?? 0

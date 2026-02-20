@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { formatStructuredPack, isSupportedPackUom, normalizePackUom } from '@/lib/utils'
+import { formatStructuredPack, normalizePackUom } from '@/lib/utils'
 
 const createProductSchema = z.object({
   brandId: z.string().uuid().nullable().optional(),
@@ -32,9 +32,6 @@ export async function POST(request: Request) {
     if (hasStructuredInput && (packCount === null || sizeValue === null || sizeUom === null)) {
       throw new RouteError(400, 'validation_error', 'Pack count, size value, and unit must all be set together')
     }
-    if (sizeUom && !isSupportedPackUom(sizeUom)) {
-      throw new RouteError(400, 'validation_error', 'Unsupported unit of measure')
-    }
 
     const inferredPackDetails =
       packCount !== null && sizeValue !== null && sizeUom
@@ -45,6 +42,7 @@ export async function POST(request: Request) {
     const { data: firstBySort, error: sortFetchError } = await admin
       .from('products')
       .select('sort_order')
+      .is('customer_id', null)
       .order('sort_order', { ascending: true })
       .limit(1)
       .maybeSingle()
@@ -59,6 +57,7 @@ export async function POST(request: Request) {
       .from('products')
       .insert({
         brand_id: payload.brandId ?? null,
+        customer_id: null,
         title: payload.title,
         pack_details: packDetails,
         pack_count: packCount,
@@ -82,4 +81,3 @@ export async function POST(request: Request) {
     return toErrorResponse(error, requestId)
   }
 }
-

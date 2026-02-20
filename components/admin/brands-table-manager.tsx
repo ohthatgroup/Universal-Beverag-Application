@@ -471,14 +471,6 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
                                   View File
                                 </a>
                               </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => updateRow(row.id, { draftLogoUrl: null })}
-                              >
-                                Delete File
-                              </Button>
                             </>
                           ) : (
                             <span className="text-xs text-muted-foreground">No file</span>
@@ -555,14 +547,6 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
                             <a href={fileUrl} target="_blank" rel="noreferrer">
                               View File
                             </a>
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => updateRow(row.id, { draftLogoUrl: null })}
-                          >
-                            Delete File
                           </Button>
                         </>
                       ) : (

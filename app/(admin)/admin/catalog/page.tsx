@@ -21,6 +21,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     supabase
       .from('products')
       .select('id,title,pack_details,pack_count,size_value,size_uom,price,is_new,is_discontinued,sort_order,brand_id')
+      .is('customer_id', null)
       .order('sort_order', { ascending: true }),
     supabase.from('brands').select('id,name').order('sort_order', { ascending: true }),
   ])
@@ -71,4 +72,3 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     </div>
   )
 }
-

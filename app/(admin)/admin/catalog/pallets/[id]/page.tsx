@@ -30,7 +30,11 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
 
   const [{ data: palletDeal, error: dealError }, { data: products }, { data: items }, { data: brands }] = await Promise.all([
     supabase.from('pallet_deals').select('*').eq('id', id).maybeSingle(),
-    supabase.from('products').select('id,title,brand_id,pack_details,pack_count,size_value,size_uom').order('title', { ascending: true }),
+    supabase
+      .from('products')
+      .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom')
+      .is('customer_id', null)
+      .order('title', { ascending: true }),
     supabase
       .from('pallet_deal_items')
       .select('id,product_id,quantity')

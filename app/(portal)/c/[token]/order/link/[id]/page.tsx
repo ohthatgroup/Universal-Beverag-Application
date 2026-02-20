@@ -119,6 +119,7 @@ export default async function PortalOrderLinkPage({
         .from('products')
         .select('*')
         .eq('is_discontinued', false)
+        .or(`customer_id.is.null,customer_id.eq.${customerId}`)
         .order('sort_order', { ascending: true }),
       admin.from('brands').select('*').order('sort_order', { ascending: true }),
       admin

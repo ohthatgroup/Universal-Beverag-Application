@@ -11,8 +11,32 @@ import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import type { OrderStatus } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate, getProductDisplayName, getProductPackLabel, getStatusIcon, getStatusLabel } from '@/lib/utils'
 
-export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function resolveReturnTo(value: string | undefined) {
+  const trimmed = value?.trim()
+  if (!trimmed) return '/admin/dashboard'
+  if (!trimmed.startsWith('/admin/')) return '/admin/dashboard'
+  if (trimmed.startsWith('/admin/orders/')) return '/admin/dashboard'
+  return trimmed
+}
+
+function getBackLabel(pathname: string) {
+  if (pathname.startsWith('/admin/customers/')) return 'Customer'
+  if (pathname.startsWith('/admin/customers')) return 'Customers'
+  if (pathname.startsWith('/admin/dashboard')) return 'Dashboard'
+  return 'Back'
+}
+
+export default async function AdminOrderDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams?: Promise<{ returnTo?: string }>
+}) {
   const { id } = await params
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const returnTo = resolveReturnTo(resolvedSearchParams?.returnTo)
+  const backLabel = getBackLabel(returnTo)
   const context = await requirePageAuth(['salesman'])
 
   const { data: order, error: orderError } = await context.supabase
@@ -37,6 +61,15 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         .maybeSingle()
     : Promise.resolve({ data: null, error: null })
 
+  const baseProductQuery = context.supabase
+    .from('products')
+    .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom,price,is_discontinued')
+    .eq('is_discontinued', false)
+
+  const productQuery = order.customer_id
+    ? baseProductQuery.or(`customer_id.is.null,customer_id.eq.${order.customer_id}`)
+    : baseProductQuery.is('customer_id', null)
+
   const [{ data: customer }, { data: items }, { data: products }, { data: pallets }, { data: brands }] =
     await Promise.all([
       customerPromise,
@@ -45,10 +78,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         .select('id,product_id,pallet_deal_id,quantity,unit_price,line_total')
         .eq('order_id', order.id)
         .order('id', { ascending: true }),
-      context.supabase
-        .from('products')
-        .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom,price,is_discontinued')
-        .eq('is_discontinued', false),
+      productQuery,
       context.supabase.from('pallet_deals').select('id,title,description'),
       context.supabase.from('brands').select('id,name'),
     ])
@@ -135,9 +165,9 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Link href="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
+        <Link href={returnTo} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
           <ArrowLeft className="h-4 w-4" />
-          Dashboard
+          {backLabel}
         </Link>
         <h1 className="text-2xl font-semibold">{customerName}</h1>
         <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">

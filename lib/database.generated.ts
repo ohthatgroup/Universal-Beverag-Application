@@ -303,6 +303,7 @@ export type Database = {
         Row: {
           id: string
           brand_id: string | null
+          customer_id: string | null
           title: string
           pack_details: string | null
           price: number
@@ -323,6 +324,7 @@ export type Database = {
         Insert: {
           id?: string
           brand_id?: string | null
+          customer_id?: string | null
           title: string
           pack_details?: string | null
           price: number
@@ -343,6 +345,7 @@ export type Database = {
         Update: {
           id?: string
           brand_id?: string | null
+          customer_id?: string | null
           title?: string
           pack_details?: string | null
           price?: number
@@ -366,6 +369,13 @@ export type Database = {
             columns: ['brand_id']
             isOneToOne: false
             referencedRelation: 'brands'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'products_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]

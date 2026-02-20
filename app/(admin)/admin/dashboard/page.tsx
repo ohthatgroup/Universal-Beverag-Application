@@ -37,6 +37,7 @@ export default async function DashboardPage() {
     context.supabase
       .from('products')
       .select('*', { head: true, count: 'exact' })
+      .is('customer_id', null)
       .eq('is_discontinued', false),
     context.supabase
       .from('pallet_deals')

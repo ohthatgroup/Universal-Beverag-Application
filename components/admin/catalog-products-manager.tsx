@@ -33,6 +33,9 @@ interface CatalogProductsManagerProps {
   searchQuery: string
 }
 
+const CREATE_NEW_BRAND_VALUE = '__create_new_brand__'
+const CREATE_NEW_SIZE_UNIT_VALUE = '__create_new_size_unit__'
+
 export function CatalogProductsManager({ products, brands, searchQuery }: CatalogProductsManagerProps) {
   const router = useRouter()
   const [rows, setRows] = useState<CatalogProductRow[]>(products)
@@ -43,6 +46,10 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
   const [showCreateRow, setShowCreateRow] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [movePosition, setMovePosition] = useState('1')
+  const [createBrandValue, setCreateBrandValue] = useState('')
+  const [createBrandName, setCreateBrandName] = useState('')
+  const [createSizeUnitValue, setCreateSizeUnitValue] = useState('')
+  const [createSizeUnitName, setCreateSizeUnitName] = useState('')
 
   const searchIsActive = searchQuery.trim().length > 0
 
@@ -155,21 +162,53 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
     if (isCreating) return
     const formData = new FormData(event.currentTarget)
 
-    const payload = {
-      brandId: (formData.get('brand_id') as string) || null,
-      title: ((formData.get('title') as string) || '').trim(),
-      packDetails: ((formData.get('pack_details') as string) || '').trim() || null,
-      packCount: ((formData.get('pack_count') as string) || '').trim() || null,
-      sizeValue: ((formData.get('size_value') as string) || '').trim() || null,
-      sizeUom: ((formData.get('size_uom') as string) || '').trim() || null,
-      price: ((formData.get('price') as string) || '').trim(),
-      imageUrl: ((formData.get('image_url') as string) || '').trim() || null,
-      isNew: formData.get('is_new') === 'on',
-    }
-
     setIsCreating(true)
     setError(null)
     try {
+      let brandId: string | null = createBrandValue || null
+      if (createBrandValue === CREATE_NEW_BRAND_VALUE) {
+        const brandName = createBrandName.trim()
+        if (!brandName) {
+          throw new Error('New brand name is required')
+        }
+
+        const brandResponse = await fetch('/api/admin/brands', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: brandName, logoUrl: null }),
+        })
+        const brandPayload = (await brandResponse.json().catch(() => null)) as
+          | { data?: { id?: string }; error?: { message?: string } }
+          | null
+
+        if (!brandResponse.ok || !brandPayload?.data?.id) {
+          throw new Error(brandPayload?.error?.message ?? 'Failed to create brand')
+        }
+
+        brandId = brandPayload.data.id
+      }
+
+      const sizeUomValue =
+        createSizeUnitValue === CREATE_NEW_SIZE_UNIT_VALUE
+          ? createSizeUnitName.trim()
+          : createSizeUnitValue.trim()
+
+      if (createSizeUnitValue === CREATE_NEW_SIZE_UNIT_VALUE && !sizeUomValue) {
+        throw new Error('New size unit is required')
+      }
+
+      const payload = {
+        brandId,
+        title: ((formData.get('title') as string) || '').trim(),
+        packDetails: ((formData.get('pack_details') as string) || '').trim() || null,
+        packCount: ((formData.get('pack_count') as string) || '').trim() || null,
+        sizeValue: ((formData.get('size_value') as string) || '').trim() || null,
+        sizeUom: sizeUomValue || null,
+        price: ((formData.get('price') as string) || '').trim(),
+        imageUrl: ((formData.get('image_url') as string) || '').trim() || null,
+        isNew: formData.get('is_new') === 'on',
+      }
+
       const response = await fetch('/api/admin/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -181,6 +220,10 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
       }
       setShowCreateRow(false)
       event.currentTarget.reset()
+      setCreateBrandValue('')
+      setCreateBrandName('')
+      setCreateSizeUnitValue('')
+      setCreateSizeUnitName('')
       router.refresh()
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'Failed to create product')
@@ -204,7 +247,22 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <Button type="button" size="sm" onClick={() => setShowCreateRow((prev) => !prev)}>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() =>
+            setShowCreateRow((prev) => {
+              const next = !prev
+              if (!next) {
+                setCreateBrandValue('')
+                setCreateBrandName('')
+                setCreateSizeUnitValue('')
+                setCreateSizeUnitName('')
+              }
+              return next
+            })
+          }
+        >
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           {showCreateRow ? 'Cancel' : 'Add Product'}
         </Button>
@@ -220,12 +278,27 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
           <form onSubmit={onCreateProduct} className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1">
               <Label htmlFor="create-brand-id">Brand</Label>
-              <select id="create-brand-id" name="brand_id" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+              <select
+                id="create-brand-id"
+                name="brand_id"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                value={createBrandValue}
+                onChange={(event) => setCreateBrandValue(event.target.value)}
+              >
                 <option value="">No brand</option>
                 {brands.map((brand) => (
                   <option key={brand.id} value={brand.id}>{brand.name}</option>
                 ))}
+                <option value={CREATE_NEW_BRAND_VALUE}>+ Create new brand</option>
               </select>
+              {createBrandValue === CREATE_NEW_BRAND_VALUE && (
+                <Input
+                  className="mt-1"
+                  placeholder="New brand name"
+                  value={createBrandName}
+                  onChange={(event) => setCreateBrandName(event.target.value)}
+                />
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="create-title">Flavor / Details</Label>
@@ -245,12 +318,27 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
             </div>
             <div className="space-y-1">
               <Label htmlFor="create-size-uom">Size unit</Label>
-              <select id="create-size-uom" name="size_uom" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+              <select
+                id="create-size-uom"
+                name="size_uom"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                value={createSizeUnitValue}
+                onChange={(event) => setCreateSizeUnitValue(event.target.value)}
+              >
                 <option value="">Select unit</option>
                 {PACK_UOM_OPTIONS.map((unit) => (
                   <option key={unit} value={unit}>{unit}</option>
                 ))}
+                <option value={CREATE_NEW_SIZE_UNIT_VALUE}>+ Create new size unit</option>
               </select>
+              {createSizeUnitValue === CREATE_NEW_SIZE_UNIT_VALUE && (
+                <Input
+                  className="mt-1"
+                  placeholder="Custom unit (e.g. CASE)"
+                  value={createSizeUnitName}
+                  onChange={(event) => setCreateSizeUnitName(event.target.value)}
+                />
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="create-price">Price</Label>
