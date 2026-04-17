@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getRequestId, logApiEvent, toErrorResponse } from '@/lib/server/api'
 import { requireOrderAccess } from '@/lib/server/auth'
+import { getRequestDb } from '@/lib/server/db'
 import { buildCsv, getProductDisplayName, getProductPackLabel } from '@/lib/utils'
 
 const paramsSchema = z.object({
@@ -15,19 +16,21 @@ export async function GET(
   try {
     const { id } = paramsSchema.parse(await routeContext.params)
     const context = await requireOrderAccess(id)
+    const db = await getRequestDb()
 
-    const { data: items, error: itemsError } = await context.supabase
-      .from('order_items')
-      .select('product_id,pallet_deal_id,quantity,unit_price,line_total')
-      .eq('order_id', context.order.id)
-      .gt('quantity', 0)
-      .order('id', { ascending: true })
-
-    if (itemsError) {
-      throw itemsError
-    }
-
-    const itemRows = items ?? []
+    const { rows: itemRows } = await db.query<{
+      product_id: string | null
+      pallet_deal_id: string | null
+      quantity: number
+      unit_price: number
+      line_total: number | null
+    }>(
+      `select product_id, pallet_deal_id, quantity, unit_price, line_total
+       from order_items
+       where order_id = $1 and quantity > 0
+       order by id asc`,
+      [context.order.id]
+    )
     const productIds = itemRows
       .map((item) => item.product_id)
       .filter((idValue): idValue is string => !!idValue)
@@ -36,41 +39,35 @@ export async function GET(
       .map((item) => item.pallet_deal_id)
       .filter((idValue): idValue is string => !!idValue)
 
-    const [
-      { data: products, error: productsError },
-      { data: pallets, error: palletsError },
-      { data: brands, error: brandsError },
-    ] =
+    const [productsResponse, palletsResponse, brandsResponse] =
       await Promise.all([
         productIds.length
-          ? context.supabase
-              .from('products')
-              .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom')
-              .in('id', productIds)
-          : Promise.resolve({ data: [], error: null }),
+          ? db.query<{
+              id: string
+              title: string
+              brand_id: string | null
+              pack_details: string | null
+              pack_count: number | null
+              size_value: number | null
+              size_uom: string | null
+            }>(
+              `select id, title, brand_id, pack_details, pack_count, size_value, size_uom
+               from products
+               where id = any($1::uuid[])`,
+              [productIds]
+            )
+          : Promise.resolve({ rows: [] }),
         palletIds.length
-          ? context.supabase
-              .from('pallet_deals')
-              .select('id,title,description')
-              .in('id', palletIds)
-          : Promise.resolve({ data: [], error: null }),
-        context.supabase.from('brands').select('id,name'),
+          ? db.query<{ id: string; title: string; description: string | null }>(
+              `select id, title, description from pallet_deals where id = any($1::uuid[])`,
+              [palletIds]
+            )
+          : Promise.resolve({ rows: [] }),
+        db.query<{ id: string; name: string }>('select id, name from brands'),
       ])
-
-    if (productsError) {
-      throw productsError
-    }
-
-    if (palletsError) {
-      throw palletsError
-    }
-    if (brandsError) {
-      throw brandsError
-    }
-
-    const productMap = new Map((products ?? []).map((product) => [product.id, product] as const))
-    const palletMap = new Map((pallets ?? []).map((pallet) => [pallet.id, pallet] as const))
-    const brandMap = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
+    const productMap = new Map(productsResponse.rows.map((product) => [product.id, product] as const))
+    const palletMap = new Map(palletsResponse.rows.map((pallet) => [pallet.id, pallet] as const))
+    const brandMap = new Map(brandsResponse.rows.map((brand) => [brand.id, brand.name] as const))
 
     const rows = itemRows.map((item) => {
       if (item.product_id) {

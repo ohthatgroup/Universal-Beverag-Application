@@ -1,0 +1,56 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "universal-beverage-app",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-04-15",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "preview_urls": true,
+  "workers_dev": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  // Deploy with an explicit environment:
+  // - Preview:    npx wrangler versions upload --env preview
+  // - Production: npx wrangler deploy --env production
+  "env": {
+    "preview": {
+      "name": "universal-beverage-app-preview",
+      "workers_dev": true,
+      "vars": {
+        "FEATURE_ECWID_PUSH": "false",
+        "NEXT_PUBLIC_APP_URL": "https://universal-beverage-app-preview.inbox-23c.workers.dev",
+        "NEXT_PUBLIC_ASSET_BASE_URL": "https://universal-beverage-app-preview.inbox-23c.workers.dev",
+        "NEON_AUTH_BASE_URL": "https://ep-proud-violet-ammybwuo.neonauth.c-5.us-east-1.aws.neon.tech/neondb/auth",
+        "INVITES_FROM_EMAIL": "mail@unibev.ohthatgrp.com"
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "640cc4f553704d8498c42ab0d5b060cd" }],
+      "r2_buckets": [{ "binding": "ASSET_BUCKET", "bucket_name": "universal-beverage-app-preview-assets" }]
+    },
+    "production": {
+      "name": "universal-beverage-app",
+      "workers_dev": true,
+      "vars": {
+        "FEATURE_ECWID_PUSH": "false",
+        "NEXT_PUBLIC_APP_URL": "https://universal-beverage-app.inbox-23c.workers.dev",
+        "NEXT_PUBLIC_ASSET_BASE_URL": "https://universal-beverage-app.inbox-23c.workers.dev",
+        "NEON_AUTH_BASE_URL": "https://ep-proud-violet-ammybwuo.neonauth.c-5.us-east-1.aws.neon.tech/neondb/auth",
+        "INVITES_FROM_EMAIL": "mail@unibev.ohthatgrp.com"
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "698855f267e94931ac3823501d3f0806" }],
+      "r2_buckets": [{ "binding": "ASSET_BUCKET", "bucket_name": "universal-beverage-app-assets" }]
+    }
+  },
+  // Set these as Wrangler secrets per environment before deploy:
+  // NEON_AUTH_COOKIE_SECRET
+  // RESEND_API_KEY
+  // TURNSTILE_SECRET_KEY
+  // Optional additional secrets/vars used by this app:
+  // NEON_API_KEY
+  // NEON_PROJECT_ID
+  // NEON_BRANCH_ID
+  // SENTRY_DSN
+}

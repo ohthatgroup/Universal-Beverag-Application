@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken, type CustomerContext } from '@/lib/server/customer-auth'
 import type { Database } from '@/lib/types'
 
@@ -11,24 +11,18 @@ export interface PortalOrderContext extends CustomerContext {
 /**
  * Validate a portal token + order ownership for portal API routes.
  * Returns the customer context plus the order row.
- * Throws a Response (401/404) on failure — callers should catch in try/catch.
+ * Throws a Response (401/404) on failure - callers should catch in try/catch.
  */
 export async function requirePortalOrderAccess(
   orderId: string,
   token: string
 ): Promise<PortalOrderContext> {
-  // This will call notFound() if token is invalid
   const customerContext = await resolveCustomerToken(token)
+  const db = await getRequestDb()
+  const orderResult = await db.query<OrderRow>('select * from orders where id = $1 limit 1', [orderId])
+  const order = orderResult.rows[0]
 
-  const admin = createAdminClient()
-
-  const { data: order, error } = await admin
-    .from('orders')
-    .select('*')
-    .eq('id', orderId)
-    .maybeSingle()
-
-  if (error || !order) {
+  if (!order) {
     throw new Response(JSON.stringify({ error: { code: 'order_not_found', message: 'Order not found' } }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' },

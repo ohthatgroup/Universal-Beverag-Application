@@ -1,24 +1,63 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { FormEvent, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { FormEvent, Suspense, useEffect, useState } from 'react'
+import { getAuthClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-muted/20 p-4 sm:p-8">Loading...</div>}>
+      <ResetPasswordContent />
+    </Suspense>
+  )
+}
+
+function ResetPasswordContent() {
+  const authClient = getAuthClient()
+  const betterAuthClient = authClient.getBetterAuthInstance()
   const router = useRouter()
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-  if (!supabaseRef.current && typeof window !== 'undefined') {
-    supabaseRef.current = createClient()
-  }
+  const searchParams = useSearchParams()
+  const code = searchParams.get('code')
+  const token = searchParams.get('token')
+  const email = searchParams.get('email')?.trim().toLowerCase() ?? ''
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [otp, setOtp] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isPreparingSession, setIsPreparingSession] = useState(Boolean(code))
+
+  useEffect(() => {
+    if (!code) {
+      setIsPreparingSession(false)
+      return
+    }
+
+    let isCancelled = false
+
+    const exchangeCode = async () => {
+      const { error } = await authClient.exchangeCodeForSession(code)
+      if (isCancelled) {
+        return
+      }
+
+      if (error) {
+        setMessage(error.message)
+      }
+      setIsPreparingSession(false)
+    }
+
+    void exchangeCode()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [authClient, code])
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -36,23 +75,49 @@ export default function ResetPasswordPage() {
 
     setIsLoading(true)
 
-    const supabase = supabaseRef.current
-    if (!supabase) {
-      setMessage('Unable to connect. Please refresh the page.')
-      setIsLoading(false)
-      return
-    }
+    let error: { message?: string } | null = null
 
-    const { error } = await supabase.auth.updateUser({ password })
+    try {
+      if (token) {
+        const result = await betterAuthClient.resetPassword({
+          newPassword: password,
+          token,
+        })
+        error = result?.error ?? null
+      } else {
+        if (!email) {
+          setMessage('Missing email address for password reset.')
+          setIsLoading(false)
+          return
+        }
+
+        if (!otp.trim()) {
+          setMessage('Enter the code from your email.')
+          setIsLoading(false)
+          return
+        }
+
+        const result = await betterAuthClient.emailOtp.resetPassword({
+          email,
+          otp: otp.trim(),
+          password,
+        })
+        error = result?.error ?? null
+      }
+    } catch (caughtError) {
+      error = {
+        message: caughtError instanceof Error ? caughtError.message : 'Unable to reset password.',
+      }
+    }
 
     setIsLoading(false)
 
     if (error) {
-      setMessage(error.message)
+      setMessage(error.message ?? 'Unable to reset password.')
       return
     }
 
-    router.push('/admin/dashboard')
+    router.push('/auth/reset-success')
     router.refresh()
   }
 
@@ -69,10 +134,32 @@ export default function ResetPasswordPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Reset Password</CardTitle>
+            <CardTitle>Admin Password Reset</CardTitle>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={onSubmit}>
+              {!code && !token && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input id="reset-email" type="email" required value={email} readOnly />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-otp">One-Time Code</Label>
+                    <Input
+                      id="reset-otp"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="Enter the code from your email"
+                      required
+                      value={otp}
+                      onChange={(event) => setOtp(event.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
                 <Input
@@ -97,8 +184,12 @@ export default function ResetPasswordPage() {
                 />
               </div>
 
-              <Button disabled={isLoading} type="submit" className="w-full">
-                {isLoading ? 'Updating...' : 'Update Password'}
+              <Button disabled={isLoading || isPreparingSession} type="submit" className="w-full">
+                {isPreparingSession
+                  ? 'Preparing...'
+                  : isLoading
+                    ? 'Resetting...'
+                    : 'Reset Password'}
               </Button>
             </form>
           </CardContent>

@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import type { OrderStatus } from '@/lib/types'
 
 interface ReportsPageProps {
   searchParams?: Promise<{
@@ -13,164 +15,150 @@ interface ReportsPageProps {
 }
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
-  const context = await requirePageAuth(['salesman'])
+  await requirePageAuth(['salesman'])
+  const db = await getRequestDb()
   const resolvedSearchParams = searchParams ? await searchParams : undefined
 
   const from = resolvedSearchParams?.from ?? addDays(todayISODate(), -30)
   const to = resolvedSearchParams?.to ?? todayISODate()
 
-  const { data: orders, error: ordersError } = await context.supabase
-    .from('orders')
-    .select('id,status,total,item_count,delivery_date')
-    .gte('delivery_date', from)
-    .lte('delivery_date', to)
-
-  if (ordersError) throw ordersError
-
-  const orderRows = orders ?? []
+  const { rows: orderRows } = await db.query<{
+    id: string
+    status: string
+    total: number | null
+    item_count: number | null
+    delivery_date: string
+  }>(
+    `select id, status, total, item_count, delivery_date::text
+     from orders
+     where delivery_date >= $1 and delivery_date <= $2`,
+    [from, to]
+  )
   const orderIds = orderRows.map((order) => order.id).filter((id): id is string => Boolean(id))
 
   const [orderItemsResponse, productsResponse, brandsResponse] = await Promise.all([
     orderIds.length
-      ? context.supabase
-          .from('order_items')
-          .select('order_id,product_id,pallet_deal_id,quantity,line_total')
-          .in('order_id', orderIds)
-      : Promise.resolve({ data: [], error: null }),
-    context.supabase.from('products').select('id,title,brand_id'),
-    context.supabase.from('brands').select('id,name'),
+      ? db.query<{
+          order_id: string
+          product_id: string | null
+          pallet_deal_id: string | null
+          quantity: number
+          line_total: number | null
+        }>(
+          `select order_id, product_id, pallet_deal_id, quantity, line_total
+           from order_items
+           where order_id = any($1::uuid[])`,
+          [orderIds]
+        )
+      : Promise.resolve({ rows: [] }),
+    db.query<{ id: string; title: string; brand_id: string | null }>('select id, title, brand_id from products'),
+    db.query<{ id: string; name: string }>('select id, name from brands'),
   ])
 
-  if (orderItemsResponse.error) throw orderItemsResponse.error
-  if (productsResponse.error) throw productsResponse.error
-  if (brandsResponse.error) throw brandsResponse.error
+  const productsById = new Map(productsResponse.rows.map((product) => [product.id, product]))
+  const brandsById = new Map(brandsResponse.rows.map((brand) => [brand.id, brand]))
 
-  const orderItemRows = orderItemsResponse.data ?? []
-  const productRows = productsResponse.data ?? []
-  const brandRows = brandsResponse.data ?? []
+  const revenue = orderRows.reduce((sum, order) => sum + Number(order.total ?? 0), 0)
+  const itemsSold = orderRows.reduce((sum, order) => sum + Number(order.item_count ?? 0), 0)
 
-  const totalRevenue = orderRows.reduce((sum, order) => sum + Number(order.total ?? 0), 0)
-  const totalItems = orderRows.reduce((sum, order) => sum + Number(order.item_count ?? 0), 0)
-
-  const statusCounts = {
-    draft: orderRows.filter((order) => order.status === 'draft').length,
-    submitted: orderRows.filter((order) => order.status === 'submitted').length,
-    delivered: orderRows.filter((order) => order.status === 'delivered').length,
-  }
-
-  const productById = new Map(productRows.map((product) => [product.id, product] as const))
-  const brandById = new Map(brandRows.map((brand) => [brand.id, brand.name] as const))
-
-  const revenueByBrand = new Map<string, number>()
-
-  for (const item of orderItemRows) {
+  const productTotals = new Map<string, { title: string; quantity: number; revenue: number; brandName: string | null }>()
+  for (const item of orderItemsResponse.rows) {
     if (!item.product_id) continue
-    const product = productById.get(item.product_id)
-    const brandLabel = product?.brand_id ? brandById.get(product.brand_id) ?? 'Unbranded' : 'Unbranded'
-    revenueByBrand.set(brandLabel, (revenueByBrand.get(brandLabel) ?? 0) + Number(item.line_total ?? 0))
+    const product = productsById.get(item.product_id)
+    const brand = product?.brand_id ? brandsById.get(product.brand_id) : null
+    const existing = productTotals.get(item.product_id)
+    const nextValue = {
+      title: product?.title ?? 'Unknown product',
+      quantity: (existing?.quantity ?? 0) + Number(item.quantity ?? 0),
+      revenue: (existing?.revenue ?? 0) + Number(item.line_total ?? 0),
+      brandName: brand?.name ?? null,
+    }
+    productTotals.set(item.product_id, nextValue)
   }
 
-  const topBrands = Array.from(revenueByBrand.entries())
-    .map(([brand, revenue]) => ({ brand, revenue }))
-    .sort((a, b) => b.revenue - a.revenue)
+  const topProducts = [...productTotals.entries()]
+    .sort((a, b) => b[1].revenue - a[1].revenue)
     .slice(0, 10)
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Reports</h1>
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold">Reports</h1>
+        <p className="text-sm text-muted-foreground">Revenue and order trends for the selected date range.</p>
+      </div>
 
-      {/* Date range filter */}
-      <form className="flex flex-wrap items-end gap-3" method="GET">
-        <div className="space-y-1">
-          <Label htmlFor="from" className="text-xs">From</Label>
-          <Input id="from" name="from" type="date" defaultValue={from} className="h-9 w-40" />
+      <form className="grid gap-4 rounded-lg border p-4 md:grid-cols-[1fr_1fr_auto]">
+        <div className="space-y-2">
+          <Label htmlFor="from">From</Label>
+          <Input id="from" name="from" type="date" defaultValue={from} />
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="to" className="text-xs">To</Label>
-          <Input id="to" name="to" type="date" defaultValue={to} className="h-9 w-40" />
+        <div className="space-y-2">
+          <Label htmlFor="to">To</Label>
+          <Input id="to" name="to" type="date" defaultValue={to} />
         </div>
-        <Button type="submit" size="sm">Refresh</Button>
+        <div className="flex items-end">
+          <Button type="submit" className="w-full md:w-auto">
+            Run Report
+          </Button>
+        </div>
       </form>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border p-4">
-          <div className="text-2xl font-semibold">{orderRows.length}</div>
-          <div className="text-xs text-muted-foreground mt-1">Orders</div>
+          <div className="text-sm text-muted-foreground">Orders</div>
+          <div className="mt-2 text-3xl font-semibold">{orderRows.length}</div>
         </div>
         <div className="rounded-lg border p-4">
-          <div className="text-2xl font-semibold">{formatCurrency(totalRevenue)}</div>
-          <div className="text-xs text-muted-foreground mt-1">Revenue</div>
+          <div className="text-sm text-muted-foreground">Revenue</div>
+          <div className="mt-2 text-3xl font-semibold">{formatCurrency(revenue)}</div>
         </div>
         <div className="rounded-lg border p-4">
-          <div className="text-2xl font-semibold">{totalItems}</div>
-          <div className="text-xs text-muted-foreground mt-1">Items Ordered</div>
-        </div>
-        <div className="rounded-lg border p-4">
-          <div className="text-2xl font-semibold">{statusCounts.delivered}</div>
-          <div className="text-xs text-muted-foreground mt-1">Delivered</div>
+          <div className="text-sm text-muted-foreground">Items Sold</div>
+          <div className="mt-2 text-3xl font-semibold">{itemsSold}</div>
         </div>
       </div>
 
-      <Separator />
-
-      {/* Status breakdown */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Status Breakdown</h2>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <span>{getStatusIcon('draft')} Draft: {statusCounts.draft}</span>
-          <span>{getStatusIcon('submitted')} Submitted: {statusCounts.submitted}</span>
-          <span>{getStatusIcon('delivered')} Delivered: {statusCounts.delivered}</span>
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* Top brands */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Top Brands by Revenue</h2>
-
-        {topBrands.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No brand data available.</p>
-        ) : (
-          <>
-            {/* Mobile */}
-            <div className="space-y-0 md:hidden">
-              {topBrands.map((entry, index) => (
-                <div key={entry.brand} className="flex items-center justify-between border-b py-2.5 last:border-0">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground mr-2">{index + 1}.</span>
-                    {entry.brand}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-lg border p-4">
+          <h2 className="text-lg font-medium">Orders</h2>
+          <Separator className="my-4" />
+          <div className="space-y-3">
+            {orderRows.map((order) => (
+              <div key={order.id} className="flex items-center justify-between gap-4 rounded-md border p-3">
+                <div>
+                  <div className="font-medium">{order.delivery_date}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {getStatusIcon(order.status as OrderStatus)} {order.status}
                   </div>
-                  <div className="text-sm font-medium">{formatCurrency(entry.revenue)}</div>
                 </div>
-              ))}
-            </div>
+                <div className="text-right">
+                  <div className="font-medium">{formatCurrency(Number(order.total ?? 0))}</div>
+                  <div className="text-sm text-muted-foreground">{order.item_count ?? 0} items</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-            {/* Desktop table */}
-            <div className="hidden md:block rounded-lg border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-4 py-2 text-left font-medium w-12">#</th>
-                    <th className="px-4 py-2 text-left font-medium">Brand</th>
-                    <th className="px-4 py-2 text-right font-medium">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topBrands.map((entry, index) => (
-                    <tr key={entry.brand} className="border-b last:border-0">
-                      <td className="px-4 py-2 text-muted-foreground">{index + 1}</td>
-                      <td className="px-4 py-2 font-medium">{entry.brand}</td>
-                      <td className="px-4 py-2 text-right">{formatCurrency(entry.revenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </section>
+        <div className="rounded-lg border p-4">
+          <h2 className="text-lg font-medium">Top Products</h2>
+          <Separator className="my-4" />
+          <div className="space-y-3">
+            {topProducts.map(([productId, row]) => (
+              <div key={productId} className="flex items-center justify-between gap-4 rounded-md border p-3">
+                <div>
+                  <div className="font-medium">{row.title}</div>
+                  <div className="text-sm text-muted-foreground">{row.brandName ?? 'Unassigned brand'}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-medium">{formatCurrency(row.revenue)}</div>
+                  <div className="text-sm text-muted-foreground">{row.quantity} sold</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

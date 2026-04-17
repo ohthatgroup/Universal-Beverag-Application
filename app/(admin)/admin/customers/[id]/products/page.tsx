@@ -10,7 +10,7 @@ import {
 } from '@/components/admin/customer-products-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { LiveQuerySelect } from '@/components/admin/live-query-select'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { getProductPackLabel } from '@/lib/utils'
 
@@ -25,7 +25,7 @@ interface CustomerProductsPageProps {
 export default async function CustomerProductsPage({ params, searchParams }: CustomerProductsPageProps) {
   const { id } = await params
   await requirePageAuth(['salesman'])
-  const supabase = await createClient()
+  const db = await getRequestDb()
   const resolvedSearchParams = searchParams ? await searchParams : undefined
 
   const searchQuery = (resolvedSearchParams?.q ?? '').trim()
@@ -33,40 +33,57 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
   const selectedBrandParam = (resolvedSearchParams?.brand ?? '').trim()
   const selectedBrandId = selectedBrandParam === 'all' ? '' : selectedBrandParam
 
-  const [{ data: customer }, { data: products, error: productsError }, { data: overrides }, { data: brands }] =
+  const [{ rows: customers }, { rows: products }, { rows: overrides }, { rows: brands }] =
     await Promise.all([
-      supabase
-        .from('profiles')
-        .select('id,business_name,contact_name,custom_pricing')
-        .eq('id', id)
-        .eq('role', 'customer')
-        .maybeSingle(),
-      supabase
-        .from('products')
-        .select('id,title,pack_details,pack_count,size_value,size_uom,price,brand_id,is_discontinued,customer_id,sort_order')
-        .eq('is_discontinued', false)
-        .or(`customer_id.is.null,customer_id.eq.${id}`)
-        .order('sort_order', { ascending: true })
-        .order('title', { ascending: true }),
-      supabase
-        .from('customer_products')
-        .select('product_id,excluded,custom_price')
-        .eq('customer_id', id),
-      supabase.from('brands').select('id,name').order('sort_order', { ascending: true }),
+      db.query<{
+        id: string
+        business_name: string | null
+        contact_name: string | null
+        custom_pricing: boolean | null
+      }>(
+        `select id, business_name, contact_name, custom_pricing
+         from profiles
+         where id = $1 and role = 'customer'
+         limit 1`,
+        [id]
+      ),
+      db.query<{
+        id: string
+        title: string
+        pack_details: string | null
+        pack_count: number | null
+        size_value: number | null
+        size_uom: string | null
+        price: number
+        brand_id: string | null
+        is_discontinued: boolean | null
+        customer_id: string | null
+        sort_order: number
+      }>(
+        `select id, title, pack_details, pack_count, size_value, size_uom, price, brand_id, is_discontinued, customer_id, sort_order
+         from products
+         where is_discontinued = false and (customer_id is null or customer_id = $1)
+         order by sort_order asc, title asc`,
+        [id]
+      ),
+      db.query<{ product_id: string; excluded: boolean | null; custom_price: number | null }>(
+        `select product_id, excluded, custom_price
+         from customer_products
+         where customer_id = $1`,
+        [id]
+      ),
+      db.query<{ id: string; name: string }>('select id, name from brands order by sort_order asc'),
     ])
 
-  if (productsError) {
-    throw productsError
-  }
-
+  const customer = customers[0]
   if (!customer) {
     notFound()
   }
 
   const customerName = customer.business_name || customer.contact_name || 'Customer'
-  const brandById = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
+  const brandById = new Map(brands.map((brand) => [brand.id, brand.name] as const))
 
-  const filteredProducts = (products ?? []).filter((product) => {
+  const filteredProducts = products.filter((product) => {
     if (selectedBrandId && product.brand_id !== selectedBrandId) {
       return false
     }
@@ -113,12 +130,12 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
     products: list,
   }))
 
-  const brandOptions: CustomerBrandOption[] = (brands ?? []).map((brand) => ({
+  const brandOptions: CustomerBrandOption[] = brands.map((brand) => ({
     id: brand.id,
     name: brand.name,
   }))
 
-  const overridesData: CustomerProductOverrideData[] = (overrides ?? []).map((override) => ({
+  const overridesData: CustomerProductOverrideData[] = overrides.map((override) => ({
     productId: override.product_id,
     excluded: Boolean(override.excluded),
     customPrice: override.custom_price ?? null,

@@ -18,11 +18,11 @@ test('salesman is not redirected when accessing admin dashboard', async ({ page 
 test('portal with valid token loads customer home', async ({ page }) => {
   const token = await getCustomerToken('CI Customer A')
 
-  await page.goto(`/c/${token}`)
+  await page.goto(`/portal/${token}`)
   await expect(page.locator('h1')).toContainText('Universal Beverages')
 })
 
 test('portal with invalid token shows not found', async ({ page }) => {
-  await page.goto('/c/00000000deadbeef00000000deadbeef')
+  await page.goto('/portal/00000000deadbeef00000000deadbeef')
   await expect(page.locator('body')).toContainText(/could not be found/i)
 })

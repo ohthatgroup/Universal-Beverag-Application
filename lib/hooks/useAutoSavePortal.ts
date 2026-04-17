@@ -68,7 +68,9 @@ export function useAutoSavePortal({
       })
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null)
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null
         const fallbackMessage =
           requestData.method === 'DELETE' ? 'Failed to delete item' : 'Failed to save item'
         const error = new Error(payload?.error?.message ?? fallbackMessage)

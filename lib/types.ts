@@ -1,12 +1,13 @@
 export type { Json, Database } from '@/lib/database.generated'
 
-// ─── Profiles ─────────────────────────────────────────────────────────────
+// ---- Profiles -----------------------------------------------------------
 
 export type UserRole = 'customer' | 'salesman'
 export type GroupByOption = 'brand' | 'size'
 
 export interface Profile {
   id: string
+  auth_user_id?: string | null
   role: UserRole
   business_name: string | null
   contact_name: string | null
@@ -19,13 +20,16 @@ export interface Profile {
   show_prices: boolean
   default_group: GroupByOption
   custom_pricing: boolean
+  // Legacy portal token kept in app types until the portal/auth runtime is replaced.
   access_token: string | null
+  disabled_at?: string | null
   created_at: string
   updated_at: string
 }
 
 export interface ProfileInsert {
-  id: string
+  id?: string
+  auth_user_id?: string | null
   role: UserRole
   business_name?: string | null
   contact_name?: string | null
@@ -39,11 +43,12 @@ export interface ProfileInsert {
   default_group?: GroupByOption
   custom_pricing?: boolean
   access_token?: string | null
+  disabled_at?: string | null
 }
 
 export type ProfileUpdate = Partial<ProfileInsert>
 
-// ─── Brands ───────────────────────────────────────────────────────────────
+// ---- Brands -------------------------------------------------------------
 
 export interface Brand {
   id: string
@@ -62,7 +67,7 @@ export interface BrandInsert {
 
 export type BrandUpdate = Partial<BrandInsert>
 
-// ─── Products ─────────────────────────────────────────────────────────────
+// ---- Products -----------------------------------------------------------
 
 export interface Product {
   id: string
@@ -108,7 +113,7 @@ export interface ProductInsert {
 
 export type ProductUpdate = Partial<ProductInsert>
 
-// ─── Customer Products ────────────────────────────────────────────────────
+// ---- Customer Products --------------------------------------------------
 
 export interface CustomerProduct {
   customer_id: string
@@ -126,7 +131,7 @@ export interface CustomerProductInsert {
 
 export type CustomerProductUpdate = Partial<CustomerProductInsert>
 
-// ─── Pallet Deals ─────────────────────────────────────────────────────────
+// ---- Pallet Deals -------------------------------------------------------
 
 export type PalletType = 'single' | 'mixed'
 
@@ -157,7 +162,7 @@ export interface PalletDealInsert {
 
 export type PalletDealUpdate = Partial<PalletDealInsert>
 
-// ─── Pallet Deal Items ────────────────────────────────────────────────────
+// ---- Pallet Deal Items --------------------------------------------------
 
 export interface PalletDealItem {
   id: string
@@ -175,7 +180,7 @@ export interface PalletDealItemInsert {
 
 export type PalletDealItemUpdate = Partial<PalletDealItemInsert>
 
-// ─── Orders ───────────────────────────────────────────────────────────────
+// ---- Orders -------------------------------------------------------------
 
 export type OrderStatus = 'draft' | 'submitted' | 'delivered'
 
@@ -203,7 +208,7 @@ export interface OrderInsert {
 
 export type OrderUpdate = Partial<OrderInsert>
 
-// ─── Order Items ──────────────────────────────────────────────────────────
+// ---- Order Items --------------------------------------------------------
 
 export interface OrderItem {
   id: string
@@ -226,7 +231,7 @@ export interface OrderItemInsert {
 
 export type OrderItemUpdate = Partial<OrderItemInsert>
 
-// ─── Order Cutoffs ────────────────────────────────────────────────────────
+// ---- Order Cutoffs ------------------------------------------------------
 
 export interface OrderCutoff {
   id: string
@@ -245,7 +250,7 @@ export interface OrderCutoffInsert {
 
 export type OrderCutoffUpdate = Partial<OrderCutoffInsert>
 
-// ─── Product Cutoff Overrides ─────────────────────────────────────────────
+// ---- Product Cutoff Overrides ------------------------------------------
 
 export interface ProductCutoffOverride {
   product_id: string
@@ -261,7 +266,7 @@ export interface ProductCutoffOverrideInsert {
 
 export type ProductCutoffOverrideUpdate = Partial<ProductCutoffOverrideInsert>
 
-// ─── Composite / Query Types ──────────────────────────────────────────────
+// ---- Composite / Query Types -------------------------------------------
 
 // Product enriched with customer-specific data (returned by catalog query)
 export interface CatalogProduct extends Product {

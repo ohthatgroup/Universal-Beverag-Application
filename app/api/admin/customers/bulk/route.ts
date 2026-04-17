@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
 
 const bulkSchema = z.object({
   action: z.literal('delete'),
@@ -13,39 +13,34 @@ export async function POST(request: Request) {
   try {
     await requireAuthContext(['salesman'])
     const payload = await parseBody(request, bulkSchema)
-    const admin = createAdminClient()
+    const db = await getRequestDb()
     const requestedIds = Array.from(new Set(payload.ids))
 
-    const { data: existingCustomers, error: listError } = await admin
-      .from('profiles')
-      .select('id')
-      .in('id', requestedIds)
-      .eq('role', 'customer')
-
-    if (listError) {
-      throw listError
-    }
-
-    const ids = (existingCustomers ?? []).map((customer) => customer.id)
+    const { rows: existingCustomers } = await db.query<{ id: string }>(
+      `select id from profiles where role = 'customer' and id = any($1::uuid[])`,
+      [requestedIds]
+    )
+    const ids = existingCustomers.map((customer) => customer.id)
     if (ids.length === 0) {
       return apiOk({ deleted: 0 }, 200, requestId)
     }
 
-    const { error: deleteError } = await admin
-      .from('profiles')
-      .delete()
-      .in('id', ids)
-      .eq('role', 'customer')
-
-    if (deleteError) {
-      if (deleteError.code === '23503') {
+    try {
+      await db.query(`delete from profiles where role = 'customer' and id = any($1::uuid[])`, [ids])
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === '23503'
+      ) {
         throw new RouteError(
           409,
           'foreign_key_violation',
           'Some selected customers have related records and cannot be deleted'
         )
       }
-      throw deleteError
+      throw error
     }
 
     return apiOk({ deleted: ids.length }, 200, requestId)

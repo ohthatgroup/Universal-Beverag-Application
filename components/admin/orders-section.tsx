@@ -157,6 +157,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [draftDeliveryDate, setDraftDeliveryDate] = useState(todayISODate())
   const [isCreating, setIsCreating] = useState(false)
+  const [draftError, setDraftError] = useState<string | null>(null)
 
   const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
   const selectedStatus = normalizeStatus(searchParams.get('status'))
@@ -243,34 +244,55 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
   const handleCreateDraft = async () => {
     if (!draftDeliveryDate || !isoDateRegex.test(draftDeliveryDate)) return
     setIsCreating(true)
+    setDraftError(null)
 
     try {
       let customerId = selectedCustomerId
 
       // Create new customer if in new customer mode
       if (newCustomerMode) {
-        if (!newBizName.trim()) { setIsCreating(false); return }
+        if (!newBizName.trim()) {
+          setDraftError('Business name is required')
+          setIsCreating(false)
+          return
+        }
+        if (!newEmail.trim()) {
+          setDraftError('Email is required to provision a customer portal access link')
+          setIsCreating(false)
+          return
+        }
         const createResp = await fetch('/api/customers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ businessName: newBizName.trim(), email: newEmail.trim() || null }),
+          body: JSON.stringify({ businessName: newBizName.trim(), email: newEmail.trim() }),
         })
-        if (createResp.ok) {
-          const payload = await createResp.json()
-          customerId = payload?.data?.id ?? ''
+        const createPayload = (await createResp.json().catch(() => null)) as
+          | { data?: { id?: string }; error?: { message?: string } }
+          | null
+        if (!createResp.ok) {
+          setDraftError(createPayload?.error?.message ?? 'Failed to create customer')
+          setIsCreating(false)
+          return
         }
+        customerId = createPayload?.data?.id ?? ''
       }
 
-      if (!customerId) { setIsCreating(false); return }
+      if (!customerId) {
+        setDraftError('Select a customer before creating a draft')
+        setIsCreating(false)
+        return
+      }
 
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customerId, deliveryDate: draftDeliveryDate }),
       })
+      const payload = (await response.json().catch(() => null)) as
+        | { data?: { order?: { id?: string } }; error?: { message?: string } }
+        | null
 
       if (response.ok) {
-        const payload = await response.json()
         const orderId = payload?.data?.order?.id
         if (orderId) {
           setDraftDialogOpen(false)
@@ -278,7 +300,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
           return
         }
       }
-      router.refresh()
+      setDraftError(payload?.error?.message ?? 'Failed to create draft order')
     } finally {
       setIsCreating(false)
     }
@@ -351,7 +373,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
       {/* Top controls: stacked by row on mobile */}
       <div className="space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => { setDraftDialogOpen(true); setNewCustomerMode(false); setSelectedCustomerId(''); setNewBizName(''); setNewEmail('') }}>
+          <Button size="sm" onClick={() => { setDraftDialogOpen(true); setDraftError(null); setNewCustomerMode(false); setSelectedCustomerId(''); setNewBizName(''); setNewEmail('') }}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             New Draft Order
           </Button>
@@ -576,14 +598,14 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
               <Button
                 size="sm"
                 variant={!newCustomerMode ? 'default' : 'outline'}
-                onClick={() => setNewCustomerMode(false)}
+                onClick={() => { setDraftError(null); setNewCustomerMode(false) }}
               >
                 Existing Customer
               </Button>
               <Button
                 size="sm"
                 variant={newCustomerMode ? 'default' : 'outline'}
-                onClick={() => setNewCustomerMode(true)}
+                onClick={() => { setDraftError(null); setNewCustomerMode(true) }}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
                 New Customer
@@ -603,13 +625,14 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="dlg-email">Email (optional)</Label>
+                  <Label htmlFor="dlg-email">Email</Label>
                   <Input
                     id="dlg-email"
                     type="email"
                     placeholder="owner@acme.com"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -644,15 +667,17 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
               />
             </div>
 
+            {draftError ? <p className="text-sm text-destructive">{draftError}</p> : null}
+
             <div className="flex gap-2 pt-1">
               <Button
                 className="flex-1"
                 onClick={handleCreateDraft}
-                disabled={isCreating || (!newCustomerMode && !selectedCustomerId) || (newCustomerMode && !newBizName.trim())}
+                disabled={isCreating || (!newCustomerMode && !selectedCustomerId) || (newCustomerMode && (!newBizName.trim() || !newEmail.trim()))}
               >
                 {isCreating ? 'Creating...' : 'Create Draft'}
               </Button>
-              <Button variant="outline" onClick={() => setDraftDialogOpen(false)}>
+              <Button variant="outline" onClick={() => { setDraftDialogOpen(false); setDraftError(null) }}>
                 Cancel
               </Button>
             </div>

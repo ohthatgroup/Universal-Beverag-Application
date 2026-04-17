@@ -1,16 +1,20 @@
 import { apiOk, apiError, toErrorResponse, getRequestId, logApiEvent } from '@/lib/server/api'
 import { requireAuthContext } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { storeUploadedAsset } from '@/lib/server/assets'
+import { buildRateLimitKey, consumeRateLimit, getEnvRateLimit } from '@/lib/server/rate-limit'
 
 const ALLOWED_FOLDERS = ['products', 'brands', 'pallets']
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
+const uploadRateLimit = getEnvRateLimit('UPLOAD_RATE_LIMIT_MAX', 'UPLOAD_RATE_LIMIT_WINDOW_MS', {
+  maxRequests: 24,
+  windowMs: 5 * 60 * 1000,
+})
 
 export async function POST(request: Request) {
   const requestId = getRequestId(request)
   try {
     const context = await requireAuthContext(['salesman'])
-    const admin = createAdminClient()
 
     const formData = await request.formData()
     const file = formData.get('file')
@@ -44,50 +48,20 @@ export async function POST(request: Request) {
       )
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const timestamp = Date.now()
-    const safeName = file.name
-      .replace(/\.[^.]+$/, '')
-      .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .slice(0, 50)
-    const path = `${folder}/${timestamp}-${safeName}.${ext}`
+    consumeRateLimit({
+      key: buildRateLimitKey('asset-upload', request, [context.userId, folder]),
+      ...uploadRateLimit,
+    })
 
-    const buffer = await file.arrayBuffer()
-
-    const { error: bucketError } = await admin.storage.getBucket('images')
-    if (bucketError) {
-      return apiError(
-        500,
-        'storage_not_configured',
-        'Images bucket is not configured. Run the storage migration to create bucket "images".',
-        bucketError.message,
-        requestId
-      )
-    }
-
-    const { error: uploadError } = await admin.storage
-      .from('images')
-      .upload(path, buffer, {
-        contentType: file.type,
-        upsert: false,
-      })
-
-    if (uploadError) {
-      logApiEvent(requestId, 'upload_storage_error', { error: uploadError.message })
-      throw uploadError
-    }
-
-    const { data: publicUrlData } = admin.storage
-      .from('images')
-      .getPublicUrl(path)
+    const stored = await storeUploadedAsset(file, folder)
 
     logApiEvent(requestId, 'upload_success', {
       userId: context.userId,
       folder,
-      path,
+      path: stored.assetPath,
     })
 
-    return apiOk({ url: publicUrlData.publicUrl }, 201, requestId)
+    return apiOk({ url: stored.url }, 201, requestId)
   } catch (error) {
     logApiEvent(requestId, 'upload_failed', {
       error: error instanceof Error ? error.message : 'unknown',

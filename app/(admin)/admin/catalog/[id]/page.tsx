@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { formatStructuredPack, normalizePackUom, PACK_UOM_OPTIONS } from '@/lib/utils'
 
@@ -32,15 +32,32 @@ function parseOptionalPositiveNumber(raw: string): number | null {
 export default async function CatalogItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   await requirePageAuth(['salesman'])
-  const supabase = await createClient()
+  const db = await getRequestDb()
 
-  const [{ data: product, error: productError }, { data: brands, error: brandsError }] = await Promise.all([
-    supabase.from('products').select('*').eq('id', id).is('customer_id', null).maybeSingle(),
-    supabase.from('brands').select('id,name').order('sort_order', { ascending: true }),
+  const [{ rows: productRows }, { rows: brands }] = await Promise.all([
+    db.query<{
+      id: string
+      brand_id: string | null
+      title: string
+      pack_details: string | null
+      pack_count: number | null
+      size_value: number | null
+      size_uom: string | null
+      price: number
+      image_url: string | null
+      tags: string[] | null
+      is_new: boolean | null
+      is_discontinued: boolean | null
+    }>(
+      `select id, brand_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, tags, is_new, is_discontinued
+       from products
+       where id = $1 and customer_id is null
+       limit 1`,
+      [id]
+    ),
+    db.query<{ id: string; name: string }>('select id, name from brands order by sort_order asc'),
   ])
-
-  if (productError) throw productError
-  if (brandsError) throw brandsError
+  const product = productRows[0] ?? null
   if (!product) notFound()
 
   const normalizedProductSizeUnit = product.size_uom ? normalizePackUom(product.size_uom) : null
@@ -51,7 +68,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
   async function updateProduct(formData: FormData) {
     'use server'
 
-    const supabaseClient = await createClient()
+    const actionDb = await getRequestDb()
     const price = Number((formData.get('price') as string) || 0)
     const packDetailsInput = (formData.get('pack_details') as string).trim()
     const packCount = parseOptionalPositiveInteger((formData.get('pack_count') as string) || '')
@@ -74,28 +91,39 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
         : null
     const packDetails = packDetailsInput || inferredPackDetails || null
 
-        const { error } = await supabaseClient
-      .from('products')
-      .update({
-        brand_id: (formData.get('brand_id') as string) || null,
-        title: (formData.get('title') as string).trim(),
-        pack_details: packDetails,
-        pack_count: packCount,
-        size_value: sizeValue,
-        size_uom: sizeUom,
+    await actionDb.query(
+      `update products
+       set brand_id = $2,
+           title = $3,
+           pack_details = $4,
+           pack_count = $5,
+           size_value = $6,
+           size_uom = $7,
+           price = $8,
+           image_url = $9,
+           tags = $10,
+           is_new = $11,
+           is_discontinued = $12,
+           updated_at = now()
+       where id = $1 and customer_id is null`,
+      [
+        id,
+        (formData.get('brand_id') as string) || null,
+        (formData.get('title') as string).trim(),
+        packDetails,
+        packCount,
+        sizeValue,
+        sizeUom,
         price,
-        image_url: (formData.get('image_url') as string) || null,
-        tags: ((formData.get('tags') as string) || '')
+        (formData.get('image_url') as string) || null,
+        ((formData.get('tags') as string) || '')
           .split(',')
           .map((entry) => entry.trim())
           .filter(Boolean),
-        is_new: formData.get('is_new') === 'on',
-        is_discontinued: formData.get('is_discontinued') === 'on',
-      })
-      .eq('id', id)
-      .is('customer_id', null)
-
-    if (error) throw error
+        formData.get('is_new') === 'on',
+        formData.get('is_discontinued') === 'on',
+      ]
+    )
     redirect(`/admin/catalog/${id}`)
   }
 
@@ -115,7 +143,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
             <Label htmlFor="brand_id">Brand</Label>
             <select id="brand_id" name="brand_id" className="h-9 w-full rounded-md border bg-background px-3 text-sm" defaultValue={product.brand_id ?? ''}>
               <option value="">No brand</option>
-              {(brands ?? []).map((brand) => (
+              {brands.map((brand) => (
                 <option key={brand.id} value={brand.id}>{brand.name}</option>
               ))}
             </select>

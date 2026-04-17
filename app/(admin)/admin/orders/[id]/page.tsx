@@ -5,8 +5,8 @@ import { CopyUrlButton } from '@/components/admin/copy-url-button'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
 import { ProductPickerDialog } from '@/components/admin/product-picker-dialog'
 import { Button } from '@/components/ui/button'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { createClient } from '@/lib/supabase/server'
 import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import type { OrderStatus } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate, getProductDisplayName, getProductPackLabel, getStatusIcon, getStatusLabel } from '@/lib/utils'
@@ -37,66 +37,98 @@ export default async function AdminOrderDetailPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined
   const returnTo = resolveReturnTo(resolvedSearchParams?.returnTo)
   const backLabel = getBackLabel(returnTo)
-  const context = await requirePageAuth(['salesman'])
+  await requirePageAuth(['salesman'])
+  const db = await getRequestDb()
 
-  const { data: order, error: orderError } = await context.supabase
-    .from('orders')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
-
-  if (orderError) {
-    throw orderError
-  }
+  const { rows: orderRows } = await db.query<{
+    id: string
+    customer_id: string | null
+    delivery_date: string
+    status: string
+    total: number | null
+    item_count: number | null
+    submitted_at: string | null
+  }>(
+    `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text
+     from orders
+     where id = $1
+     limit 1`,
+    [id]
+  )
+  const order = orderRows[0] ?? null
 
   if (!order) {
     notFound()
   }
 
-  const customerPromise = order.customer_id
-    ? context.supabase
-        .from('profiles')
-        .select('id,business_name,contact_name,email,phone,access_token')
-        .eq('id', order.customer_id)
-        .maybeSingle()
-    : Promise.resolve({ data: null, error: null })
-
-  const baseProductQuery = context.supabase
-    .from('products')
-    .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom,price,is_discontinued')
-    .eq('is_discontinued', false)
-
-  const productQuery = order.customer_id
-    ? baseProductQuery.or(`customer_id.is.null,customer_id.eq.${order.customer_id}`)
-    : baseProductQuery.is('customer_id', null)
-
-  const [{ data: customer }, { data: items }, { data: products }, { data: pallets }, { data: brands }] =
+  const [{ rows: customers }, { rows: items }, { rows: products }, { rows: pallets }, { rows: brands }] =
     await Promise.all([
-      customerPromise,
-      context.supabase
-        .from('order_items')
-        .select('id,product_id,pallet_deal_id,quantity,unit_price,line_total')
-        .eq('order_id', order.id)
-        .order('id', { ascending: true }),
-      productQuery,
-      context.supabase.from('pallet_deals').select('id,title,description'),
-      context.supabase.from('brands').select('id,name'),
+      order.customer_id
+        ? db.query<{
+            id: string
+            business_name: string | null
+            contact_name: string | null
+            email: string | null
+            phone: string | null
+            access_token: string | null
+          }>(
+            `select id, business_name, contact_name, email, phone, access_token
+             from profiles
+             where id = $1
+             limit 1`,
+            [order.customer_id]
+          )
+        : Promise.resolve({ rows: [] }),
+      db.query<{
+        id: string
+        product_id: string | null
+        pallet_deal_id: string | null
+        quantity: number
+        unit_price: number
+        line_total: number | null
+      }>(
+        `select id, product_id, pallet_deal_id, quantity, unit_price, line_total
+         from order_items
+         where order_id = $1
+         order by id asc`,
+        [order.id]
+      ),
+      db.query<{
+        id: string
+        title: string
+        brand_id: string | null
+        pack_details: string | null
+        pack_count: number | null
+        size_value: number | null
+        size_uom: string | null
+        price: number
+        is_discontinued: boolean | null
+      }>(
+        `select id, title, brand_id, pack_details, pack_count, size_value, size_uom, price, is_discontinued
+         from products
+         where is_discontinued = false and (${order.customer_id ? '(customer_id is null or customer_id = $1)' : 'customer_id is null'})
+         order by title asc`,
+        order.customer_id ? [order.customer_id] : []
+      ),
+      db.query<{ id: string; title: string; description: string | null }>('select id, title, description from pallet_deals'),
+      db.query<{ id: string; name: string }>('select id, name from brands'),
     ])
 
-  const productById = new Map((products ?? []).map((product) => [product.id, product] as const))
-  const palletById = new Map((pallets ?? []).map((pallet) => [pallet.id, pallet] as const))
-  const brandById = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
+  const customer = customers[0] ?? null
+  const productById = new Map(products.map((product) => [product.id, product] as const))
+  const palletById = new Map(pallets.map((pallet) => [pallet.id, pallet] as const))
+  const brandById = new Map(brands.map((brand) => [brand.id, brand.name] as const))
   const orderStatus = asOrderStatus(order.status)
   const orderId = order.id
   const submittedAt = order.submitted_at
-  const orderItems = items ?? []
+  const orderItems = items
   const getItemHref = (item: { product_id: string | null; pallet_deal_id: string | null }) => {
     if (item.product_id) return `/admin/catalog/${item.product_id}`
     if (item.pallet_deal_id) return `/admin/catalog/pallets/${item.pallet_deal_id}`
     return null
   }
   const orderDeepLink = buildCustomerOrderDeepLink(customer?.access_token ?? null, order.id)
-  const pickerProducts = (products ?? []).map((product) => ({
+  const pickerProducts = products.map((product) => ({
     id: product.id,
     title: product.title,
     brandLabel: product.brand_id ? brandById.get(product.brand_id) ?? 'No brand' : 'No brand',
@@ -110,19 +142,16 @@ export default async function AdminOrderDetailPage({
     'use server'
 
     await requirePageAuth(['salesman'])
-    const supabase = await createClient()
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        status: 'delivered',
-        delivered_at: new Date().toISOString(),
-        submitted_at: submittedAt ?? new Date().toISOString(),
-      })
-      .eq('id', orderId)
-
-    if (updateError) {
-      throw updateError
-    }
+    const actionDb = await getRequestDb()
+    const now = new Date().toISOString()
+    await actionDb.query(
+      `update orders
+       set status = 'delivered',
+           delivered_at = $2,
+           submitted_at = coalesce(submitted_at, $3)
+       where id = $1`,
+      [orderId, now, submittedAt ?? now]
+    )
 
     redirect(`/admin/orders/${orderId}`)
   }
@@ -131,18 +160,14 @@ export default async function AdminOrderDetailPage({
     'use server'
 
     await requirePageAuth(['salesman'])
-    const supabase = await createClient()
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        status: 'draft',
-        delivered_at: null,
-      })
-      .eq('id', orderId)
-
-    if (updateError) {
-      throw updateError
-    }
+    const actionDb = await getRequestDb()
+    await actionDb.query(
+      `update orders
+       set status = 'draft',
+           delivered_at = null
+       where id = $1`,
+      [orderId]
+    )
 
     redirect(`/admin/orders/${orderId}`)
   }
@@ -151,12 +176,11 @@ export default async function AdminOrderDetailPage({
     'use server'
 
     await requirePageAuth(['salesman'])
-    const supabase = await createClient()
-    const { error: deleteError } = await supabase.from('orders').delete().eq('id', orderId)
-
-    if (deleteError) {
-      throw deleteError
-    }
+    const actionDb = await getRequestDb()
+    await actionDb.transaction(async (client) => {
+      await client.query('delete from order_items where order_id = $1', [orderId])
+      await client.query('delete from orders where id = $1', [orderId])
+    })
 
     redirect('/admin/orders')
   }

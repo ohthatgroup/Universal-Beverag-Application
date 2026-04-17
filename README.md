@@ -1,104 +1,89 @@
 # Universal Beverages App
 
-Universal Beverages is a mobile-first ordering system built with Next.js and Supabase for beverage customers and sales operations.
+Universal Beverages is a Next.js 15 application for beverage ordering and admin operations.
 
 ## Stack
-- Next.js App Router (v15)
-- Supabase (Auth, Postgres, Storage, RLS)
-- Tailwind + shadcn/ui
-- Sentry (optional)
+
+- Next.js 15 App Router
+- React 18
+- Neon Postgres
+- Neon Auth
+- Cloudflare Workers via OpenNext
+- Resend
+- Tailwind CSS + shadcn/ui
+- Vitest + Playwright
+
+## Runtime
+
+- Admin routes live under `/admin/*`
+- Customer portal routes live under `/portal/[token]/*`
+- Admin auth is email/password through Neon Auth
+- Customer access is bearer-link based
 
 ## Local Development
-1. Install dependencies:
+
 ```bash
 npm ci
-```
-2. Create `.env.local` from `.env.local.example` and fill Supabase keys.
-3. Run the app:
-```bash
 npm run dev
 ```
 
-## Quality Gates
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
-- `npm run test:e2e`
-- `npm run verify:rls`
-- `npm run db:types:check`
+Copy `.env.local.example` to `.env.local` and fill the active runtime values:
 
-CI runs all of the above in `.github/workflows/ci.yml`.
+- `DATABASE_URL`
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_ASSET_BASE_URL`
+- `NEON_AUTH_BASE_URL`
+- `NEON_AUTH_COOKIE_SECRET`
+- `NEON_PROJECT_ID`
+- `NEON_BRANCH_ID`
+- `NEON_API_KEY`
+- `RESEND_API_KEY`
+- `INVITES_FROM_EMAIL`
 
-## Database Setup
-Schema and seed migrations are in `/supabase/migrations`.
+## Commands
 
-### Required env vars for database scripts
-- `SUPABASE_DB_URL` (preferred) or `POSTGRES_URL_NON_POOLING`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+```bash
+npm run dev
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
 
-### Deterministic setup commands
+Database/bootstrap:
+
 ```bash
 npm run db:reset
 npm run db:migrate
 npm run db:verify
+npm run db:import
 npm run db:provision
-```
-
-One-shot CI/local reset:
-```bash
+npm run db:smoke
 npm run ci:prepare-db
 ```
 
-### Generated DB typings
-- Generate: `npm run db:types:generate`
-- Check drift: `npm run db:types:check`
+Workers/deploy:
 
-Type generation introspects the live DB via `SUPABASE_DB_URL` (or `POSTGRES_URL_NON_POOLING` fallback).
+```bash
+npm run cf:check:preview
+npm run cf:check:production
+npm run deploy:preview
+npm run deploy:production
+npm run deploy:production:live
+npm run triggers:preview
+npm run triggers:production
+npm run rollback:production
+npm run smoke:deploy
+npm run smoke:preview
+npm run smoke:production
+```
 
-## Roles and Auth
-- `customer`: magic link login and customer-facing order flow
-- `salesman`: password login and admin dashboard routes
+Deployment runbook:
 
-Middleware protects page routes by role. API routes enforce auth/role via server guards.
+- `docs/st-7.5-preview-live-deployment-runbook.md`
 
-## Link Host Policy
-- Generated customer order links and magic-link callbacks are pinned to:
-`https://universal-beverag-application.vercel.app`
-- Localhost is for local debugging only and is never used for generated production links.
-- Supabase Auth settings must include:
-  - Site URL: `https://universal-beverag-application.vercel.app`
-  - Redirect allowlist: `https://universal-beverag-application.vercel.app/auth/callback`
+## Repo Notes
 
-## API Response Contract
-- Success: `{ "data": ... }`
-- Error: `{ "error": { "code": string, "message": string, "details"?: unknown } }`
-
-`GET /api/orders/:id/csv` returns CSV content directly.
-
-## Launch Defaults
-- Full-scope launch enabled
-- Ecwid push disabled (`FEATURE_ECWID_PUSH=false`)
-- Manual customer provisioning
-- Single environment strategy
-
-## CI Contract (Real Supabase Jobs)
-The real-Supabase CI path is protected and expects a dedicated CI project (not production) with these secrets:
-- `CI_SUPABASE_PROJECT_REF`
-- `SUPABASE_DB_URL`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `CI_SALESMAN_EMAIL`, `CI_SALESMAN_PASSWORD`
-- `CI_CUSTOMER_A_EMAIL`, `CI_CUSTOMER_A_PASSWORD`
-- `CI_CUSTOMER_B_EMAIL`, `CI_CUSTOMER_B_PASSWORD`
-- Optional: `CI_INBOX_EMAIL`, `CI_INBOX_PASSWORD`
-
-## Operations Docs
-- Deployment: `docs/deployment.md`
-- Rollback: `docs/rollback.md`
-- Incident response: `docs/incident-response.md`
-- Implementation tasks: `docs/implementation-tasks.md`
-- Production readiness checklist: `docs/production-readiness-checklist.md`
+- `db/` is the active migration source
+- `.env.local.example` is the canonical env template
+- `.next`, `.open-next`, `.wrangler`, `output`, `test-results`, and `.playwright-cli` are local/generated artifacts and should stay untracked

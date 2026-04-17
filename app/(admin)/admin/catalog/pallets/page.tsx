@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { PalletDealsManager, type PalletDealRow } from '@/components/admin/pallet-deals-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
 interface PalletsPageProps {
@@ -14,43 +14,38 @@ interface PalletsPageProps {
 
 export default async function PalletsPage({ searchParams }: PalletsPageProps) {
   await requirePageAuth(['salesman'])
-  const supabase = await createClient()
+  const db = await getRequestDb()
   const resolvedSearchParams = searchParams ? await searchParams : undefined
 
   const searchQuery = (resolvedSearchParams?.q ?? '').trim()
   const searchTerm = searchQuery.toLowerCase()
 
-  const { data: palletDeals, error } = await supabase
-    .from('pallet_deals')
-    .select('*')
-    .order('sort_order', { ascending: true })
-
-  if (error) throw error
+  const { rows: palletDeals } = await db.query<{
+    id: string
+    title: string
+    pallet_type: string
+    price: number
+    is_active: boolean | null
+    description: string | null
+  }>('select id, title, pallet_type, price, is_active, description from pallet_deals order by sort_order asc')
 
   async function createEmptyPallet() {
     'use server'
 
     await requirePageAuth(['salesman'])
-    const supabaseClient = await createClient()
+    const actionDb = await getRequestDb()
 
-    const { data: created, error: insertError } = await supabaseClient
-      .from('pallet_deals')
-      .insert({
-        title: 'New Pallet Deal',
-        pallet_type: 'single',
-        price: 0.01,
-        savings_text: null,
-        description: null,
-        is_active: true,
-      })
-      .select('id')
-      .single()
+    const { rows } = await actionDb.query<{ id: string }>(
+      `insert into pallet_deals (title, pallet_type, price, savings_text, description, is_active, sort_order)
+       values ('New Pallet Deal', 'single', 0.01, null, null, true, coalesce((select max(sort_order) from pallet_deals), -1) + 1)
+       returning id`
+    )
 
-    if (insertError || !created) throw insertError ?? new Error('Failed to create pallet deal')
-    redirect(`/admin/catalog/pallets/${created.id}`)
+    if (!rows[0]) throw new Error('Failed to create pallet deal')
+    redirect(`/admin/catalog/pallets/${rows[0].id}`)
   }
 
-  const deals = (palletDeals ?? []).filter((deal) => {
+  const deals = palletDeals.filter((deal) => {
     if (!searchTerm) return true
     const haystack = [deal.title ?? '', deal.description ?? '', deal.pallet_type ?? '']
       .join(' ')

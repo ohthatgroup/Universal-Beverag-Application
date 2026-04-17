@@ -3,6 +3,7 @@ import { ArrowLeft, Download } from 'lucide-react'
 import type { OrderStatus } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel } from '@/lib/utils'
 
 interface CustomerReadonlyLineItem {
@@ -30,13 +31,15 @@ interface CustomerOrderReadonlyProps {
 }
 
 export function CustomerOrderReadonly({ token, order, items, showPrices }: CustomerOrderReadonlyProps) {
+  const ordersHref = `${buildCustomerPortalBasePath(token) ?? '/portal'}/orders`
+
   return (
     <div className="space-y-4 p-4 pb-20 md:pb-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-            <Link href={`/c/${token}/orders`}>
+            <Link href={ordersHref}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>

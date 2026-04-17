@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePortalOrderAccess, requirePortalToken } from '@/lib/server/customer-order-access'
 
 const upsertItemSchema = z.object({
@@ -35,6 +36,7 @@ function resolveIdentity(payload: { productId?: string | null; palletDealId?: st
   if (payload.productId) {
     return { column: 'product_id' as const, value: payload.productId }
   }
+
   return { column: 'pallet_deal_id' as const, value: payload.palletDealId as string }
 }
 
@@ -47,10 +49,13 @@ export async function PUT(
   request: Request,
   routeContext: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getRequestId(request)
   try {
     const token = requirePortalToken(request)
     const { id } = await routeContext.params
     const { order } = await requirePortalOrderAccess(id, token)
+    const payload = await parseBody(request, upsertItemSchema)
+    const db = await getRequestDb()
 
     if (order.status !== 'draft') {
       return Response.json(
@@ -58,9 +63,6 @@ export async function PUT(
         { status: 409 }
       )
     }
-
-    const body = await request.json().catch(() => null)
-    const payload = upsertItemSchema.parse(body)
 
     const identity = resolveIdentity(payload)
     if (!identity) {
@@ -70,82 +72,66 @@ export async function PUT(
       )
     }
 
-    const admin = createAdminClient()
-
-    const existingQuery = admin
-      .from('order_items')
-      .select('id')
-      .eq('order_id', order.id)
-      .eq(identity.column, identity.value)
-
-    const { data: existing, error: existingError } =
-      identity.column === 'product_id'
-        ? await existingQuery.is('pallet_deal_id', null).maybeSingle()
-        : await existingQuery.is('product_id', null).maybeSingle()
-
-    if (existingError) throw existingError
+    const { rows: existingRows } = await db.query<{ id: string }>(
+      `select id
+       from order_items
+       where order_id = $1
+         and ${identity.column} = $2
+         and ${identity.column === 'product_id' ? 'pallet_deal_id is null' : 'product_id is null'}
+       limit 1`,
+      [order.id, identity.value]
+    )
+    const existing = existingRows[0] ?? null
 
     if (existing) {
-      const { error: updateError } = await admin
-        .from('order_items')
-        .update({
-          quantity: payload.quantity,
-          unit_price: payload.unitPrice,
-        })
-        .eq('id', existing.id)
-
-      if (updateError) throw updateError
+      await db.query(
+        `update order_items
+         set quantity = $2, unit_price = $3
+         where id = $1`,
+        [existing.id, payload.quantity, payload.unitPrice]
+      )
     } else {
-      const { error: insertError } = await admin
-        .from('order_items')
-        .insert({
-          order_id: order.id,
-          quantity: payload.quantity,
-          unit_price: payload.unitPrice,
-          product_id: payload.productId ?? null,
-          pallet_deal_id: payload.palletDealId ?? null,
-        })
+      try {
+        await db.query(
+          `insert into order_items (order_id, quantity, unit_price, product_id, pallet_deal_id)
+           values ($1, $2, $3, $4, $5)`,
+          [order.id, payload.quantity, payload.unitPrice, payload.productId ?? null, payload.palletDealId ?? null]
+        )
+      } catch (insertError) {
+        if (isUniqueViolation(insertError)) {
+          const { rows: retryRows } = await db.query<{ id: string }>(
+            `select id
+             from order_items
+             where order_id = $1
+               and ${identity.column} = $2
+               and ${identity.column === 'product_id' ? 'pallet_deal_id is null' : 'product_id is null'}
+             limit 1`,
+            [order.id, identity.value]
+          )
+          const retriedExisting = retryRows[0]
+          if (!retriedExisting) {
+            throw insertError
+          }
 
-      if (insertError && isUniqueViolation(insertError)) {
-        const retryQuery = admin
-          .from('order_items')
-          .select('id')
-          .eq('order_id', order.id)
-          .eq(identity.column, identity.value)
-
-        const { data: retriedExisting, error: retryError } =
-          identity.column === 'product_id'
-            ? await retryQuery.is('pallet_deal_id', null).maybeSingle()
-            : await retryQuery.is('product_id', null).maybeSingle()
-
-        if (retryError) throw retryError
-        if (!retriedExisting) throw insertError
-
-        const { error: retryUpdateError } = await admin
-          .from('order_items')
-          .update({
-            quantity: payload.quantity,
-            unit_price: payload.unitPrice,
-          })
-          .eq('id', retriedExisting.id)
-
-        if (retryUpdateError) throw retryUpdateError
-      } else if (insertError) {
-        throw insertError
+          await db.query(
+            `update order_items
+             set quantity = $2, unit_price = $3
+             where id = $1`,
+            [retriedExisting.id, payload.quantity, payload.unitPrice]
+          )
+        } else {
+          throw insertError
+        }
       }
     }
 
-    return Response.json({ data: { saved: true } })
+    return apiOk({ saved: true }, 200, requestId)
   } catch (error) {
+    logApiEvent(requestId, 'portal_order_item_upsert_failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    })
     if (error instanceof Response) return error
-    if (error instanceof z.ZodError) {
-      return Response.json(
-        { error: { code: 'validation_error', message: 'Invalid request', details: error.flatten() } },
-        { status: 400 }
-      )
-    }
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return Response.json({ error: { code: 'internal_error', message } }, { status: 500 })
+    return toErrorResponse(error, requestId)
   }
 }
 
@@ -158,10 +144,13 @@ export async function DELETE(
   request: Request,
   routeContext: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getRequestId(request)
   try {
     const token = requirePortalToken(request)
     const { id } = await routeContext.params
     const { order } = await requirePortalOrderAccess(id, token)
+    const payload = await parseBody(request, deleteItemSchema)
+    const db = await getRequestDb()
 
     if (order.status !== 'draft') {
       return Response.json(
@@ -170,9 +159,6 @@ export async function DELETE(
       )
     }
 
-    const body = await request.json().catch(() => null)
-    const payload = deleteItemSchema.parse(body)
-
     if (!payload.productId && !payload.palletDealId) {
       return Response.json(
         { error: { code: 'validation_error', message: 'Either productId or palletDealId is required' } },
@@ -180,33 +166,18 @@ export async function DELETE(
       )
     }
 
-    const admin = createAdminClient()
+    await db.query(
+      `delete from order_items
+       where order_id = $1 and ${payload.productId ? 'product_id = $2' : 'pallet_deal_id = $2'}`,
+      [order.id, payload.productId ?? payload.palletDealId]
+    )
 
-    let query = admin
-      .from('order_items')
-      .delete()
-      .eq('order_id', order.id)
-
-    if (payload.productId) {
-      query = query.eq('product_id', payload.productId)
-    } else if (payload.palletDealId) {
-      query = query.eq('pallet_deal_id', payload.palletDealId)
-    }
-
-    const { error } = await query
-
-    if (error) throw error
-
-    return Response.json({ data: { deleted: true } })
+    return apiOk({ deleted: true }, 200, requestId)
   } catch (error) {
+    logApiEvent(requestId, 'portal_order_item_delete_failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    })
     if (error instanceof Response) return error
-    if (error instanceof z.ZodError) {
-      return Response.json(
-        { error: { code: 'validation_error', message: 'Invalid request', details: error.flatten() } },
-        { status: 400 }
-      )
-    }
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return Response.json({ error: { code: 'internal_error', message } }, { status: 500 })
+    return toErrorResponse(error, requestId)
   }
 }

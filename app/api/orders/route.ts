@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
 import { createOrGetDraftSchema, isoDateSchema, orderStatusSchema } from '@/lib/server/schemas'
+import { getRequestDb } from '@/lib/server/db'
 
 const listQuerySchema = z.object({
   status: orderStatusSchema.optional(),
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
   const requestId = getRequestId(request)
   try {
     const context = await requireAuthContext()
+    const db = await getRequestDb()
     const params = Object.fromEntries(new URL(request.url).searchParams.entries())
     const query = listQuerySchema.parse(params)
 
@@ -24,42 +26,34 @@ export async function GET(request: Request) {
       role: context.profile.role,
     })
 
-    let dbQuery = context.supabase
-      .from('orders')
-      .select('*')
-      .order('delivery_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(query.limit)
+    const filters = ['1=1']
+    const values: unknown[] = []
+    const push = (value: unknown, sql: string) => {
+      values.push(value)
+      filters.push(sql.replace('?', `$${values.length}`))
+    }
 
     if (context.profile.role === 'customer') {
-      dbQuery = dbQuery.eq('customer_id', context.userId)
+      push(context.userId, 'customer_id = ?')
     } else if (query.customerId) {
-      dbQuery = dbQuery.eq('customer_id', query.customerId)
+      push(query.customerId, 'customer_id = ?')
     }
+    if (query.status) push(query.status, 'status = ?')
+    if (query.deliveryDate) push(query.deliveryDate, 'delivery_date = ?')
+    if (query.from) push(query.from, 'delivery_date >= ?')
+    if (query.to) push(query.to, 'delivery_date <= ?')
+    values.push(query.limit)
 
-    if (query.status) {
-      dbQuery = dbQuery.eq('status', query.status)
-    }
+    const { rows } = await db.query(
+      `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text
+       from orders
+       where ${filters.join(' and ')}
+       order by delivery_date desc, created_at desc
+       limit $${values.length}`,
+      values
+    )
 
-    if (query.deliveryDate) {
-      dbQuery = dbQuery.eq('delivery_date', query.deliveryDate)
-    }
-
-    if (query.from) {
-      dbQuery = dbQuery.gte('delivery_date', query.from)
-    }
-
-    if (query.to) {
-      dbQuery = dbQuery.lte('delivery_date', query.to)
-    }
-
-    const { data, error } = await dbQuery
-
-    if (error) {
-      throw error
-    }
-
-    return apiOk(data ?? [], 200, requestId)
+    return apiOk(rows, 200, requestId)
   } catch (error) {
     logApiEvent(requestId, 'orders_list_failed', {
       error: error instanceof Error ? error.message : 'unknown',
@@ -72,6 +66,7 @@ export async function POST(request: Request) {
   const requestId = getRequestId(request)
   try {
     const context = await requireAuthContext()
+    const db = await getRequestDb()
     const payload = await parseBody(request, createOrGetDraftSchema)
 
     const customerId =
@@ -85,50 +80,46 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: existingOrder, error: existingError } = await context.supabase
-      .from('orders')
-      .select('*')
-      .eq('customer_id', customerId)
-      .eq('delivery_date', payload.deliveryDate)
-      .eq('status', 'draft')
-      .maybeSingle()
+    const { rows: existingRows } = await db.query(
+      `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text
+       from orders
+       where customer_id = $1 and delivery_date = $2 and status = 'draft'
+       limit 1`,
+      [customerId, payload.deliveryDate]
+    )
 
-    if (existingError) {
-      throw existingError
+    if (existingRows[0]) {
+      return apiOk({ order: existingRows[0], created: false }, 200, requestId)
     }
 
-    if (existingOrder) {
-      return apiOk({ order: existingOrder, created: false }, 200, requestId)
-    }
-
-    const { data: order, error: insertError } = await context.supabase
-      .from('orders')
-      .insert({
-        customer_id: customerId,
-        delivery_date: payload.deliveryDate,
-        status: 'draft',
-      })
-      .select('*')
-      .single()
-
-    if (insertError) {
-      if (insertError.code === '23505') {
-        const { data: raceOrder } = await context.supabase
-          .from('orders')
-          .select('*')
-          .eq('customer_id', customerId)
-          .eq('delivery_date', payload.deliveryDate)
-          .eq('status', 'draft')
-          .maybeSingle()
-
-        if (raceOrder) {
-          return apiOk({ order: raceOrder, created: false }, 200, requestId)
+    try {
+      const { rows } = await db.query(
+        `insert into orders (customer_id, delivery_date, status)
+         values ($1, $2, 'draft')
+         returning id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text`,
+        [customerId, payload.deliveryDate]
+      )
+      return apiOk({ order: rows[0], created: true }, 201, requestId)
+    } catch (insertError) {
+      if (
+        typeof insertError === 'object' &&
+        insertError !== null &&
+        'code' in insertError &&
+        (insertError as { code?: string }).code === '23505'
+      ) {
+        const { rows: raceRows } = await db.query(
+          `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text
+           from orders
+           where customer_id = $1 and delivery_date = $2 and status = 'draft'
+           limit 1`,
+          [customerId, payload.deliveryDate]
+        )
+        if (raceRows[0]) {
+          return apiOk({ order: raceRows[0], created: false }, 200, requestId)
         }
       }
       throw insertError
     }
-
-    return apiOk({ order, created: true }, 201, requestId)
   } catch (error) {
     logApiEvent(requestId, 'order_create_failed', {
       error: error instanceof Error ? error.message : 'unknown',

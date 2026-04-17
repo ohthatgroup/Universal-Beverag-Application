@@ -27,7 +27,23 @@
       "Bash(npm run test)",
       "WebFetch(domain:universal-beverag-application.vercel.app)",
       "Bash(cat:*)",
-      "Bash(python -c:*)"
+      "Bash(python -c:*)",
+      "Bash(pg_dump --version)",
+      "Bash(psql --version)",
+      "Read(//c/Program Files/PostgreSQL//**)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "Bash(where pg_dump)",
+      "Bash(where psql:*)",
+      "Bash(winget --version)",
+      "Bash(export PATH=\"/c/Program Files/PostgreSQL/17/bin:$PATH\")",
+      "Bash(npm run:*)",
+      "Bash(export PGPASSWORD='eClips@usa25')",
+      "Bash(export SUPA='postgresql://postgres@db.wfcwnanssppbhzkkbqap.supabase.co:5432/postgres?sslmode=require')",
+      "Bash(psql \"$SUPA\" -c \"select ''brands'' t, count\\(*\\) from public.brands union all select ''products'', count\\(*\\) from public.products union all select ''pallet_deals'', count\\(*\\) from public.pallet_deals union all select ''pallet_deal_items'', count\\(*\\) from public.pallet_deal_items union all select ''order_cutoffs'', count\\(*\\) from public.order_cutoffs union all select ''product_cutoff_overrides'', count\\(*\\) from public.product_cutoff_overrides order by 1;\")",
+      "Bash(psql \"$SUPA\" -c \"select count\\(*\\) filter \\(where customer_id is not null\\) as customer_scoped, count\\(*\\) filter \\(where customer_id is null\\) as global_products from public.products;\")",
+      "Bash(pg_dump \"postgresql://postgres@db.wfcwnanssppbhzkkbqap.supabase.co:5432/postgres?sslmode=require\" --data-only --column-inserts --no-owner --no-privileges --no-comments --disable-triggers -t public.brands -t public.products -t public.pallet_deals -t public.pallet_deal_items -t public.order_cutoffs -t public.product_cutoff_overrides -f catalog-dump.sql)",
+      "Bash(pg_dump \"postgresql://postgres@db.wfcwnanssppbhzkkbqap.supabase.co:5432/postgres?sslmode=require\" --data-only --column-inserts --no-owner --no-privileges --no-comments -t public.brands -t public.products -t public.pallet_deals -t public.pallet_deal_items -t public.order_cutoffs -t public.product_cutoff_overrides -f catalog-dump.sql)",
+      "Bash(cd:*)"
     ]
   }
 }

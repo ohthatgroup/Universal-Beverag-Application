@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
 
 const orderStatusSchema = z.enum(['draft', 'submitted', 'delivered'])
 
@@ -22,39 +22,22 @@ export async function POST(request: Request) {
   try {
     await requireAuthContext(['salesman'])
     const payload = await parseBody(request, bulkSchema)
-    const admin = createAdminClient()
+    const db = await getRequestDb()
     const ids = Array.from(new Set(payload.ids))
 
     if (payload.action === 'delete') {
-      const { error: itemDeleteError } = await admin
-        .from('order_items')
-        .delete()
-        .in('order_id', ids)
-
-      if (itemDeleteError) {
-        throw itemDeleteError
-      }
-
-      const { error: orderDeleteError } = await admin
-        .from('orders')
-        .delete()
-        .in('id', ids)
-
-      if (orderDeleteError) {
-        throw orderDeleteError
-      }
+      await db.transaction(async (client) => {
+        await client.query('delete from order_items where order_id = any($1::uuid[])', [ids])
+        await client.query('delete from orders where id = any($1::uuid[])', [ids])
+      })
 
       return apiOk({ deleted: ids.length }, 200, requestId)
     }
 
-    const { data: orders, error: ordersError } = await admin
-      .from('orders')
-      .select('id,submitted_at')
-      .in('id', ids)
-
-    if (ordersError) {
-      throw ordersError
-    }
+    const { rows: orders } = await db.query<{ id: string; submitted_at: string | null }>(
+      `select id, submitted_at::text from orders where id = any($1::uuid[])`,
+      [ids]
+    )
 
     const now = new Date().toISOString()
     for (const order of orders ?? []) {
@@ -80,14 +63,12 @@ export async function POST(request: Request) {
         patch.delivered_at = now
       }
 
-      const { error: updateError } = await admin
-        .from('orders')
-        .update(patch)
-        .eq('id', order.id)
-
-      if (updateError) {
-        throw updateError
-      }
+      await db.query(
+        `update orders
+         set status = $2, submitted_at = $3, delivered_at = $4
+         where id = $1`,
+        [order.id, patch.status, patch.submitted_at ?? null, patch.delivered_at ?? null]
+      )
     }
 
     return apiOk({ updated: orders?.length ?? 0 }, 200, requestId)

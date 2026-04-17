@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Package, Search } from 'lucide-react'
 import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
 import { useCatalog, type CatalogTab } from '@/lib/hooks/useCatalog'
+import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import type { CatalogProduct, GroupByOption, PalletDeal } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate, getProductDisplayName, getProductPackLabel } from '@/lib/utils'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
@@ -65,6 +66,7 @@ export function OrderBuilder({
   productToPalletDealIds,
 }: OrderBuilderProps) {
   const router = useRouter()
+  const basePath = buildCustomerPortalBasePath(token) ?? '/portal'
 
   const [activeTab, setActiveTab] = useState<CatalogTab>('all')
   const [isReviewOpen, setIsReviewOpen] = useState(false)
@@ -211,7 +213,9 @@ export function OrderBuilder({
     setIsResetting(false)
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => null)
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
       setError(payload?.error?.message ?? 'Failed to reset order')
       return
     }
@@ -247,7 +251,7 @@ export function OrderBuilder({
       return
     }
     setIsReviewOpen(false)
-    router.push(`/c/${token}/orders`)
+    router.push(`${basePath}/orders`)
     router.refresh()
   }
 
@@ -380,7 +384,7 @@ export function OrderBuilder({
                 </Button>
               ) : (
                 <Button asChild variant="ghost" size="sm" className="-ml-2">
-                  <Link href={`/c/${token}/orders`}>
+                  <Link href={`${basePath}/orders`}>
                     <ArrowLeft className="mr-1 h-4 w-4" />
                     Back
                   </Link>

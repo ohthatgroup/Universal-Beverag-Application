@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, UserCircle } from 'lucide-react'
+import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import { cn } from '@/lib/utils'
 
 interface CustomerNavProps {
@@ -11,7 +12,7 @@ interface CustomerNavProps {
 
 export function CustomerNav({ token }: CustomerNavProps) {
   const pathname = usePathname()
-  const base = `/c/${token}`
+  const base = buildCustomerPortalBasePath(token) ?? '/portal'
 
   const links = [
     { href: base, label: 'Home', icon: Home },

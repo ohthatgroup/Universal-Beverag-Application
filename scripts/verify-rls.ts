@@ -1,10 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
+import fs from 'node:fs'
 import type { Database } from '../lib/database.generated'
 
 interface CheckResult {
   name: string
   pass: boolean
   details?: string
+}
+
+function loadLocalEnvFiles() {
+  if (fs.existsSync('.env')) {
+    process.loadEnvFile?.('.env')
+  }
+
+  if (fs.existsSync('.env.local')) {
+    process.loadEnvFile?.('.env.local')
+  }
 }
 
 function requireEnv(name: string): string {
@@ -42,6 +53,7 @@ async function signInClient(
 }
 
 async function main() {
+  loadLocalEnvFiles()
   const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
   const anonKey = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
   const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')

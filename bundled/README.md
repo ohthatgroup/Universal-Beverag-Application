@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "universal-beverage-app-preview" generated at 2026-04-16T23:28:20.914Z.

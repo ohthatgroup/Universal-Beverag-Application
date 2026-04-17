@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { getProductPackLabel } from '@/lib/utils'
 
@@ -21,28 +21,53 @@ interface PalletDetailPageProps {
 export default async function PalletDetailPage({ params, searchParams }: PalletDetailPageProps) {
   const { id } = await params
   await requirePageAuth(['salesman'])
-  const supabase = await createClient()
+  const db = await getRequestDb()
   const resolvedSearchParams = searchParams ? await searchParams : undefined
   const searchQuery = (resolvedSearchParams?.q ?? '').trim()
   const searchTerm = searchQuery.toLowerCase()
   const contentParam = (resolvedSearchParams?.content ?? 'all').trim()
   const contentFilter = contentParam === 'included' || contentParam === 'excluded' ? contentParam : 'all'
 
-  const [{ data: palletDeal, error: dealError }, { data: products }, { data: items }, { data: brands }] = await Promise.all([
-    supabase.from('pallet_deals').select('*').eq('id', id).maybeSingle(),
-    supabase
-      .from('products')
-      .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom')
-      .is('customer_id', null)
-      .order('title', { ascending: true }),
-    supabase
-      .from('pallet_deal_items')
-      .select('id,product_id,quantity')
-      .eq('pallet_deal_id', id),
-    supabase.from('brands').select('id,name'),
+  const [{ rows: palletDealRows }, { rows: products }, { rows: items }, { rows: brands }] = await Promise.all([
+    db.query<{
+      id: string
+      title: string
+      pallet_type: 'single' | 'mixed'
+      image_url: string | null
+      price: number
+      savings_text: string | null
+      description: string | null
+      is_active: boolean | null
+    }>(
+      `select id, title, pallet_type, image_url, price, savings_text, description, is_active
+       from pallet_deals
+       where id = $1
+       limit 1`,
+      [id]
+    ),
+    db.query<{
+      id: string
+      title: string
+      brand_id: string | null
+      pack_details: string | null
+      pack_count: number | null
+      size_value: number | null
+      size_uom: string | null
+    }>(
+      `select id, title, brand_id, pack_details, pack_count, size_value, size_uom
+       from products
+       where customer_id is null
+       order by title asc`
+    ),
+    db.query<{ id: string; product_id: string | null; quantity: number }>(
+      `select id, product_id, quantity
+       from pallet_deal_items
+       where pallet_deal_id = $1`,
+      [id]
+    ),
+    db.query<{ id: string; name: string }>('select id, name from brands'),
   ])
-
-  if (dealError) throw dealError
+  const palletDeal = palletDealRows[0] ?? null
   if (!palletDeal) notFound()
 
   const itemByProduct = new Map(
@@ -71,27 +96,34 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
   async function updatePallet(formData: FormData) {
     'use server'
 
-    const supabaseClient = await createClient()
+    const actionDb = await getRequestDb()
     const price = Number((formData.get('price') as string) || 0)
 
     if (!Number.isFinite(price) || price <= 0) {
       throw new Error('Price must be greater than zero')
     }
 
-    const { error } = await supabaseClient
-      .from('pallet_deals')
-      .update({
-        title: (formData.get('title') as string).trim(),
-        pallet_type: (formData.get('pallet_type') as 'single' | 'mixed') || 'single',
-        image_url: (formData.get('image_url') as string) || null,
+    await actionDb.query(
+      `update pallet_deals
+       set title = $2,
+           pallet_type = $3,
+           image_url = $4,
+           price = $5,
+           savings_text = $6,
+           description = $7,
+           is_active = $8
+       where id = $1`,
+      [
+        id,
+        (formData.get('title') as string).trim(),
+        (formData.get('pallet_type') as 'single' | 'mixed') || 'single',
+        (formData.get('image_url') as string) || null,
         price,
-        savings_text: (formData.get('savings_text') as string) || null,
-        description: (formData.get('description') as string) || null,
-        is_active: formData.get('is_active') === 'on',
-      })
-      .eq('id', id)
-
-    if (error) throw error
+        (formData.get('savings_text') as string) || null,
+        (formData.get('description') as string) || null,
+        formData.get('is_active') === 'on',
+      ]
+    )
     redirect(`/admin/catalog/pallets/${id}`)
   }
 

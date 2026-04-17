@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
 
 const updateItemSchema = z.object({
   productId: z.string().uuid(),
@@ -17,61 +17,40 @@ export async function PUT(
     await requireAuthContext(['salesman'])
     const { id } = await routeContext.params
     const payload = await parseBody(request, updateItemSchema)
-    const admin = createAdminClient()
-    const { data: deal, error: dealError } = await admin
-      .from('pallet_deals')
-      .select('pallet_type')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (dealError) {
-      throw dealError
-    }
+    const db = await getRequestDb()
+    const { rows: dealRows } = await db.query<{ pallet_type: string }>(
+      'select pallet_type from pallet_deals where id = $1 limit 1',
+      [id]
+    )
+    const deal = dealRows[0] ?? null
     if (!deal) {
       return toErrorResponse(new Error('Pallet deal not found'), requestId)
     }
     const isSingleType = deal.pallet_type === 'single'
 
     if (payload.quantity === 0) {
-      const { error } = await admin
-        .from('pallet_deal_items')
-        .delete()
-        .eq('pallet_deal_id', id)
-        .eq('product_id', payload.productId)
-
-      if (error) {
-        throw error
-      }
+      await db.query(
+        'delete from pallet_deal_items where pallet_deal_id = $1 and product_id = $2',
+        [id, payload.productId]
+      )
 
       return apiOk({ deleted: true }, 200, requestId)
     }
 
     if (isSingleType) {
-      const { error: clearError } = await admin
-        .from('pallet_deal_items')
-        .delete()
-        .eq('pallet_deal_id', id)
-        .neq('product_id', payload.productId)
-
-      if (clearError) {
-        throw clearError
-      }
+      await db.query(
+        'delete from pallet_deal_items where pallet_deal_id = $1 and product_id <> $2',
+        [id, payload.productId]
+      )
     }
 
-    const { error } = await admin.from('pallet_deal_items').upsert(
-      {
-        pallet_deal_id: id,
-        product_id: payload.productId,
-        quantity: isSingleType ? 1 : payload.quantity,
-      },
-      {
-        onConflict: 'pallet_deal_id,product_id',
-      }
+    await db.query(
+      `insert into pallet_deal_items (pallet_deal_id, product_id, quantity)
+       values ($1, $2, $3)
+       on conflict (pallet_deal_id, product_id)
+       do update set quantity = excluded.quantity`,
+      [id, payload.productId, isSingleType ? 1 : payload.quantity]
     )
-
-    if (error) {
-      throw error
-    }
 
     return apiOk({ saved: true }, 200, requestId)
   } catch (error) {

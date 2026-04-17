@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
 import { formatStructuredPack, normalizePackUom } from '@/lib/utils'
 
 const createProductSchema = z.object({
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   try {
     await requireAuthContext(['salesman'])
     const payload = await parseBody(request, createProductSchema)
-    const admin = createAdminClient()
+    const db = await getRequestDb()
 
     const packCount = payload.packCount ?? null
     const sizeValue = payload.sizeValue ?? null
@@ -39,42 +39,26 @@ export async function POST(request: Request) {
         : null
     const packDetails = payload.packDetails?.trim() || inferredPackDetails || null
 
-    const { data: firstBySort, error: sortFetchError } = await admin
-      .from('products')
-      .select('sort_order')
-      .is('customer_id', null)
-      .order('sort_order', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (sortFetchError) {
-      throw sortFetchError
-    }
-
-    const nextSortOrder = (firstBySort?.sort_order ?? 0) - 1
-
-    const { data, error } = await admin
-      .from('products')
-      .insert({
-        brand_id: payload.brandId ?? null,
-        customer_id: null,
-        title: payload.title,
-        pack_details: packDetails,
-        pack_count: packCount,
-        size_value: sizeValue,
-        size_uom: sizeUom,
-        price: Number(payload.price),
-        image_url: payload.imageUrl || null,
-        is_new: payload.isNew ?? false,
-        is_discontinued: false,
-        sort_order: nextSortOrder,
-      })
-      .select('id')
-      .single()
-
-    if (error) {
-      throw error
-    }
+    const { rows } = await db.query<{ id: string }>(
+      `insert into products (
+        brand_id, customer_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, is_new, is_discontinued, sort_order
+      ) values (
+        $1, null, $2, $3, $4, $5, $6, $7, $8, $9, false, coalesce((select min(sort_order) from products where customer_id is null), 0) - 1
+      ) returning id`,
+      [
+        payload.brandId ?? null,
+        payload.title,
+        packDetails,
+        packCount,
+        sizeValue,
+        sizeUom,
+        Number(payload.price),
+        payload.imageUrl || null,
+        payload.isNew ?? false,
+      ]
+    )
+    const data = rows[0]
+    if (!data) throw new Error('Failed to create product')
 
     return apiOk({ productId: data.id }, 201, requestId)
   } catch (error) {

@@ -1,12 +1,8 @@
-import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
+import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { requirePortalToken } from '@/lib/server/customer-order-access'
-import { isoDateSchema } from '@/lib/server/schemas'
-
-const createDraftSchema = z.object({
-  deliveryDate: isoDateSchema,
-})
+import { createOrGetDraftSchema } from '@/lib/server/schemas'
 
 /**
  * POST /api/portal/orders
@@ -14,69 +10,61 @@ const createDraftSchema = z.object({
  * Auth: X-Customer-Token header
  */
 export async function POST(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const token = requirePortalToken(request)
     const { customerId } = await resolveCustomerToken(token)
+    const payload = await parseBody(request, createOrGetDraftSchema.pick({ deliveryDate: true }))
+    const db = await getRequestDb()
 
-    const body = await request.json().catch(() => null)
-    const payload = createDraftSchema.parse(body)
+    const { rows: existingRows } = await db.query(
+      `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text
+       from orders
+       where customer_id = $1 and delivery_date = $2 and status = 'draft'
+       limit 1`,
+      [customerId, payload.deliveryDate]
+    )
 
-    const admin = createAdminClient()
-
-    // Check for existing draft
-    const { data: existingOrder, error: existingError } = await admin
-      .from('orders')
-      .select('*')
-      .eq('customer_id', customerId)
-      .eq('delivery_date', payload.deliveryDate)
-      .eq('status', 'draft')
-      .maybeSingle()
-
-    if (existingError) throw existingError
-
-    if (existingOrder) {
-      return Response.json({ data: { order: existingOrder, created: false } })
+    if (existingRows[0]) {
+      return apiOk({ order: existingRows[0], created: false }, 200, requestId)
     }
 
-    // Create new draft
-    const { data: order, error: insertError } = await admin
-      .from('orders')
-      .insert({
-        customer_id: customerId,
-        delivery_date: payload.deliveryDate,
-        status: 'draft',
-      })
-      .select('*')
-      .single()
+    try {
+      const { rows } = await db.query(
+        `insert into orders (customer_id, delivery_date, status)
+         values ($1, $2, 'draft')
+         returning id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text`,
+        [customerId, payload.deliveryDate]
+      )
 
-    if (insertError) {
-      // Race condition: another request created the draft
-      if (insertError.code === '23505') {
-        const { data: raceOrder } = await admin
-          .from('orders')
-          .select('*')
-          .eq('customer_id', customerId)
-          .eq('delivery_date', payload.deliveryDate)
-          .eq('status', 'draft')
-          .maybeSingle()
+      return apiOk({ order: rows[0], created: true }, 201, requestId)
+    } catch (insertError) {
+      if (
+        typeof insertError === 'object' &&
+        insertError !== null &&
+        'code' in insertError &&
+        (insertError as { code?: string }).code === '23505'
+      ) {
+        const { rows: raceRows } = await db.query(
+          `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text
+           from orders
+           where customer_id = $1 and delivery_date = $2 and status = 'draft'
+           limit 1`,
+          [customerId, payload.deliveryDate]
+        )
 
-        if (raceOrder) {
-          return Response.json({ data: { order: raceOrder, created: false } })
+        if (raceRows[0]) {
+          return apiOk({ order: raceRows[0], created: false }, 200, requestId)
         }
       }
+
       throw insertError
     }
-
-    return Response.json({ data: { order, created: true } }, { status: 201 })
   } catch (error) {
+    logApiEvent(requestId, 'portal_order_create_failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    })
     if (error instanceof Response) return error
-    if (error instanceof z.ZodError) {
-      return Response.json(
-        { error: { code: 'validation_error', message: 'Invalid request', details: error.flatten() } },
-        { status: 400 }
-      )
-    }
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return Response.json({ error: { code: 'internal_error', message } }, { status: 500 })
+    return toErrorResponse(error, requestId)
   }
 }

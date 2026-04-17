@@ -3,10 +3,19 @@ const path = require('node:path')
 const { Client } = require('pg')
 
 function resolveDbUrl() {
+  if (fs.existsSync(path.join(process.cwd(), '.env'))) {
+    process.loadEnvFile?.('.env')
+  }
+
+  if (fs.existsSync(path.join(process.cwd(), '.env.local'))) {
+    process.loadEnvFile?.('.env.local')
+  }
+
   return (
-    process.env.SUPABASE_DB_URL ||
+    process.env.DATABASE_URL ||
     process.env.POSTGRES_URL_NON_POOLING ||
     process.env.POSTGRES_URL ||
+    process.env.SUPABASE_DB_URL ||
     ''
   ).trim()
 }
@@ -29,7 +38,7 @@ async function main() {
 
   const dbUrl = resolveDbUrl()
   if (!dbUrl) {
-    throw new Error('Missing DB URL. Set SUPABASE_DB_URL or POSTGRES_URL_NON_POOLING or POSTGRES_URL.')
+    throw new Error('Missing DB URL. Set DATABASE_URL or POSTGRES_URL_NON_POOLING or POSTGRES_URL.')
   }
 
   const client = new Client({ connectionString: dbUrl })

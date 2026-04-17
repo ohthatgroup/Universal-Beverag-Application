@@ -1,4 +1,5 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { apiOk, getRequestId, logApiEvent, toErrorResponse } from '@/lib/server/api'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePortalOrderAccess, requirePortalToken } from '@/lib/server/customer-order-access'
 
 /**
@@ -10,10 +11,12 @@ export async function DELETE(
   request: Request,
   routeContext: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getRequestId(request)
   try {
     const token = requirePortalToken(request)
     const { id } = await routeContext.params
     const { order } = await requirePortalOrderAccess(id, token)
+    const db = await getRequestDb()
 
     if (order.status !== 'draft') {
       return Response.json(
@@ -22,19 +25,14 @@ export async function DELETE(
       )
     }
 
-    const admin = createAdminClient()
+    await db.query('delete from order_items where order_id = $1', [order.id])
 
-    const { error } = await admin
-      .from('order_items')
-      .delete()
-      .eq('order_id', order.id)
-
-    if (error) throw error
-
-    return Response.json({ data: { deleted: true } })
+    return apiOk({ deleted: true }, 200, requestId)
   } catch (error) {
+    logApiEvent(requestId, 'portal_order_reset_failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    })
     if (error instanceof Response) return error
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return Response.json({ error: { code: 'internal_error', message } }, { status: 500 })
+    return toErrorResponse(error, requestId)
   }
 }

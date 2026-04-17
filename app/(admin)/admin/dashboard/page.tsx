@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { OrdersSection } from '@/components/admin/orders-section'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { formatDeliveryDate, todayISODate } from '@/lib/utils'
 
 export default async function DashboardPage() {
-  const context = await requirePageAuth(['salesman'])
+  await requirePageAuth(['salesman'])
+  const db = await getRequestDb()
   const today = todayISODate()
 
   const [
@@ -18,76 +20,71 @@ export default async function DashboardPage() {
     ordersResponse,
     customersResponse,
   ] = await Promise.all([
-    context.supabase
-      .from('orders')
-      .select('*', { head: true, count: 'exact' })
-      .eq('delivery_date', today),
-    context.supabase
-      .from('orders')
-      .select('*', { head: true, count: 'exact' })
-      .eq('status', 'draft'),
-    context.supabase
-      .from('profiles')
-      .select('*', { head: true, count: 'exact' })
-      .eq('role', 'customer'),
-    context.supabase
-      .from('orders')
-      .select('*', { head: true, count: 'exact' })
-      .eq('status', 'submitted'),
-    context.supabase
-      .from('products')
-      .select('*', { head: true, count: 'exact' })
-      .is('customer_id', null)
-      .eq('is_discontinued', false),
-    context.supabase
-      .from('pallet_deals')
-      .select('*', { head: true, count: 'exact' })
-      .eq('is_active', true),
-    context.supabase
-      .from('orders')
-      .select('*')
-      .order('delivery_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(200),
-    context.supabase
-      .from('profiles')
-      .select('id,business_name,contact_name,email,access_token')
-      .eq('role', 'customer')
-      .order('business_name', { ascending: true }),
+    db.query<{ count: string }>('select count(*)::text as count from orders where delivery_date = $1', [today]),
+    db.query<{ count: string }>("select count(*)::text as count from orders where status = 'draft'"),
+    db.query<{ count: string }>("select count(*)::text as count from profiles where role = 'customer'"),
+    db.query<{ count: string }>("select count(*)::text as count from orders where status = 'submitted'"),
+    db.query<{ count: string }>(
+      'select count(*)::text as count from products where customer_id is null and is_discontinued = false'
+    ),
+    db.query<{ count: string }>("select count(*)::text as count from pallet_deals where is_active = true"),
+    db.query<{
+      id: string
+      customer_id: string | null
+      delivery_date: string
+      item_count: number | null
+      total: number | null
+      status: string
+      created_at: string
+    }>(
+      `select id, customer_id, delivery_date::text, item_count, total, status, created_at::text
+       from orders
+       order by delivery_date desc, created_at desc
+       limit 200`
+    ),
+    db.query<{
+      id: string
+      business_name: string | null
+      contact_name: string | null
+      email: string | null
+      access_token: string | null
+    }>(
+      `select id, business_name, contact_name, email, access_token
+       from profiles
+       where role = 'customer'
+       order by business_name asc nulls last, contact_name asc nulls last`
+    ),
   ])
-
-  if (ordersResponse.error) throw ordersResponse.error
-  if (customersResponse.error) throw customersResponse.error
 
   const stats = [
     {
       label: 'Orders Today',
-      value: ordersTodayCount.count ?? 0,
+      value: Number(ordersTodayCount.rows[0]?.count ?? 0),
       href: `/admin/dashboard?deliveryDate=${today}`,
     },
     {
       label: 'Pending Review',
-      value: submittedOrdersCount.count ?? 0,
+      value: Number(submittedOrdersCount.rows[0]?.count ?? 0),
       href: '/admin/dashboard?status=submitted',
     },
     {
       label: 'Drafts',
-      value: draftOrdersCount.count ?? 0,
+      value: Number(draftOrdersCount.rows[0]?.count ?? 0),
       href: '/admin/dashboard?status=draft',
     },
     {
       label: 'Customers',
-      value: activeCustomersCount.count ?? 0,
+      value: Number(activeCustomersCount.rows[0]?.count ?? 0),
       href: '/admin/customers',
     },
     {
       label: 'Products',
-      value: activeProductsCount.count ?? 0,
+      value: Number(activeProductsCount.rows[0]?.count ?? 0),
       href: '/admin/catalog',
     },
     {
       label: 'Pallets',
-      value: activePalletsCount.count ?? 0,
+      value: Number(activePalletsCount.rows[0]?.count ?? 0),
       href: '/admin/catalog/pallets',
     },
   ]
@@ -99,7 +96,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-muted-foreground">{formatDeliveryDate(today)}</p>
       </div>
 
-      {/* Stat cards — 2 cols mobile, 3 cols desktop */}
+      {/* Stat cards - 2 cols mobile, 3 cols desktop */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {stats.map((stat) => (
           <Link key={stat.label} href={stat.href}>
@@ -118,10 +115,9 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Full orders section */}
       <OrdersSection
-        orders={ordersResponse.data ?? []}
-        customers={customersResponse.data ?? []}
+        orders={ordersResponse.rows}
+        customers={customersResponse.rows}
         basePath="/admin/dashboard"
       />
     </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 
 interface CustomerPortalLinkProps {
   customerId: string
@@ -16,7 +17,8 @@ export function CustomerPortalLink({ customerId, accessToken }: CustomerPortalLi
   const [error, setError] = useState<string | null>(null)
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-  const portalUrl = token ? `${appUrl}/c/${token}` : null
+  const portalPath = buildCustomerPortalBasePath(token)
+  const portalUrl = portalPath ? `${appUrl}${portalPath}` : null
 
   const copyLink = async () => {
     if (!portalUrl) return
@@ -32,7 +34,9 @@ export function CustomerPortalLink({ customerId, accessToken }: CustomerPortalLi
       const response = await fetch(`/api/customers/${customerId}/regenerate-token`, {
         method: 'POST',
       })
-      const payload = await response.json().catch(() => null)
+      const payload = (await response.json().catch(() => null)) as
+        | { data?: { access_token?: string | null }; error?: { message?: string } }
+        | null
       if (!response.ok) {
         setError(payload?.error?.message ?? 'Failed to regenerate token')
         return

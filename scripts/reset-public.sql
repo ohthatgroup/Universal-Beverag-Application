@@ -5,6 +5,7 @@ drop function if exists public.submit_order(uuid) cascade;
 drop function if exists public.is_salesman() cascade;
 drop function if exists public.update_order_totals() cascade;
 drop function if exists public.set_updated_at() cascade;
+drop table if exists public.schema_migrations cascade;
 
 drop table if exists public.customer_products cascade;
 drop table if exists public.product_cutoff_overrides cascade;

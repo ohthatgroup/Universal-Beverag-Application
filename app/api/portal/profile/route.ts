@@ -1,8 +1,8 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
+import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { requirePortalToken } from '@/lib/server/customer-order-access'
 import { portalProfileUpdateSchema } from '@/lib/server/schemas'
-import { apiOk, toErrorResponse } from '@/lib/server/api'
 
 /**
  * PATCH /api/portal/profile
@@ -10,16 +10,13 @@ import { apiOk, toErrorResponse } from '@/lib/server/api'
  * Auth: X-Customer-Token header
  */
 export async function PATCH(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const token = requirePortalToken(request)
     const { customerId } = await resolveCustomerToken(token)
+    const payload = await parseBody(request, portalProfileUpdateSchema)
+    const db = await getRequestDb()
 
-    const body = await request.json().catch(() => null)
-    const payload = portalProfileUpdateSchema.parse(body)
-
-    const admin = createAdminClient()
-
-    // Only update provided fields — convert empty strings to null for optional fields
     const updates: Record<string, string | null> = {}
     for (const [key, value] of Object.entries(payload)) {
       if (value !== undefined) {
@@ -28,19 +25,26 @@ export async function PATCH(request: Request) {
     }
 
     if (Object.keys(updates).length === 0) {
-      return apiOk({ updated: false })
+      return apiOk({ updated: false }, 200, requestId)
     }
 
-    const { error } = await admin
-      .from('profiles')
-      .update(updates)
-      .eq('id', customerId)
+    const columns = Object.keys(updates)
+    const values = columns.map((column) => updates[column])
+    const assignments = columns.map((column, index) => `${column} = $${index + 1}`)
 
-    if (error) throw error
+    await db.query(
+      `update profiles
+       set ${assignments.join(', ')}, updated_at = now()
+       where id = $${columns.length + 1}`,
+      [...values, customerId]
+    )
 
-    return apiOk({ updated: true })
+    return apiOk({ updated: true }, 200, requestId)
   } catch (error) {
+    logApiEvent(requestId, 'portal_profile_update_failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    })
     if (error instanceof Response) return error
-    return toErrorResponse(error)
+    return toErrorResponse(error, requestId)
   }
 }

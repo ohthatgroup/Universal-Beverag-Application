@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, ShoppingBag, BarChart3, ChevronDown, Tag, Package } from 'lucide-react'
+import { LayoutDashboard, Users, ShoppingBag, BarChart3, ChevronDown, Tag, Package, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const topLinks = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/customers', label: 'Customers', icon: Users },
+  { href: '/admin/staff', label: 'Staff', icon: ShieldCheck },
 ]
 
 const catalogSubLinks = [

@@ -10,13 +10,17 @@
 /coverage
 /playwright-report
 /test-results
+/.playwright-cli
 
 # next.js
 /.next/
 /out/
+/.open-next/
 
 # production
 /build
+/output
+/.wrangler
 
 # misc
 .DS_Store
@@ -38,4 +42,3 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 Universal Beverages Price list MAR. 25 25 DRINKS (2).xlsx
-/docs

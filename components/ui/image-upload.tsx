@@ -35,7 +35,9 @@ export function ImageUpload({ value, onChange, folder, className, compact = fals
           body: formData,
         })
 
-        const payload = await response.json().catch(() => null)
+        const payload = (await response.json().catch(() => null)) as
+          | { data?: { url?: string | null }; error?: { message?: string } }
+          | null
 
         if (!response.ok) {
           const msg =

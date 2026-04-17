@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
+import { getRequestDb } from '@/lib/server/db'
 import { formatStructuredPack, normalizePackUom } from '@/lib/utils'
 
 const paramsSchema = z.object({
@@ -37,42 +38,32 @@ const createCustomerProductSchema = z.object({
 
 async function assertCustomerExists(customerId: string) {
   const context = await requireAuthContext(['salesman'])
-  const { data: customer, error } = await context.supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', customerId)
-    .eq('role', 'customer')
-    .maybeSingle()
+  const db = await getRequestDb()
+  const { rows } = await db.query<{ id: string }>(
+    `select id from profiles where id = $1 and role = 'customer' limit 1`,
+    [customerId]
+  )
 
-  if (error) {
-    throw error
-  }
-  if (!customer) {
+  if (!rows[0]) {
     throw new RouteError(404, 'customer_not_found', 'Customer not found')
   }
 
   return context
 }
 
-async function assertProductsVisibleToCustomer(
-  customerId: string,
-  productIds: string[],
-  requestContext: Awaited<ReturnType<typeof requireAuthContext>>
-) {
+async function assertProductsVisibleToCustomer(customerId: string, productIds: string[]) {
+  const db = await getRequestDb()
   const uniqueIds = Array.from(new Set(productIds))
   if (uniqueIds.length === 0) return
 
-  const { data: products, error } = await requestContext.supabase
-    .from('products')
-    .select('id')
-    .in('id', uniqueIds)
-    .or(`customer_id.is.null,customer_id.eq.${customerId}`)
+  const { rows } = await db.query<{ id: string }>(
+    `select id
+     from products
+     where id = any($1::uuid[]) and (customer_id is null or customer_id = $2)`,
+    [uniqueIds, customerId]
+  )
 
-  if (error) {
-    throw error
-  }
-
-  const visibleIds = new Set((products ?? []).map((product) => product.id))
+  const visibleIds = new Set(rows.map((product) => product.id))
   if (uniqueIds.some((productId) => !visibleIds.has(productId))) {
     throw new RouteError(
       400,
@@ -91,40 +82,27 @@ export async function PUT(
     const { id } = paramsSchema.parse(await routeContext.params)
     const payload = await parseBody(request, updateCustomerProductSchema)
     const context = await assertCustomerExists(id)
-    await assertProductsVisibleToCustomer(id, [payload.productId], context)
+    const db = await getRequestDb()
+    await assertProductsVisibleToCustomer(id, [payload.productId])
 
     const hidden = payload.hidden ?? false
     const customPrice = payload.customPrice ?? null
 
     if (!hidden && customPrice === null) {
-      const { error } = await context.supabase
-        .from('customer_products')
-        .delete()
-        .eq('customer_id', id)
-        .eq('product_id', payload.productId)
-
-      if (error) {
-        throw error
-      }
-
+      await db.query(
+        `delete from customer_products where customer_id = $1 and product_id = $2`,
+        [id, payload.productId]
+      )
       return apiOk({ deleted: true }, 200, requestId)
     }
 
-    const { error } = await context.supabase
-      .from('customer_products')
-      .upsert(
-        {
-          customer_id: id,
-          product_id: payload.productId,
-          excluded: hidden,
-          custom_price: customPrice,
-        },
-        { onConflict: 'customer_id,product_id' }
-      )
-
-    if (error) {
-      throw error
-    }
+    await db.query(
+      `insert into customer_products (customer_id, product_id, excluded, custom_price)
+       values ($1, $2, $3, $4)
+       on conflict (customer_id, product_id)
+       do update set excluded = EXCLUDED.excluded, custom_price = EXCLUDED.custom_price`,
+      [id, payload.productId, hidden, customPrice]
+    )
 
     logApiEvent(requestId, 'customer_product_updated', {
       customerId: id,
@@ -158,6 +136,7 @@ export async function PATCH(
     const { id } = paramsSchema.parse(await routeContext.params)
     const payload = await parseBody(request, bulkPriceUpdateSchema)
     const context = await assertCustomerExists(id)
+    const db = await getRequestDb()
 
     const updatesByProductId = new Map<string, { productId: string; customPrice: number | null }>()
     for (const update of payload.updates) {
@@ -167,20 +146,21 @@ export async function PATCH(
     const updates = Array.from(updatesByProductId.values())
     const productIds = updates.map((update) => update.productId)
 
-    await assertProductsVisibleToCustomer(id, productIds, context)
+    await assertProductsVisibleToCustomer(id, productIds)
 
-    const { data: existingRows, error: existingError } = await context.supabase
-      .from('customer_products')
-      .select('product_id,excluded,custom_price')
-      .eq('customer_id', id)
-      .in('product_id', productIds)
-
-    if (existingError) {
-      throw existingError
-    }
+    const { rows: existingRows } = await db.query<{
+      product_id: string
+      excluded: boolean | null
+      custom_price: number | null
+    }>(
+      `select product_id, excluded, custom_price
+       from customer_products
+       where customer_id = $1 and product_id = any($2::uuid[])`,
+      [id, productIds]
+    )
 
     const existingByProductId = new Map(
-      (existingRows ?? []).map((row) => [
+      existingRows.map((row) => [
         row.product_id,
         { excluded: Boolean(row.excluded), customPrice: row.custom_price },
       ])
@@ -211,24 +191,22 @@ export async function PATCH(
     }
 
     if (toDelete.length > 0) {
-      const { error: deleteError } = await context.supabase
-        .from('customer_products')
-        .delete()
-        .eq('customer_id', id)
-        .in('product_id', toDelete)
-
-      if (deleteError) {
-        throw deleteError
-      }
+      await db.query(
+        `delete from customer_products
+         where customer_id = $1 and product_id = any($2::uuid[])`,
+        [id, toDelete]
+      )
     }
 
     if (toUpsert.length > 0) {
-      const { error: upsertError } = await context.supabase.from('customer_products').upsert(toUpsert, {
-        onConflict: 'customer_id,product_id',
-      })
-
-      if (upsertError) {
-        throw upsertError
+      for (const row of toUpsert) {
+        await db.query(
+          `insert into customer_products (customer_id, product_id, excluded, custom_price)
+           values ($1, $2, $3, $4)
+           on conflict (customer_id, product_id)
+           do update set excluded = EXCLUDED.excluded, custom_price = EXCLUDED.custom_price`,
+          [row.customer_id, row.product_id, row.excluded, row.custom_price]
+        )
       }
     }
 
@@ -263,6 +241,7 @@ export async function POST(
     const { id } = paramsSchema.parse(await routeContext.params)
     const payload = await parseBody(request, createCustomerProductSchema)
     const context = await assertCustomerExists(id)
+    const db = await getRequestDb()
 
     const packCount = payload.packCount ?? null
     const sizeValue = payload.sizeValue ?? null
@@ -284,42 +263,37 @@ export async function POST(
         : null
     const packDetails = payload.packDetails?.trim() || inferredPackDetails || null
 
-    const { data: firstBySort, error: sortFetchError } = await context.supabase
-      .from('products')
-      .select('sort_order')
-      .or(`customer_id.is.null,customer_id.eq.${id}`)
-      .order('sort_order', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (sortFetchError) {
-      throw sortFetchError
-    }
-
-    const nextSortOrder = (firstBySort?.sort_order ?? 0) - 1
-
-    const { data: created, error: createError } = await context.supabase
-      .from('products')
-      .insert({
-        brand_id: payload.brandId ?? null,
-        customer_id: id,
-        title: payload.title,
-        pack_details: packDetails,
-        pack_count: packCount,
-        size_value: sizeValue,
-        size_uom: sizeUom,
-        price: Number(payload.price),
-        image_url: payload.imageUrl || null,
-        is_new: true,
-        is_discontinued: false,
-        sort_order: nextSortOrder,
-      })
-      .select('id,title,brand_id,pack_details,pack_count,size_value,size_uom,price,customer_id')
-      .single()
-
-    if (createError) {
-      throw createError
-    }
+    const { rows } = await db.query<{
+      id: string
+      title: string
+      brand_id: string | null
+      pack_details: string | null
+      pack_count: number | null
+      size_value: number | null
+      size_uom: string | null
+      price: number
+      customer_id: string | null
+    }>(
+      `insert into products (
+        brand_id, customer_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, is_new, is_discontinued, sort_order
+      ) values (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, true, false, coalesce((select min(sort_order) from products where customer_id is null or customer_id = $2), 0) - 1
+      )
+      returning id, title, brand_id, pack_details, pack_count, size_value, size_uom, price, customer_id`,
+      [
+        payload.brandId ?? null,
+        id,
+        payload.title,
+        packDetails,
+        packCount,
+        sizeValue,
+        sizeUom,
+        Number(payload.price),
+        payload.imageUrl || null,
+      ]
+    )
+    const created = rows[0]
+    if (!created) throw new Error('Failed to create product')
 
     logApiEvent(requestId, 'customer_scoped_product_created', {
       customerId: id,

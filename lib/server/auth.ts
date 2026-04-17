@@ -1,67 +1,58 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth/server'
+import { getRequestDb } from '@/lib/server/db'
+import { RouteError } from '@/lib/server/route-error'
+import { markPendingStaffInvitesAccepted } from '@/lib/server/staff-invites'
 import type { Database, Profile, UserRole } from '@/lib/types'
 
-export type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
 type OrderRow = Database['public']['Tables']['orders']['Row']
 type ProfileRow = Database['public']['Tables']['profiles']['Row']
 
 export interface AuthContext {
-  supabase: ServerSupabaseClient
+  authUserId: string
   userId: string
   profile: Profile
 }
 
-export class RouteError extends Error {
-  status: number
-  code: string
-  details?: unknown
-
-  constructor(status: number, code: string, message: string, details?: unknown) {
-    super(message)
-    this.status = status
-    this.code = code
-    this.details = details
-  }
-}
-
-export function isRouteError(error: unknown): error is RouteError {
-  return error instanceof RouteError
-}
+export { RouteError, isRouteError } from '@/lib/server/route-error'
 
 export async function getAuthContext(): Promise<
   | (AuthContext & { hasSession: true })
-  | { supabase: ServerSupabaseClient; hasSession: false }
+  | { hasSession: false }
 > {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  const { data: session, error } = await auth.getSession()
 
-  if (error || !user) {
-    return { supabase, hasSession: false }
+  if (error || !session?.user) {
+    return { hasSession: false }
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle()
+  const profile = await resolveProfileForUser(session.user.id, session.user.email)
 
-  if (profileError || !profile || !isValidRole(profile.role)) {
+  if (!profile || !isValidRole(profile.role)) {
     throw new RouteError(
       403,
       'profile_missing',
       'Signed-in user does not have an application profile',
-      profileError?.message
+      session.user.email
     )
   }
 
   const normalizedProfile = normalizeProfile(profile)
 
+  if (normalizedProfile.role === 'salesman' && normalizedProfile.disabled_at) {
+    throw new RouteError(403, 'admin_disabled', 'This admin account is disabled')
+  }
+
+  if (normalizedProfile.role === 'salesman') {
+    await markPendingStaffInvitesAccepted({
+      profileId: normalizedProfile.id,
+      email: normalizedProfile.email,
+      authUserId: session.user.id,
+    })
+  }
+
   return {
-    supabase,
-    userId: user.id,
+    authUserId: session.user.id,
+    userId: profile.id,
     profile: normalizedProfile,
     hasSession: true,
   }
@@ -86,14 +77,11 @@ export async function requireOrderAccess(
   options: { allowSalesman: boolean } = { allowSalesman: true }
 ): Promise<AuthContext & { order: OrderRow }> {
   const context = await requireAuthContext()
+  const db = await getRequestDb()
+  const orderResult = await db.query<OrderRow>('select * from orders where id = $1 limit 1', [orderId])
+  const order = orderResult.rows[0]
 
-  const { data: order, error } = await context.supabase
-    .from('orders')
-    .select('*')
-    .eq('id', orderId)
-    .maybeSingle()
-
-  if (error || !order) {
+  if (!order) {
     throw new RouteError(404, 'order_not_found', 'Order not found')
   }
 
@@ -118,6 +106,52 @@ function isValidRole(value: string): value is UserRole {
   return value === 'customer' || value === 'salesman'
 }
 
+async function resolveProfileForUser(authUserId: string, email: string) {
+  const db = await getRequestDb()
+
+  const directProfile = await db.query<ProfileRow>(
+    'select * from profiles where auth_user_id = $1 limit 1',
+    [authUserId]
+  )
+  if (directProfile.rows[0]) {
+    return directProfile.rows[0]
+  }
+
+  const normalizedEmail = email.trim().toLowerCase()
+  if (!normalizedEmail) {
+    return null
+  }
+
+  const fallbackProfiles = await db.query<ProfileRow>(
+    `
+      select *
+      from profiles
+      where lower(coalesce(email, '')) = $1
+      order by created_at asc
+      limit 2
+    `,
+    [normalizedEmail]
+  )
+
+  if (fallbackProfiles.rows.length !== 1) {
+    return null
+  }
+
+  const profile = fallbackProfiles.rows[0]
+  if (!profile.auth_user_id) {
+    await db.query('update profiles set auth_user_id = $1 where id = $2 and auth_user_id is null', [
+      authUserId,
+      profile.id,
+    ])
+    return {
+      ...profile,
+      auth_user_id: authUserId,
+    }
+  }
+
+  return profile
+}
+
 export function normalizeProfile(profile: ProfileRow): Profile {
   return {
     ...profile,
@@ -126,6 +160,7 @@ export function normalizeProfile(profile: ProfileRow): Profile {
     custom_pricing: profile.custom_pricing ?? false,
     default_group: profile.default_group === 'size' ? 'size' : 'brand',
     access_token: profile.access_token ?? null,
+    disabled_at: profile.disabled_at ?? null,
     created_at: profile.created_at ?? new Date(0).toISOString(),
     updated_at: profile.updated_at ?? new Date(0).toISOString(),
   }

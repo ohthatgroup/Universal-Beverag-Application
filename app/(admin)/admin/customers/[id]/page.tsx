@@ -5,7 +5,7 @@ import { CustomerPortalLink } from '@/components/admin/customer-portal-link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel, todayISODate } from '@/lib/utils'
 import type { OrderStatus } from '@/lib/types'
@@ -15,29 +15,54 @@ const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   await requirePageAuth(['salesman'])
-  const supabase = await createClient()
+  const db = await getRequestDb()
 
-  const [{ data: customer, error: customerError }, { data: orderHistory }, { count: excludedCount }] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', id)
-      .eq('role', 'customer')
-      .maybeSingle(),
-    supabase
-      .from('orders')
-      .select('id,delivery_date,status,total,item_count,created_at')
-      .eq('customer_id', id)
-      .order('delivery_date', { ascending: false })
-      .limit(20),
-    supabase
-      .from('customer_products')
-      .select('*', { head: true, count: 'exact' })
-      .eq('customer_id', id)
-      .eq('excluded', true),
+  const [{ rows: customers }, { rows: orderHistory }, { rows: excludedCountRows }] = await Promise.all([
+    db.query<{
+      id: string
+      business_name: string | null
+      contact_name: string | null
+      email: string | null
+      phone: string | null
+      address: string | null
+      city: string | null
+      state: string | null
+      zip: string | null
+      show_prices: boolean | null
+      custom_pricing: boolean | null
+      default_group: 'brand' | 'size' | null
+      access_token: string | null
+    }>(
+      `select id, business_name, contact_name, email, phone, address, city, state, zip, show_prices, custom_pricing, default_group, access_token
+       from profiles
+       where id = $1 and role = 'customer'
+       limit 1`,
+      [id]
+    ),
+    db.query<{
+      id: string
+      delivery_date: string
+      status: string
+      total: number | null
+      item_count: number | null
+      created_at: string
+    }>(
+      `select id, delivery_date::text, status, total, item_count, created_at::text
+       from orders
+       where customer_id = $1
+       order by delivery_date desc
+       limit 20`,
+      [id]
+    ),
+    db.query<{ count: string }>(
+      `select count(*)::text as count
+       from customer_products
+       where customer_id = $1 and excluded = true`,
+      [id]
+    ),
   ])
 
-  if (customerError) throw customerError
+  const customer = customers[0] ?? null
   if (!customer) notFound()
 
   const customerName = customer.business_name || customer.contact_name || 'Customer'
@@ -47,26 +72,38 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     'use server'
 
     await requirePageAuth(['salesman'])
-    const supabaseClient = await createClient()
+    const actionDb = await getRequestDb()
 
-    const { error: updateError } = await supabaseClient
-      .from('profiles')
-      .update({
-        business_name: String(formData.get('business_name') ?? '').trim() || null,
-        contact_name: String(formData.get('contact_name') ?? '').trim() || null,
-        email: String(formData.get('email') ?? '').trim() || null,
-        phone: String(formData.get('phone') ?? '').trim() || null,
-        address: String(formData.get('address') ?? '').trim() || null,
-        city: String(formData.get('city') ?? '').trim() || null,
-        state: String(formData.get('state') ?? '').trim() || null,
-        zip: String(formData.get('zip') ?? '').trim() || null,
-        show_prices: formData.get('show_prices') === 'on',
-        custom_pricing: formData.get('custom_pricing') === 'on',
-        default_group: (formData.get('default_group') as 'brand' | 'size') || 'brand',
-      })
-      .eq('id', id)
-
-    if (updateError) throw updateError
+    await actionDb.query(
+      `update profiles
+       set business_name = $2,
+           contact_name = $3,
+           email = $4,
+           phone = $5,
+           address = $6,
+           city = $7,
+           state = $8,
+           zip = $9,
+           show_prices = $10,
+           custom_pricing = $11,
+           default_group = $12,
+           updated_at = now()
+       where id = $1`,
+      [
+        id,
+        String(formData.get('business_name') ?? '').trim() || null,
+        String(formData.get('contact_name') ?? '').trim() || null,
+        String(formData.get('email') ?? '').trim() || null,
+        String(formData.get('phone') ?? '').trim() || null,
+        String(formData.get('address') ?? '').trim() || null,
+        String(formData.get('city') ?? '').trim() || null,
+        String(formData.get('state') ?? '').trim() || null,
+        String(formData.get('zip') ?? '').trim() || null,
+        formData.get('show_prices') === 'on',
+        formData.get('custom_pricing') === 'on',
+        (formData.get('default_group') as 'brand' | 'size') || 'brand',
+      ]
+    )
     redirect(`/admin/customers/${id}`)
   }
 
@@ -74,40 +111,33 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     'use server'
 
     await requirePageAuth(['salesman'])
-    const supabaseClient = await createClient()
+    const actionDb = await getRequestDb()
 
     const deliveryDate = String(formData.get('delivery_date') ?? '').trim()
     if (!isoDateRegex.test(deliveryDate)) {
       throw new Error('Delivery date must use YYYY-MM-DD format')
     }
 
-    const { data: existingDraft, error: existingDraftError } = await supabaseClient
-      .from('orders')
-      .select('id')
-      .eq('customer_id', id)
-      .eq('delivery_date', deliveryDate)
-      .eq('status', 'draft')
-      .maybeSingle()
+    const { rows: existingDraftRows } = await actionDb.query<{ id: string }>(
+      `select id
+       from orders
+       where customer_id = $1 and delivery_date = $2 and status = 'draft'
+       limit 1`,
+      [id, deliveryDate]
+    )
 
-    if (existingDraftError) throw existingDraftError
-
-    if (existingDraft?.id) {
-      redirect(`/admin/orders/${existingDraft.id}?returnTo=${encodeURIComponent(`/admin/customers/${id}`)}`)
+    if (existingDraftRows[0]?.id) {
+      redirect(`/admin/orders/${existingDraftRows[0].id}?returnTo=${encodeURIComponent(`/admin/customers/${id}`)}`)
     }
 
-    const { data: createdOrder, error: createOrderError } = await supabaseClient
-      .from('orders')
-      .insert({
-        customer_id: id,
-        delivery_date: deliveryDate,
-        status: 'draft',
-      })
-      .select('id')
-      .single()
-
-    if (createOrderError || !createdOrder) {
-      throw createOrderError ?? new Error('Unable to create draft order')
-    }
+    const { rows: createdOrderRows } = await actionDb.query<{ id: string }>(
+      `insert into orders (customer_id, delivery_date, status)
+       values ($1, $2, 'draft')
+       returning id`,
+      [id, deliveryDate]
+    )
+    const createdOrder = createdOrderRows[0]
+    if (!createdOrder) throw new Error('Unable to create draft order')
 
     redirect(`/admin/orders/${createdOrder.id}?returnTo=${encodeURIComponent(`/admin/customers/${id}`)}`)
   }
@@ -116,14 +146,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     'use server'
 
     await requirePageAuth(['salesman'])
-    const supabaseClient = await createClient()
-
-    const { error: deleteError } = await supabaseClient
-      .from('profiles')
-      .delete()
-      .eq('id', id)
-
-    if (deleteError) throw deleteError
+    const actionDb = await getRequestDb()
+    await actionDb.query('delete from profiles where id = $1', [id])
     redirect('/admin/customers')
   }
 
@@ -242,7 +266,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           >
             <div>
               <div className="text-sm font-medium">Manage Products</div>
-              <div className="text-xs text-muted-foreground">{excludedCount ?? 0} excluded</div>
+              <div className="text-xs text-muted-foreground">{Number(excludedCountRows[0]?.count ?? 0)} excluded</div>
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
           </Link>

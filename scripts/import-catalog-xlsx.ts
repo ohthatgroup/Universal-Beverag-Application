@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Client } from 'pg'
+import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
 
 type Block = 'left' | 'right'
@@ -66,7 +67,50 @@ interface ExistingProductRow {
   is_discontinued: boolean
 }
 
+export interface CatalogImportReport {
+  mode: 'dry-run' | 'apply'
+  workbookPath: string
+  parsedPricedRows: number
+  uniqueProducts: number
+  distinctBrands: number
+  skippedRows: number
+  duplicateWorkbookRows: number
+  brandsToCreate: number
+  createdBrands: number
+  productsToInsert: number
+  productsToUpdate: number
+  productsUnchanged: number
+  unresolvedBrandProducts: number
+}
+
 const HEADER_TOKENS = new Set(['PRODUCT', 'DESCRIPTION', 'CASE', 'COST'])
+
+function loadLocalEnvFiles() {
+  if (existsSync('.env')) {
+    process.loadEnvFile?.('.env')
+  }
+
+  if (existsSync('.env.local')) {
+    process.loadEnvFile?.('.env.local')
+  }
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  if (typeof error === 'string' && error) {
+    return error
+  }
+  if (error && typeof error === 'object') {
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return String(error)
+    }
+  }
+  return String(error)
+}
 
 const BRANDS_ALIAS: Record<string, string> = {
   COKE: 'Coca-Cola',
@@ -115,8 +159,8 @@ function parseArgs(argv: string[]): CliOptions {
 
 function printHelp() {
   console.log(
-    [
-      'Usage: tsx scripts/import-catalog-xlsx.ts [--file <path>] [--apply] [--db-url <url>]',
+      [
+      'Usage: node --experimental-strip-types scripts/import-catalog-xlsx.ts [--file <path>] [--apply] [--db-url <url>]',
       '',
       'Options:',
       '  --file     Path to .xlsx file. Defaults to workbook in repo root.',
@@ -124,7 +168,7 @@ function printHelp() {
       '  --db-url   Postgres connection string. Fallbacks: env vars, .claude/settings.local.json.',
       '',
       'Environment fallback order:',
-      '  SUPABASE_DB_URL -> POSTGRES_URL_NON_POOLING -> POSTGRES_URL',
+      '  DATABASE_URL -> SUPABASE_DB_URL -> POSTGRES_URL_NON_POOLING -> POSTGRES_URL',
     ].join('\n')
   )
 }
@@ -611,6 +655,7 @@ function getDbUrlFromClaudeSettings(): string | undefined {
 function resolveDbUrl(explicit?: string): string | undefined {
   return (
     explicit ??
+    process.env.DATABASE_URL ??
     process.env.SUPABASE_DB_URL ??
     process.env.POSTGRES_URL_NON_POOLING ??
     process.env.POSTGRES_URL ??
@@ -630,8 +675,9 @@ function parsedIdentityKey(parsed: ParsedProduct): string {
   return `${normalizeKey(parsed.brand)}|${normalizeKey(parsed.title)}|${normalizeKey(parsed.packDetails)}`
 }
 
-async function run() {
-  const options = parseArgs(process.argv.slice(2))
+export async function runCatalogImport(argv: string[] = process.argv.slice(2)): Promise<CatalogImportReport> {
+  loadLocalEnvFiles()
+  const options = parseArgs(argv)
   const parsed = parseWorkbookFromFile(options.filePath)
 
   const dedupedByParsedKey = new Map<string, ParsedProduct>()
@@ -652,6 +698,22 @@ async function run() {
   console.log(`Skipped rows: ${parsed.skipped.length}`)
   if (duplicateParsedRows.length > 0) {
     console.log(`Duplicate workbook rows collapsed by key: ${duplicateParsedRows.length}`)
+  }
+
+  const baseReport: CatalogImportReport = {
+    mode: options.apply ? 'apply' : 'dry-run',
+    workbookPath: options.filePath,
+    parsedPricedRows: parsed.products.length,
+    uniqueProducts: catalogProducts.length,
+    distinctBrands: distinctBrands.size,
+    skippedRows: parsed.skipped.length,
+    duplicateWorkbookRows: duplicateParsedRows.length,
+    brandsToCreate: 0,
+    createdBrands: 0,
+    productsToInsert: 0,
+    productsToUpdate: 0,
+    productsUnchanged: 0,
+    unresolvedBrandProducts: 0,
   }
 
   if (parsed.skipped.length > 0) {
@@ -677,7 +739,7 @@ async function run() {
   const dbUrl = resolveDbUrl(options.dbUrl)
   if (!dbUrl) {
     console.log('No DB URL found; dry-run parse complete (no database actions).')
-    process.exit(0)
+    return baseReport
   }
 
   const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
@@ -705,6 +767,7 @@ async function run() {
 
     const uniqueMissingBrands = [...new Set(missingBrandNames.map((v) => normalizeSpaces(v)))]
     console.log(`Brands to create: ${uniqueMissingBrands.length}`)
+    baseReport.brandsToCreate = uniqueMissingBrands.length
 
     if (options.apply && uniqueMissingBrands.length > 0) {
       await client.query('begin')
@@ -719,6 +782,7 @@ async function run() {
       }
       await client.query('commit')
       console.log(`Created brands: ${uniqueMissingBrands.length}`)
+      baseReport.createdBrands = uniqueMissingBrands.length
     } else if (!options.apply && uniqueMissingBrands.length > 0) {
       console.log('Brand creation preview:')
       for (const name of uniqueMissingBrands.slice(0, 40)) {
@@ -782,10 +846,14 @@ async function run() {
     if (unresolvedBrand > 0) {
       console.log(`Products skipped due to unresolved brand: ${unresolvedBrand}`)
     }
+    baseReport.productsToInsert = inserts.length
+    baseReport.productsToUpdate = updates.length
+    baseReport.productsUnchanged = unchanged
+    baseReport.unresolvedBrandProducts = unresolvedBrand
 
     if (!options.apply) {
       console.log('Dry-run complete. Use --apply to persist changes.')
-      process.exit(0)
+      return baseReport
     }
 
     await client.query('begin')
@@ -812,6 +880,7 @@ async function run() {
     console.log('Catalog upload completed.')
     console.log(`Inserted products: ${inserts.length}`)
     console.log(`Updated products: ${updates.length}`)
+    return baseReport
   } catch (error) {
     try {
       await client.query('rollback')
@@ -824,8 +893,14 @@ async function run() {
   }
 }
 
-run().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(`Import failed: ${message}`)
-  process.exit(1)
-})
+const isDirectExecution =
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isDirectExecution) {
+  runCatalogImport().catch((error) => {
+    const message = formatError(error)
+    console.error(`Import failed: ${message}`)
+    process.exit(1)
+  })
+}

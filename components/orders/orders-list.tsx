@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { buildCustomerOrderDeepLink, buildCustomerPortalOrderDatePath } from '@/lib/portal-links'
 import type { Order, OrderStatus } from '@/lib/types'
 import { addDays, formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,7 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
     setReorderDate((prev) => addDays(prev, days))
   }
 
-  const getOrderHref = (orderId: string) => `/c/${token}/order/link/${orderId}`
+  const getOrderHref = (orderId: string) => buildCustomerOrderDeepLink(token, orderId) ?? '/portal'
 
   const navigateToOrder = (orderId: string) => {
     router.push(getOrderHref(orderId))
@@ -84,7 +85,9 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
         body: JSON.stringify({ status: 'draft' }),
       })
       if (!response.ok) {
-        const payload = await response.json().catch(() => null)
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null
         setError(payload?.error?.message ?? 'Failed to cancel order')
         return
       }
@@ -104,7 +107,9 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
         headers: { 'X-Customer-Token': token },
       })
       if (!response.ok) {
-        const payload = await response.json().catch(() => null)
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null
         setError(payload?.error?.message ?? 'Failed to delete order')
         return
       }
@@ -149,7 +154,12 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
 
     setIsReorderDialogOpen(false)
     setSelectedReorderOrderId(null)
-    router.push(clonedOrderId ? `/c/${token}/order/link/${clonedOrderId}` : `/c/${token}/order/${deliveryDate}`)
+    const destination = clonedOrderId
+      ? buildCustomerOrderDeepLink(token, clonedOrderId)
+      : buildCustomerPortalOrderDatePath(token, deliveryDate)
+    if (destination) {
+      router.push(destination)
+    }
     router.refresh()
   }
 
@@ -169,7 +179,7 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
       <div className="mt-3 flex flex-wrap gap-2">
         {order.status === 'draft' && (
           <Button asChild size="sm" variant="outline">
-            <Link href={`/c/${token}/order/link/${order.id}`}>
+            <Link href={getOrderHref(order.id)}>
               <Pencil className="mr-1.5 h-3.5 w-3.5" />
               Edit
             </Link>

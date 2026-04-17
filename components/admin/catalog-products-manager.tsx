@@ -76,7 +76,9 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
           orderedIds: nextRows.map((row) => row.id),
         }),
       })
-      const payload = await response.json().catch(() => null)
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
       if (!response.ok) {
         throw new Error(payload?.error?.message ?? 'Failed to save order')
       }
@@ -143,7 +145,9 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
           ids,
         }),
       })
-      const payload = await response.json().catch(() => null)
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
       if (!response.ok) {
         throw new Error(payload?.error?.message ?? 'Failed to delete products')
       }
@@ -214,7 +218,9 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const result = await response.json().catch(() => null)
+      const result = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
       if (!response.ok) {
         throw new Error(result?.error?.message ?? 'Failed to create product')
       }

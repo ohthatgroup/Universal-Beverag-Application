@@ -1,10 +1,11 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FormEvent, Suspense, useMemo, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { FormEvent, Suspense, useEffect, useState } from 'react'
+import { getAuthClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { buildInteractiveUrl } from '@/lib/config/public-url'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -17,19 +18,52 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
+  const authClient = getAuthClient()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') ?? '/admin/dashboard'
+  const code = searchParams.get('code')
   const error = searchParams.get('error')
 
-  const supabase = useMemo(() => createClient(), [])
-
-  const [email, setEmail] = useState('')
+  const [salesmanEmail, setSalesmanEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+  const [isExchangingCode, setIsExchangingCode] = useState(false)
+
+  useEffect(() => {
+    if (!code || isExchangingCode) {
+      return
+    }
+
+    let isCancelled = false
+
+    const exchangeCode = async () => {
+      setIsExchangingCode(true)
+      setMessage(null)
+
+      const { error: exchangeError } = await authClient.exchangeCodeForSession(code)
+      if (isCancelled) {
+        return
+      }
+
+      if (exchangeError) {
+        setMessage(exchangeError.message)
+        setIsExchangingCode(false)
+        return
+      }
+
+      window.location.replace(redirect)
+    }
+
+    void exchangeCode()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [authClient, code, isExchangingCode, redirect, router])
 
   const onSalesmanLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -37,8 +71,8 @@ function LoginContent() {
     setMessage(null)
     setSuccessMessage(null)
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+    const { error: signInError } = await authClient.signInWithPassword({
+      email: salesmanEmail,
       password,
     })
 
@@ -49,25 +83,22 @@ function LoginContent() {
       return
     }
 
-    router.push(redirect)
-    router.refresh()
+    window.location.assign(redirect)
   }
 
   const onForgotPassword = async () => {
-    if (!email) {
+    if (!salesmanEmail) {
       setMessage('Enter your email address first, then click Forgot password.')
       return
     }
+
     setIsResetting(true)
     setMessage(null)
     setSuccessMessage(null)
 
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent('/auth/reset-password')}`
-
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email,
-      { redirectTo }
-    )
+    const { error: resetError } = await authClient.resetPasswordForEmail(salesmanEmail, {
+      redirectTo: buildInteractiveUrl('/auth/reset-password'),
+    })
 
     setIsResetting(false)
 
@@ -76,7 +107,7 @@ function LoginContent() {
       return
     }
 
-    setSuccessMessage('Check your email for a password reset link.')
+    router.push(`/auth/reset-email-sent?email=${encodeURIComponent(salesmanEmail.trim())}`)
   }
 
   return (
@@ -89,7 +120,11 @@ function LoginContent() {
             {error === 'auth_callback_failed'
               ? 'The authentication callback failed. Please try again.'
               : error === 'profile_missing'
-                ? 'You are signed in but do not have a profile yet. Contact your admin.'
+                ? 'You are signed in, but this account is not linked to an admin profile.'
+                : error === 'admin_disabled'
+                  ? 'This admin account is disabled. Contact another salesman if you need access restored.'
+                : error === 'admin_only'
+                  ? 'This sign-in page is for admin access only. Customers should use their portal access link.'
                 : message}
           </div>
         )}
@@ -102,7 +137,7 @@ function LoginContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Salesman Login</CardTitle>
+            <CardTitle>Admin Sign In</CardTitle>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={onSalesmanLogin}>
@@ -112,8 +147,8 @@ function LoginContent() {
                   id="salesman-email"
                   type="email"
                   required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  value={salesmanEmail}
+                  onChange={(event) => setSalesmanEmail(event.target.value)}
                 />
               </div>
 
@@ -128,7 +163,7 @@ function LoginContent() {
                 />
               </div>
 
-              <Button disabled={isLoading} type="submit" className="w-full">
+              <Button disabled={isLoading || isExchangingCode} type="submit" className="w-full">
                 {isLoading ? 'Signing in...' : 'Sign in'}
               </Button>
             </form>
@@ -137,7 +172,7 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={onForgotPassword}
-                disabled={isResetting}
+                disabled={isResetting || isExchangingCode}
                 className="text-sm text-muted-foreground underline hover:text-foreground disabled:opacity-50"
               >
                 {isResetting ? 'Sending...' : 'Forgot password?'}
@@ -145,6 +180,7 @@ function LoginContent() {
             </div>
           </CardContent>
         </Card>
+
       </div>
     </div>
   )

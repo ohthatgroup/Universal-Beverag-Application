@@ -2,11 +2,21 @@ import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { apiOk, getRequestId, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
+import { buildRateLimitKey, consumeRateLimit, getEnvRateLimit } from '@/lib/server/rate-limit'
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
 })
+
+const portalTokenRateLimit = getEnvRateLimit(
+  'PORTAL_TOKEN_ROTATION_RATE_LIMIT_MAX',
+  'PORTAL_TOKEN_ROTATION_WINDOW_MS',
+  {
+    maxRequests: 10,
+    windowMs: 15 * 60 * 1000,
+  }
+)
 
 export async function POST(
   request: Request,
@@ -16,17 +26,18 @@ export async function POST(
   try {
     const context = await requireAuthContext(['salesman'])
     const { id } = paramsSchema.parse(await routeContext.params)
+    consumeRateLimit({
+      key: buildRateLimitKey('portal-token-rotation', request, [context.userId, id]),
+      ...portalTokenRateLimit,
+    })
 
-    const admin = createAdminClient()
-
-    // Verify this is a customer profile
-    const { data: profile, error: profileError } = await admin
-      .from('profiles')
-      .select('role')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (profileError || !profile) {
+    const db = await getRequestDb()
+    const { rows } = await db.query<{ role: string }>(
+      'select role from profiles where id = $1 limit 1',
+      [id]
+    )
+    const profile = rows[0]
+    if (!profile) {
       throw new RouteError(404, 'customer_not_found', 'Customer not found')
     }
 
@@ -37,12 +48,7 @@ export async function POST(
     // Generate new token
     const newToken = randomBytes(16).toString('hex')
 
-    const { error: updateError } = await admin
-      .from('profiles')
-      .update({ access_token: newToken })
-      .eq('id', id)
-
-    if (updateError) throw updateError
+    await db.query('update profiles set access_token = $2, updated_at = now() where id = $1', [id, newToken])
 
     void context // used for auth check
 

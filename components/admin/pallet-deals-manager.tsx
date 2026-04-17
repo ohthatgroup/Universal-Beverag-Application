@@ -56,7 +56,9 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
           orderedIds: nextRows.map((row) => row.id),
         }),
       })
-      const payload = await response.json().catch(() => null)
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
       if (!response.ok) {
         throw new Error(payload?.error?.message ?? 'Failed to save order')
       }
@@ -119,7 +121,9 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
           ids,
         }),
       })
-      const payload = await response.json().catch(() => null)
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
       if (!response.ok) {
         throw new Error(payload?.error?.message ?? 'Failed to delete deals')
       }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { ZodError, type ZodType } from 'zod'
-import { isRouteError } from '@/lib/server/auth'
+import { isRouteError } from '@/lib/server/route-error'
 
 export interface ApiErrorBody {
   error: {

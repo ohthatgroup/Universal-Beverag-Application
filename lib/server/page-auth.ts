@@ -1,9 +1,19 @@
 import { redirect } from 'next/navigation'
 import type { UserRole } from '@/lib/types'
-import { getAuthContext } from '@/lib/server/auth'
+import { getAuthContext, isRouteError } from '@/lib/server/auth'
 
 export async function requirePageAuth(allowedRoles?: UserRole[]) {
-  const context = await getAuthContext().catch(() => ({ hasSession: false as const }))
+  const context = await getAuthContext().catch((error) => {
+    if (isRouteError(error)) {
+      if (error.code === 'admin_disabled') {
+        redirect('/auth/login?error=admin_disabled')
+      }
+      if (error.code === 'profile_missing') {
+        redirect('/auth/login?error=profile_missing')
+      }
+    }
+    return { hasSession: false as const }
+  })
 
   if (!('hasSession' in context) || !context.hasSession) {
     redirect('/auth/login')

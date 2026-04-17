@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { buildCustomerOrderDeepLink, buildCustomerPortalOrderDatePath } from '@/lib/portal-links'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -57,8 +58,14 @@ export function DateSelectorCard({ token, initialDate, drafts }: DateSelectorCar
     const deliveryDate =
       payload && 'data' in payload ? payload.data?.order?.delivery_date ?? date : date
 
-    router.push(orderId ? `/c/${token}/order/link/${orderId}` : `/c/${token}/order/${deliveryDate}`)
-    router.refresh()
+    const destination = orderId
+      ? buildCustomerOrderDeepLink(token, orderId)
+      : buildCustomerPortalOrderDatePath(token, deliveryDate)
+
+    if (destination) {
+      router.push(destination)
+      router.refresh()
+    }
   }
 
   const moveDate = (direction: -1 | 1) => {

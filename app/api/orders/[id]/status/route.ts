@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireOrderAccess, RouteError } from '@/lib/server/auth'
+import { getRequestDb } from '@/lib/server/db'
 import { updateOrderStatusSchema } from '@/lib/server/schemas'
 
 const paramsSchema = z.object({
@@ -34,6 +35,7 @@ export async function PATCH(
     const { id } = paramsSchema.parse(await routeContext.params)
     const payload = await parseBody(request, updateOrderStatusSchema)
     const context = await requireOrderAccess(id)
+    const db = await getRequestDb()
     const currentOrder = context.order
 
     if (!isTransitionAllowed(currentOrder.status, payload.status, context.profile.role)) {
@@ -64,16 +66,15 @@ export async function PATCH(
       patch.delivered_at = null
     }
 
-    const { data, error } = await context.supabase
-      .from('orders')
-      .update(patch)
-      .eq('id', context.order.id)
-      .select('*')
-      .single()
-
-    if (error) {
-      throw error
-    }
+    const { rows } = await db.query(
+      `update orders
+       set status = $2, submitted_at = $3, delivered_at = $4
+       where id = $1
+       returning id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text`,
+      [context.order.id, patch.status, patch.submitted_at ?? null, patch.delivered_at ?? null]
+    )
+    const data = rows[0]
+    if (!data) throw new Error('Order not found')
 
     logApiEvent(requestId, 'order_status_updated', {
       orderId: context.order.id,

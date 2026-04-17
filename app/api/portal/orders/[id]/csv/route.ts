@@ -1,4 +1,5 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestId, logApiEvent, toErrorResponse } from '@/lib/server/api'
+import { getRequestDb } from '@/lib/server/db'
 import { requirePortalOrderAccess, extractPortalToken } from '@/lib/server/customer-order-access'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { buildCsv, getProductDisplayName, getProductPackLabel } from '@/lib/utils'
@@ -12,6 +13,7 @@ export async function GET(
   request: Request,
   routeContext: { params: Promise<{ id: string }> }
 ) {
+  const requestId = getRequestId(request)
   try {
     const token = extractPortalToken(request)
     if (!token) {
@@ -22,52 +24,60 @@ export async function GET(
     }
 
     const { id } = await routeContext.params
-
-    // Verify token + order ownership
     await resolveCustomerToken(token)
     const { order } = await requirePortalOrderAccess(id, token)
+    const db = await getRequestDb()
 
-    const admin = createAdminClient()
+    const { rows: itemRows } = await db.query<{
+      product_id: string | null
+      pallet_deal_id: string | null
+      quantity: number
+      unit_price: number
+      line_total: number | null
+    }>(
+      `select product_id, pallet_deal_id, quantity, unit_price, line_total
+       from order_items
+       where order_id = $1 and quantity > 0
+       order by id asc`,
+      [order.id]
+    )
 
-    const { data: items, error: itemsError } = await admin
-      .from('order_items')
-      .select('product_id,pallet_deal_id,quantity,unit_price,line_total')
-      .eq('order_id', order.id)
-      .gt('quantity', 0)
-      .order('id', { ascending: true })
-
-    if (itemsError) throw itemsError
-
-    const itemRows = items ?? []
     const productIds = itemRows
       .map((item) => item.product_id)
-      .filter((idValue): idValue is string => !!idValue)
+      .filter((value): value is string => Boolean(value))
     const palletIds = itemRows
       .map((item) => item.pallet_deal_id)
-      .filter((idValue): idValue is string => !!idValue)
+      .filter((value): value is string => Boolean(value))
 
-    const [
-      { data: products, error: productsError },
-      { data: pallets, error: palletsError },
-      { data: brands, error: brandsError },
-    ] =
-      await Promise.all([
-        productIds.length
-          ? admin.from('products').select('id,title,brand_id,pack_details,pack_count,size_value,size_uom').in('id', productIds)
-          : Promise.resolve({ data: [], error: null }),
-        palletIds.length
-          ? admin.from('pallet_deals').select('id,title,description').in('id', palletIds)
-          : Promise.resolve({ data: [], error: null }),
-        admin.from('brands').select('id,name'),
-      ])
+    const [productsResponse, palletsResponse, brandsResponse] = await Promise.all([
+      productIds.length
+        ? db.query<{
+            id: string
+            title: string
+            brand_id: string | null
+            pack_details: string | null
+            pack_count: number | null
+            size_value: number | null
+            size_uom: string | null
+          }>(
+            `select id, title, brand_id, pack_details, pack_count, size_value, size_uom
+             from products
+             where id = any($1::uuid[])`,
+            [productIds]
+          )
+        : Promise.resolve({ rows: [] }),
+      palletIds.length
+        ? db.query<{ id: string; title: string; description: string | null }>(
+            `select id, title, description from pallet_deals where id = any($1::uuid[])`,
+            [palletIds]
+          )
+        : Promise.resolve({ rows: [] }),
+      db.query<{ id: string; name: string }>('select id, name from brands'),
+    ])
 
-    if (productsError) throw productsError
-    if (palletsError) throw palletsError
-    if (brandsError) throw brandsError
-
-    const productMap = new Map((products ?? []).map((p) => [p.id, p] as const))
-    const palletMap = new Map((pallets ?? []).map((p) => [p.id, p] as const))
-    const brandMap = new Map((brands ?? []).map((brand) => [brand.id, brand.name] as const))
+    const productMap = new Map(productsResponse.rows.map((product) => [product.id, product] as const))
+    const palletMap = new Map(palletsResponse.rows.map((pallet) => [pallet.id, pallet] as const))
+    const brandMap = new Map(brandsResponse.rows.map((brand) => [brand.id, brand.name] as const))
 
     const rows = itemRows.map((item) => {
       if (item.product_id) {
@@ -81,6 +91,7 @@ export async function GET(
           'Line Total': Number(item.line_total ?? 0).toFixed(2),
         }
       }
+
       const pallet = item.pallet_deal_id ? palletMap.get(item.pallet_deal_id) : null
       return {
         Product: pallet?.title ?? 'Unknown Pallet',
@@ -98,11 +109,14 @@ export async function GET(
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="order-${order.id}.csv"`,
+        'x-request-id': requestId,
       },
     })
   } catch (error) {
+    logApiEvent(requestId, 'portal_order_csv_failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    })
     if (error instanceof Response) return error
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return Response.json({ error: { code: 'internal_error', message } }, { status: 500 })
+    return toErrorResponse(error, requestId)
   }
 }

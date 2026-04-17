@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, ShoppingBag, BarChart3, ArrowLeft, Package, Tag } from 'lucide-react'
+import { LayoutDashboard, Users, ShoppingBag, BarChart3, ArrowLeft, Package, Tag, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const mainLinks = [
   { href: '/admin/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/admin/customers', label: 'Customers', icon: Users },
+  { href: '/admin/staff', label: 'Staff', icon: ShieldCheck },
   { href: '/admin/catalog', label: 'Catalog', icon: ShoppingBag },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
 ]
@@ -67,7 +68,7 @@ export function AdminNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur md:hidden">
-      <div className="mx-auto grid h-16 w-full grid-cols-4 gap-1 px-2">
+      <div className="mx-auto grid h-16 w-full grid-cols-5 gap-1 px-2">
         {mainLinks.map((link) => {
           const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
           return (

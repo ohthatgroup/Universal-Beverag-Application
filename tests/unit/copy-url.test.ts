@@ -7,11 +7,10 @@ describe('toAbsoluteUrl', () => {
   })
 
   it('converts root-relative path to absolute URL', () => {
-    expect(toAbsoluteUrl('/c/token123', 'http://localhost:3000')).toBe('http://localhost:3000/c/token123')
+    expect(toAbsoluteUrl('/portal/token123', 'http://localhost:3000')).toBe('http://localhost:3000/portal/token123')
   })
 
   it('converts path without leading slash to absolute URL', () => {
-    expect(toAbsoluteUrl('c/token123', 'http://localhost:3000')).toBe('http://localhost:3000/c/token123')
+    expect(toAbsoluteUrl('portal/token123', 'http://localhost:3000')).toBe('http://localhost:3000/portal/token123')
   })
 })
-

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
 
 const createBrandSchema = z.object({
   name: z.string().trim().min(1),
@@ -13,32 +13,20 @@ export async function POST(request: Request) {
   try {
     await requireAuthContext(['salesman'])
     const payload = await parseBody(request, createBrandSchema)
-    const admin = createAdminClient()
-
-    const { data: highestSort, error: sortError } = await admin
-      .from('brands')
-      .select('sort_order')
-      .order('sort_order', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (sortError) {
-      throw sortError
-    }
-
-    const { data: created, error: createError } = await admin
-      .from('brands')
-      .insert({
-        name: payload.name,
-        logo_url: payload.logoUrl ?? null,
-        sort_order: Number(highestSort?.sort_order ?? -1) + 1,
-      })
-      .select('id,name,logo_url,sort_order')
-      .single()
-
-    if (createError) {
-      throw createError
-    }
+    const db = await getRequestDb()
+    const { rows } = await db.query<{
+      id: string
+      name: string
+      logo_url: string | null
+      sort_order: number
+    }>(
+      `insert into brands (name, logo_url, sort_order)
+       values ($1, $2, coalesce((select max(sort_order) from brands), -1) + 1)
+       returning id, name, logo_url, sort_order`,
+      [payload.name, payload.logoUrl ?? null]
+    )
+    const created = rows[0]
+    if (!created) throw new Error('Failed to create brand')
 
     return apiOk(
       {

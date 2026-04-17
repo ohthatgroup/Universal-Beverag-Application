@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestDb } from '@/lib/server/db'
 
 const bulkSchema = z.discriminatedUnion('action', [
   z.object({
@@ -19,30 +19,29 @@ export async function POST(request: Request) {
   try {
     await requireAuthContext(['salesman'])
     const payload = await parseBody(request, bulkSchema)
-    const admin = createAdminClient()
+    const db = await getRequestDb()
 
     if (payload.action === 'reorder') {
       const orderedIds = Array.from(new Set(payload.orderedIds))
-      for (let index = 0; index < orderedIds.length; index += 1) {
-        const id = orderedIds[index]
-        const { error } = await admin
-          .from('pallet_deals')
-          .update({ sort_order: index })
-          .eq('id', id)
-
-        if (error) {
-          throw error
+      await db.transaction(async (client) => {
+        for (let index = 0; index < orderedIds.length; index += 1) {
+          await client.query('update pallet_deals set sort_order = $2 where id = $1', [orderedIds[index], index])
         }
-      }
+      })
 
       return apiOk({ reordered: true }, 200, requestId)
     }
 
     const ids = Array.from(new Set(payload.ids))
-    const { error } = await admin.from('pallet_deals').delete().in('id', ids)
-
-    if (error) {
-      if (error.code === '23503') {
+    try {
+      await db.query('delete from pallet_deals where id = any($1::uuid[])', [ids])
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === '23503'
+      ) {
         throw new RouteError(
           409,
           'foreign_key_violation',
