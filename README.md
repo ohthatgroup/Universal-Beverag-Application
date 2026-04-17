@@ -47,6 +47,10 @@ npm run dev
 npm run lint
 npm run typecheck
 npm run test
+npm run test:e2e
+npm run test:e2e:certification
+npm run test:e2e:certification:preview
+npm run test:e2e:certification:production
 npm run build
 ```
 
@@ -81,6 +85,7 @@ npm run smoke:production
 Deployment runbook:
 
 - `docs/st-7.5-preview-live-deployment-runbook.md`
+- `docs/st-9-full-touchpoint-flow-certification.md`
 
 ## Repo Notes
 

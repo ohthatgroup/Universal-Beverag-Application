@@ -23,7 +23,7 @@ export default async function AcceptInvitePage({
   }))
 
   if (result.status === 'pending') {
-    redirect(`/auth/reset-email-sent?email=${encodeURIComponent(result.invite.email)}`)
+    redirect(`/auth/reset-password?email=${encodeURIComponent(result.invite.email)}`)
   }
 
   if (result.status === 'accepted') {

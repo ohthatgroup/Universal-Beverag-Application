@@ -24,6 +24,7 @@ function ResetPasswordContent() {
   const code = searchParams.get('code')
   const token = searchParams.get('token')
   const email = searchParams.get('email')?.trim().toLowerCase() ?? ''
+  const isEmailCodeFlow = !code && !token
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -138,8 +139,13 @@ function ResetPasswordContent() {
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={onSubmit}>
-              {!code && !token && (
+              {isEmailCodeFlow && (
                 <>
+                  <p className="text-sm text-muted-foreground">
+                    Check your email for the reset code or use the reset link from the message, then finish setting
+                    your password here.
+                  </p>
+
                   <div className="space-y-2">
                     <Label htmlFor="reset-email">Email</Label>
                     <Input id="reset-email" type="email" required value={email} readOnly />

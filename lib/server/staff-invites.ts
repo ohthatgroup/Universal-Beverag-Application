@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID } from 'crypto'
-import { buildAbsoluteUrl, getPublicAppUrl } from '@/lib/config/public-url'
+import { buildAbsoluteUrl, buildPasswordResetCallbackUrl } from '@/lib/config/public-url'
 import { auth } from '@/lib/auth/server'
 import { RouteError } from '@/lib/server/auth'
 import { getRequestDb } from '@/lib/server/db'
@@ -27,14 +27,6 @@ function requireInviteSignerSecret() {
     )
   }
   return secret
-}
-
-function baseAppUrl() {
-  try {
-    return getPublicAppUrl()
-  } catch (error) {
-    throw new RouteError(500, 'app_url_not_configured', error instanceof Error ? error.message : 'Invalid app URL')
-  }
 }
 
 function normalizeEmail(email: string) {
@@ -357,7 +349,7 @@ export async function triggerStaffInvitePasswordSetup(token: string) {
 
   await auth.requestPasswordReset({
     email: invite.email,
-    redirectTo: `${baseAppUrl()}/auth/reset-password`,
+    redirectTo: buildPasswordResetCallbackUrl(),
   })
 
   const db = await getRequestDb()

@@ -92,6 +92,44 @@ Import scope:
   - Hyperdrive already owns connection pooling, and Cloudflare's current guidance is to create a new `pg.Client` per request
   - `ST-7.6` therefore centers on replacing Worker-side pool reuse with a request-scoped client facade rather than adding route-specific retries or timeouts
 
+### ST-9: Full Touchpoint and Flow Certification
+
+- Status: pending
+- Placement:
+  - starts after `ST-7.6`
+  - sits before final rollout signoff
+- Write scope:
+  - `tests/**`
+  - `docs/**` certification/runbook files
+  - small test-only helpers/fixtures
+  - minimal bug-fix surface only when needed to close a certified flow failure
+- Purpose:
+  - certify every supported user/operator touchpoint and end-to-end flow on preview and production
+  - use Playwright-driven physical testing plus collaborative manual verification where automation is not sufficient
+- Acceptance criteria:
+  - no supported touchpoint remains unclassified
+  - every flow is marked `pass`, `fail`, or `not run with blocker`
+  - preview and production both have recorded results
+  - no open `fail` remains at stage close
+- Required coverage groups:
+  - admin auth and recovery
+  - staff invite lifecycle
+  - admin dashboard/navigation
+  - admin CRUD and mutation flows
+  - customer bearer-link portal flows
+  - uploads/assets
+  - compatibility redirects and share/copy touchpoints
+  - deployed-domain/runtime behavior
+- Implementation artifacts:
+  - application flow inventory at `docs/st-9-application-flow-inventory.md`
+  - certification matrix/runbook at `docs/st-9-full-touchpoint-flow-certification.md`
+  - grouped Playwright certification specs under `tests/e2e/certification`
+  - certification runner scripts for local, preview, and production
+- Defaults:
+  - local is for prep/debug only
+  - preview is the first certification target
+  - production repeats the same matrix and blocks stage completion on any deviation
+
 ### ST-8: Documentation Cleanup + Canonicalization
 
 - Status: complete
@@ -130,6 +168,7 @@ Import scope:
 - [~] `ST-7` in progress
 - [x] `ST-7.5` complete
 - [~] `ST-7.6` in progress
+- [ ] `ST-9` pending
 - [x] `ST-8` complete
 
 ## Last Handoff
@@ -171,6 +210,7 @@ Remaining risks:
 - Production remote verification still depends on running the final production deploy and smoke commands from an authenticated Cloudflare shell.
 - `npm run cf:check:production` currently fails on this Windows/Node 25 workstation with an esbuild `.map` loader error in Wrangler's dry-run bundle path, so the dry-run command is not a reliable local gate here.
 - Production currently shows a runtime hang in DB-backed routes, so `ST-7.5` deploy completeness does not yet imply production operational readiness.
+- `ST-9` certification cannot begin until `ST-7.6` closes and both deployed URLs are stable enough to run the full matrix.
 
 Exact next stage unblockers:
 
@@ -178,6 +218,7 @@ Exact next stage unblockers:
 - record pass/fail for live email QA under `ST-7`
 - run `npm run deploy:production:live` from an authenticated Cloudflare shell
 - run `npm run smoke:production` and record invite/reset/portal-link pass-fail for the deployed production `workers.dev` URL
+- start `ST-9` once preview and production are both stable enough for full-touchpoint certification
 
 ## ST-7.5 Completion Record
 

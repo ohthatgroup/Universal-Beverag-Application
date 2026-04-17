@@ -5,7 +5,7 @@ import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { getAuthClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { buildInteractiveUrl } from '@/lib/config/public-url'
+import { buildPasswordResetCallbackUrl } from '@/lib/config/public-url'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -97,7 +97,7 @@ function LoginContent() {
     setSuccessMessage(null)
 
     const { error: resetError } = await authClient.resetPasswordForEmail(salesmanEmail, {
-      redirectTo: buildInteractiveUrl('/auth/reset-password'),
+      redirectTo: buildPasswordResetCallbackUrl(),
     })
 
     setIsResetting(false)

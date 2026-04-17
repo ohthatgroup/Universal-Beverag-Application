@@ -65,3 +65,7 @@ export function buildAuthCallbackUrl(nextPath: string): string {
   const safeNextPath = sanitizePath(nextPath)
   return `${getPublicAppUrl()}/auth/callback?next=${encodeURIComponent(safeNextPath)}`
 }
+
+export function buildPasswordResetCallbackUrl(): string {
+  return buildAuthCallbackUrl('/auth/reset-password')
+}

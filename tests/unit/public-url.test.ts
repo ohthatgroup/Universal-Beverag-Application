@@ -3,6 +3,7 @@ import {
   buildAbsoluteUrl,
   buildAuthCallbackUrl,
   buildInteractiveUrl,
+  buildPasswordResetCallbackUrl,
   getInteractiveAppOrigin,
   getPublicAppUrl,
 } from '@/lib/config/public-url'
@@ -42,6 +43,14 @@ describe('public URL helpers', () => {
     )
     expect(buildAuthCallbackUrl('https://malicious.example')).toBe(
       'https://preview.example.com/auth/callback?next=%2F'
+    )
+  })
+
+  it('builds the password reset callback URL from the configured public host', () => {
+    process.env.NEXT_PUBLIC_APP_URL = 'https://preview.example.com/'
+
+    expect(buildPasswordResetCallbackUrl()).toBe(
+      'https://preview.example.com/auth/callback?next=%2Fauth%2Freset-password'
     )
   })
 
