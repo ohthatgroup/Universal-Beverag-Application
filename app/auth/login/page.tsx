@@ -5,7 +5,6 @@ import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { getAuthClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { buildPasswordResetCallbackUrl } from '@/lib/config/public-url'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -96,14 +95,24 @@ function LoginContent() {
     setMessage(null)
     setSuccessMessage(null)
 
-    const { error: resetError } = await authClient.resetPasswordForEmail(salesmanEmail, {
-      redirectTo: buildPasswordResetCallbackUrl(),
+    const response = await fetch('/api/auth/password-reset', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: salesmanEmail.trim(),
+      }),
     })
+
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null
 
     setIsResetting(false)
 
-    if (resetError) {
-      setMessage(resetError.message)
+    if (!response.ok) {
+      setMessage(payload?.error?.message ?? 'Unable to start password reset.')
       return
     }
 

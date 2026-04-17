@@ -21,6 +21,10 @@ export const cloneOrderSchema = z.object({
   deliveryDate: isoDateSchema,
 })
 
+export const passwordResetRequestSchema = z.object({
+  email: z.string().trim().email().max(320),
+})
+
 export const portalProfileUpdateSchema = z.object({
   contact_name: z.string().min(1).max(200).optional(),
   email: z.string().email().max(320).optional().or(z.literal('')),
