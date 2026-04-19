@@ -10,12 +10,45 @@ function normalizeBaseUrl(rawUrl: string): string {
   return new URL(rawUrl).toString().replace(/\/$/, '')
 }
 
+function isValidUrl(rawUrl: string): boolean {
+  try {
+    new URL(rawUrl)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function isHttpsUrl(rawUrl: string): boolean {
+  try {
+    return new URL(rawUrl).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function getConfiguredPublicUrlCandidates(): string[] {
+  return [process.env.APP_URL, process.env.NEXT_PUBLIC_APP_URL]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+}
+
 function readConfiguredPublicUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL
-  if (!configuredUrl?.trim()) {
+  const candidates = getConfiguredPublicUrlCandidates()
+  const validCandidates = candidates.filter(isValidUrl)
+
+  if (validCandidates.length === 0) {
     throw new Error('Missing required environment variable: NEXT_PUBLIC_APP_URL')
   }
-  return configuredUrl
+
+  if (process.env.NODE_ENV === 'production') {
+    const secureCandidate = validCandidates.find(isHttpsUrl)
+    if (secureCandidate) {
+      return secureCandidate
+    }
+  }
+
+  return validCandidates[0]
 }
 
 function validatePublicUrl(baseUrl: string) {
@@ -25,13 +58,13 @@ function validatePublicUrl(baseUrl: string) {
     throw new Error(`PUBLIC_APP_URL must use https in production. Received: ${baseUrl}`)
   }
 
-  const envConfiguredUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL
-  if (envConfiguredUrl) {
-    const normalizedEnvUrl = normalizeBaseUrl(envConfiguredUrl)
-    if (normalizedEnvUrl !== baseUrl && !hasLoggedEnvDriftWarning) {
+  const envConfiguredUrl = getConfiguredPublicUrlCandidates()
+  if (envConfiguredUrl.length > 0) {
+    const normalizedEnvUrls = envConfiguredUrl.filter(isValidUrl).map(normalizeBaseUrl)
+    if (!normalizedEnvUrls.includes(baseUrl) && !hasLoggedEnvDriftWarning) {
       hasLoggedEnvDriftWarning = true
       console.warn(
-        `Configured env URL (${normalizedEnvUrl}) does not match resolved PUBLIC_APP_URL (${baseUrl}).`
+        `Configured env URLs (${normalizedEnvUrls.join(', ')}) do not include resolved PUBLIC_APP_URL (${baseUrl}).`
       )
     }
   }

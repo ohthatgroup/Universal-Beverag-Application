@@ -21,6 +21,7 @@
       "name": "universal-beverage-app-preview",
       "workers_dev": true,
       "vars": {
+        "APP_URL": "https://universal-beverage-app-preview.inbox-23c.workers.dev",
         "FEATURE_ECWID_PUSH": "false",
         "NEXT_PUBLIC_APP_URL": "https://universal-beverage-app-preview.inbox-23c.workers.dev",
         "NEXT_PUBLIC_ASSET_BASE_URL": "https://universal-beverage-app-preview.inbox-23c.workers.dev",
@@ -34,6 +35,7 @@
       "name": "universal-beverage-app",
       "workers_dev": true,
       "vars": {
+        "APP_URL": "https://universal-beverage-app.inbox-23c.workers.dev",
         "FEATURE_ECWID_PUSH": "false",
         "NEXT_PUBLIC_APP_URL": "https://universal-beverage-app.inbox-23c.workers.dev",
         "NEXT_PUBLIC_ASSET_BASE_URL": "https://universal-beverage-app.inbox-23c.workers.dev",

@@ -4,7 +4,9 @@ import type { OrderStatus } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
-import { formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel } from '@/lib/utils'
+import { formatDeliveryDate } from '@/lib/utils'
+import { Money } from '@/components/ui/money'
+import { StatusChip } from '@/components/ui/status-chip'
 
 interface CustomerReadonlyLineItem {
   id: string
@@ -45,9 +47,7 @@ export function CustomerOrderReadonly({ token, order, items, showPrices }: Custo
           </Button>
           <div>
             <h1 className="text-lg font-semibold">{formatDeliveryDate(order.delivery_date)}</h1>
-            <p className="text-sm text-muted-foreground">
-              {getStatusIcon(order.status)} {getStatusLabel(order.status)}
-            </p>
+            <StatusChip status={order.status} className="mt-0.5" />
           </div>
         </div>
 
@@ -62,7 +62,7 @@ export function CustomerOrderReadonly({ token, order, items, showPrices }: Custo
       {/* Summary */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <span>{order.item_count ?? 0} items</span>
-        {showPrices && <span>{formatCurrency(order.total ?? 0)}</span>}
+        {showPrices && <Money value={order.total ?? 0} />}
         {order.submitted_at && (
           <span>Submitted {new Date(order.submitted_at).toLocaleDateString()}</span>
         )}
@@ -84,11 +84,11 @@ export function CustomerOrderReadonly({ token, order, items, showPrices }: Custo
               )}
               <div className="text-xs text-muted-foreground mt-0.5">
                 Qty {item.quantity}
-                {showPrices && <span> · {formatCurrency(item.unitPrice)} each</span>}
+                {showPrices && <span> · <Money value={item.unitPrice} /> each</span>}
               </div>
             </div>
             {showPrices && (
-              <div className="text-sm font-medium ml-4">{formatCurrency(item.lineTotal)}</div>
+              <div className="ml-4"><Money value={item.lineTotal} className="text-sm" /></div>
             )}
           </div>
         ))}
@@ -102,7 +102,7 @@ export function CustomerOrderReadonly({ token, order, items, showPrices }: Custo
           <Separator />
           <div className="flex items-center justify-between font-semibold">
             <span>{order.item_count} items</span>
-            <span>{formatCurrency(order.total ?? 0)}</span>
+            <Money value={order.total ?? 0} />
           </div>
         </>
       )}

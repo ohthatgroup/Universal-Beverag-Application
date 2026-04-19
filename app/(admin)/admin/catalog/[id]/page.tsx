@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -129,13 +130,15 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href="/admin/catalog" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2">
-          <ArrowLeft className="h-4 w-4" />
-          Catalog
-        </Link>
-        <h1 className="text-2xl font-semibold">{product.title}</h1>
-      </div>
+      <PageHeader
+        title={product.title}
+        breadcrumb={
+          <Link href="/admin/catalog" className="inline-flex items-center gap-1.5 hover:text-foreground">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Catalog
+          </Link>
+        }
+      />
 
       {/*
         Grouped into Identity / Pack / Commercial per st-9 admin design theory.
