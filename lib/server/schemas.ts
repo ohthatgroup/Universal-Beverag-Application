@@ -25,6 +25,11 @@ export const passwordResetRequestSchema = z.object({
   email: z.string().trim().email().max(320),
 })
 
+export const inviteSetupSchema = z.object({
+  token: z.string().trim().min(1).max(500),
+  password: z.string().min(8).max(200),
+})
+
 export const portalProfileUpdateSchema = z.object({
   contact_name: z.string().min(1).max(200).optional(),
   email: z.string().email().max(320).optional().or(z.literal('')),

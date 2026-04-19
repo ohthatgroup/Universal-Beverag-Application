@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  toSafeInviteSetupErrorMessage,
   toSafeLoginErrorMessage,
   toSafePasswordResetCompletionErrorMessage,
   toSafePasswordResetRequestErrorMessage,
@@ -36,6 +37,15 @@ describe('auth safe messages', () => {
   it('maps unknown completion failures to a generic reset message', () => {
     expect(toSafePasswordResetCompletionErrorMessage({ message: 'Provider exploded' })).toBe(
       'Unable to reset password. Request a new reset email and try again.'
+    )
+  })
+
+  it('maps invite setup failures to safe messages', () => {
+    expect(toSafeInviteSetupErrorMessage({ code: 'invite_revoked' })).toBe(
+      'This admin invite is no longer active. Ask an existing salesman to send you a new invite.'
+    )
+    expect(toSafeInviteSetupErrorMessage({ message: 'Password too short' })).toBe(
+      'Password must be at least 8 characters.'
     )
   })
 })

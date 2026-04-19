@@ -1,9 +1,9 @@
 import { createHash, createHmac, randomUUID } from 'crypto'
-import { buildAbsoluteUrl, buildPasswordResetCallbackUrl } from '@/lib/config/public-url'
+import { buildAbsoluteUrl } from '@/lib/config/public-url'
 import { getAuth } from '@/lib/auth/server'
 import { RouteError } from '@/lib/server/auth'
 import { getRequestDb } from '@/lib/server/db'
-import { ensureNeonAuthUser } from '@/lib/server/neon-auth-users'
+import { lookupNeonAuthUserId } from '@/lib/server/neon-auth-users'
 import { consumeRateLimit, getEnvRateLimit } from '@/lib/server/rate-limit'
 
 export interface StaffListRow {
@@ -16,6 +16,20 @@ export interface StaffListRow {
   invite_id: string | null
   invite_status: 'pending' | 'accepted' | 'revoked' | null
   last_sent_at: string | null
+}
+
+export interface PendingStaffInvite {
+  id: string
+  profile_id: string
+  email: string
+  status: 'pending' | 'accepted' | 'revoked'
+  token_hash: string
+  revoked_at: string | null
+  accepted_at: string | null
+  disabled_at: string | null
+  contact_name: string | null
+  business_name: string | null
+  auth_user_id: string | null
 }
 
 const invitePasswordSetupRateLimit = getEnvRateLimit(
@@ -289,18 +303,7 @@ export async function validateStaffInviteToken(token: string) {
   }
 
   const db = await getRequestDb()
-  const { rows } = await db.query<{
-    id: string
-    profile_id: string
-    email: string
-    status: 'pending' | 'accepted' | 'revoked'
-    token_hash: string
-    revoked_at: string | null
-    accepted_at: string | null
-    disabled_at: string | null
-    contact_name: string | null
-    business_name: string | null
-  }>(
+  const { rows } = await db.query<PendingStaffInvite>(
     `select
         si.id,
         si.profile_id,
@@ -311,7 +314,8 @@ export async function validateStaffInviteToken(token: string) {
         si.accepted_at::text,
         p.disabled_at::text,
         p.contact_name,
-        p.business_name
+        p.business_name,
+        p.auth_user_id
       from staff_invites si
       inner join profiles p on p.id = si.profile_id
       where si.id = $1 and p.role = 'salesman'
@@ -343,11 +347,103 @@ export async function validateStaffInviteToken(token: string) {
   return { status: 'pending' as const, invite }
 }
 
-export async function triggerStaffInvitePasswordSetup(token: string) {
-  const validation = await validateStaffInviteToken(token)
+function isExistingUserError(error: { message?: string } | null | undefined) {
+  const message = error?.message?.trim().toLowerCase() ?? ''
+  return message.includes('already exists') || message.includes('already registered')
+}
+
+function toInviteSetupRouteError(validation: Awaited<ReturnType<typeof validateStaffInviteToken>>) {
+  if (validation.status === 'accepted') {
+    return new RouteError(
+      409,
+      'invite_accepted',
+      'This admin invite has already been accepted. Use the normal admin sign-in screen or reset your password if needed.'
+    )
+  }
+
+  if (validation.status === 'revoked') {
+    return new RouteError(
+      409,
+      'invite_revoked',
+      'This admin invite is no longer active. Ask an existing salesman to send you a new invite.'
+    )
+  }
+
+  if (validation.status === 'disabled') {
+    return new RouteError(
+      403,
+      'invite_disabled',
+      'This admin account is currently disabled. Contact another salesman if you need access restored.'
+    )
+  }
+
+  return new RouteError(
+    404,
+    'invite_invalid',
+    'This admin invite link is invalid or has expired.'
+  )
+}
+
+async function createOrUpdateInviteAuthUser(invite: PendingStaffInvite, password: string) {
+  const auth = getAuth()
+  const displayName = invite.contact_name?.trim() || invite.business_name?.trim() || invite.email
+  let authUserId = invite.auth_user_id ?? (await lookupNeonAuthUserId(invite.email))
+  let createdUser = false
+
+  if (!authUserId) {
+    const { data, error } = await auth.admin.createUser({
+      email: invite.email,
+      password,
+      name: displayName,
+    })
+
+    if (error) {
+      if (!isExistingUserError(error)) {
+        throw new RouteError(
+          502,
+          'invite_setup_failed',
+          'Unable to finish invite setup right now.'
+        )
+      }
+
+      authUserId = await lookupNeonAuthUserId(invite.email)
+    } else {
+      authUserId = data?.user?.id ?? null
+      createdUser = true
+    }
+  }
+
+  if (!authUserId) {
+    throw new RouteError(
+      502,
+      'invite_setup_failed',
+      'Unable to finish invite setup right now.'
+    )
+  }
+
+  if (!createdUser) {
+    const { error } = await auth.admin.setUserPassword({
+      userId: authUserId,
+      newPassword: password,
+    })
+
+    if (error) {
+      throw new RouteError(
+        502,
+        'invite_setup_failed',
+        'Unable to finish invite setup right now.'
+      )
+    }
+  }
+
+  return authUserId
+}
+
+export async function completeStaffInviteSetup(input: { token: string; password: string }) {
+  const validation = await validateStaffInviteToken(input.token)
 
   if (validation.status !== 'pending') {
-    return validation
+    throw toInviteSetupRouteError(validation)
   }
 
   const invite = validation.invite
@@ -356,16 +452,7 @@ export async function triggerStaffInvitePasswordSetup(token: string) {
     ...invitePasswordSetupRateLimit,
   })
 
-  const displayName = invite.contact_name?.trim() || invite.business_name?.trim() || invite.email
-  const authUserId = await ensureNeonAuthUser({
-    email: invite.email,
-    name: displayName,
-  })
-
-  await getAuth().requestPasswordReset({
-    email: invite.email,
-    redirectTo: buildPasswordResetCallbackUrl(),
-  })
+  const authUserId = await createOrUpdateInviteAuthUser(invite, input.password)
 
   const db = await getRequestDb()
   await db.query(
@@ -376,11 +463,17 @@ export async function triggerStaffInvitePasswordSetup(token: string) {
     [invite.profile_id, authUserId]
   )
 
-  return {
-    status: 'pending' as const,
-    invite,
-    authUserId,
-  }
+  await db.query(
+    `update staff_invites
+     set status = 'accepted',
+         accepted_at = coalesce(accepted_at, now()),
+         updated_at = now()
+     where id = $1
+       and status = 'pending'`,
+    [invite.id]
+  )
+
+  return { email: invite.email, authUserId }
 }
 
 export async function markPendingStaffInvitesAccepted(input: {

@@ -37,7 +37,7 @@ export async function sendStaffInviteEmail(input: {
         <p>Hello ${staffName},</p>
         <p>${inviterName} invited you to Universal Beverages admin access.</p>
         <p><a href="${input.inviteUrl}">Open your admin invite</a></p>
-        <p>This link starts your password setup flow. After you set a password, sign in from the normal admin login screen.</p>
+        <p>This link opens your first-time admin setup screen so you can create your password directly.</p>
       `,
       text: [
         `Hello ${staffName},`,
@@ -46,7 +46,7 @@ export async function sendStaffInviteEmail(input: {
         '',
         `Open your admin invite: ${input.inviteUrl}`,
         '',
-        'This link starts your password setup flow. After you set a password, sign in from the normal admin login screen.',
+        'This link opens your first-time admin setup screen so you can create your password directly.',
       ].join('\n'),
     }),
   })

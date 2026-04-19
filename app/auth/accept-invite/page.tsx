@@ -1,9 +1,8 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { triggerStaffInvitePasswordSetup } from '@/lib/server/staff-invites'
-import { isRouteError } from '@/lib/server/route-error'
+import { InviteSetupForm } from '@/components/auth/invite-setup-form'
+import { validateStaffInviteToken } from '@/lib/server/staff-invites'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,16 +17,21 @@ export default async function AcceptInvitePage({
     return <InviteState title="Invite Link Invalid" message="This admin invite link is missing required information." />
   }
 
-  const result = await triggerStaffInvitePasswordSetup(token).catch((error) => ({
-    status: 'error' as const,
-    message:
-      isRouteError(error) && error.code === 'rate_limited'
-        ? 'A password setup email was sent recently. Check your inbox or wait a few minutes before trying again.'
-        : 'Unable to process this invite.',
-  }))
+  const result = await validateStaffInviteToken(token)
 
   if (result.status === 'pending') {
-    redirect(`/auth/reset-password?email=${encodeURIComponent(result.invite.email)}`)
+    return (
+      <div className="min-h-screen bg-muted/20 p-4 sm:p-8">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+          <h1 className="text-2xl font-semibold">Universal Beverages</h1>
+          <InviteSetupForm
+            token={token}
+            email={result.invite.email}
+            contactName={result.invite.contact_name}
+          />
+        </div>
+      </div>
+    )
   }
 
   if (result.status === 'accepted') {
@@ -60,7 +64,7 @@ export default async function AcceptInvitePage({
   return (
     <InviteState
       title="Invite Link Invalid"
-      message={result.status === 'error' ? result.message : 'This admin invite link is invalid or has expired.'}
+      message="This admin invite link is invalid or has expired."
     />
   )
 }
