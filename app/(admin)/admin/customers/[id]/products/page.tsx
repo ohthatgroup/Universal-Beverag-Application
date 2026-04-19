@@ -66,8 +66,8 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
          order by sort_order asc, title asc`,
         [id]
       ),
-      db.query<{ product_id: string; excluded: boolean | null; custom_price: number | null }>(
-        `select product_id, excluded, custom_price
+      db.query<{ product_id: string; excluded: boolean | null; custom_price: number | null; is_usual: boolean | null }>(
+        `select product_id, excluded, custom_price, is_usual
          from customer_products
          where customer_id = $1`,
         [id]
@@ -139,6 +139,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
     productId: override.product_id,
     excluded: Boolean(override.excluded),
     customPrice: override.custom_price ?? null,
+    isUsual: Boolean(override.is_usual),
   }))
 
   return (

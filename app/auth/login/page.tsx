@@ -111,8 +111,16 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/20 p-4 sm:p-8">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-muted/40 to-background p-4 sm:p-8">
+      {/* Ambient glow — same aesthetic as the portal */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+      >
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
+      </div>
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center justify-center gap-6">
         <h1 className="text-2xl font-semibold">Universal Beverages</h1>
 
         {(error || message) && (
@@ -135,7 +143,7 @@ function LoginContent() {
           </div>
         )}
 
-        <Card>
+        <Card className="w-full border-white/30 bg-white/60 shadow-xl backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-white/5">
           <CardHeader>
             <CardTitle>Admin Sign In</CardTitle>
           </CardHeader>

@@ -43,7 +43,11 @@
       "Bash(psql \"$SUPA\" -c \"select count\\(*\\) filter \\(where customer_id is not null\\) as customer_scoped, count\\(*\\) filter \\(where customer_id is null\\) as global_products from public.products;\")",
       "Bash(pg_dump \"postgresql://postgres@db.wfcwnanssppbhzkkbqap.supabase.co:5432/postgres?sslmode=require\" --data-only --column-inserts --no-owner --no-privileges --no-comments --disable-triggers -t public.brands -t public.products -t public.pallet_deals -t public.pallet_deal_items -t public.order_cutoffs -t public.product_cutoff_overrides -f catalog-dump.sql)",
       "Bash(pg_dump \"postgresql://postgres@db.wfcwnanssppbhzkkbqap.supabase.co:5432/postgres?sslmode=require\" --data-only --column-inserts --no-owner --no-privileges --no-comments -t public.brands -t public.products -t public.pallet_deals -t public.pallet_deal_items -t public.order_cutoffs -t public.product_cutoff_overrides -f catalog-dump.sql)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npm test *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(export DATABASE_URL='postgresql://neondb_owner:npg_a8Xp0yZdNOVS@ep-proud-violet-ammybwuo.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require')",
+      "Bash(curl -sf http://localhost:3000/portal/7bac9d11b8a3dc5205ac2508eab9b87d -o /dev/null)"
     ]
   }
 }

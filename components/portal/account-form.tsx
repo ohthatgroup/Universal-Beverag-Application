@@ -71,106 +71,94 @@ export function AccountForm({ token, profile }: AccountFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Business Name — read only */}
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5">
-        <Label className="text-muted-foreground">Business Name</Label>
+        <Label className="text-muted-foreground">Business</Label>
         <p className="text-sm font-medium">{profile.business_name ?? '—'}</p>
       </div>
 
-      {/* Contact Info */}
-      <fieldset className="space-y-4 rounded-lg border p-4">
-        <legend className="px-2 text-sm font-medium">Contact</legend>
+      <div className="space-y-1.5">
+        <Label htmlFor="contact_name">Contact name</Label>
+        <Input
+          id="contact_name"
+          value={formData.contact_name}
+          onChange={(e) => handleChange('contact_name', e.target.value)}
+          placeholder="Full name"
+        />
+      </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="contact_name">Contact Name</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
-            id="contact_name"
-            value={formData.contact_name}
-            onChange={(e) => handleChange('contact_name', e.target.value)}
-            placeholder="Full name"
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+            placeholder="email@example.com"
           />
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-              placeholder="email@example.com"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleChange('phone', e.target.value)}
-              placeholder="(555) 123-4567"
-            />
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Address */}
-      <fieldset className="space-y-4 rounded-lg border p-4">
-        <legend className="px-2 text-sm font-medium">Address</legend>
-
         <div className="space-y-1.5">
-          <Label htmlFor="address">Street Address</Label>
+          <Label htmlFor="phone">Phone</Label>
           <Input
-            id="address"
-            value={formData.address}
-            onChange={(e) => handleChange('address', e.target.value)}
-            placeholder="123 Main St"
+            id="phone"
+            type="tel"
+            value={formData.phone}
+            onChange={(e) => handleChange('phone', e.target.value)}
+            placeholder="(555) 123-4567"
           />
         </div>
+      </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="city">City</Label>
-            <Input
-              id="city"
-              value={formData.city}
-              onChange={(e) => handleChange('city', e.target.value)}
-              placeholder="City"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="state">State</Label>
-            <Input
-              id="state"
-              value={formData.state}
-              onChange={(e) => handleChange('state', e.target.value)}
-              placeholder="State"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="zip">ZIP</Label>
-            <Input
-              id="zip"
-              value={formData.zip}
-              onChange={(e) => handleChange('zip', e.target.value)}
-              placeholder="12345"
-            />
-          </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="address">Street address</Label>
+        <Input
+          id="address"
+          value={formData.address}
+          onChange={(e) => handleChange('address', e.target.value)}
+          placeholder="123 Main St"
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="city">City</Label>
+          <Input
+            id="city"
+            value={formData.city}
+            onChange={(e) => handleChange('city', e.target.value)}
+            placeholder="City"
+          />
         </div>
-      </fieldset>
+        <div className="space-y-1.5">
+          <Label htmlFor="state">State</Label>
+          <Input
+            id="state"
+            value={formData.state}
+            onChange={(e) => handleChange('state', e.target.value)}
+            placeholder="State"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="zip">ZIP</Label>
+          <Input
+            id="zip"
+            value={formData.zip}
+            onChange={(e) => handleChange('zip', e.target.value)}
+            placeholder="12345"
+          />
+        </div>
+      </div>
 
-      {/* Feedback + Submit */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-2">
         <Button type="submit" disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save Changes'}
+          {isSaving ? 'Saving…' : 'Save changes'}
         </Button>
         {feedback && (
           <p
             className={
               feedback.type === 'success'
-                ? 'text-sm text-green-600'
+                ? 'text-sm text-muted-foreground'
                 : 'text-sm text-destructive'
             }
           >

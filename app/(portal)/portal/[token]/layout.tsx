@@ -1,5 +1,5 @@
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
-import { CustomerNav } from '@/components/layout/customer-nav'
+import { PortalTopBar } from '@/components/layout/portal-top-bar'
 
 export default async function PortalLayout({
   children,
@@ -10,13 +10,15 @@ export default async function PortalLayout({
 }) {
   const { token } = await params
 
-  await resolveCustomerToken(token)
+  const { profile } = await resolveCustomerToken(token)
+  const customerName =
+    profile.business_name?.trim() || profile.contact_name?.trim() || 'Account'
 
   return (
     <div className="min-h-screen bg-background">
-      <CustomerNav token={token} />
-      <main className="pb-20 md:pb-0">
-        <div className="mx-auto max-w-4xl p-4 md:p-6">
+      <PortalTopBar token={token} customerName={customerName} />
+      <main>
+        <div className="mx-auto max-w-3xl p-4 md:p-6">
           {children}
         </div>
       </main>

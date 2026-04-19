@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { CatalogProductsManager, type CatalogBrandOption, type CatalogProductRow } from '@/components/admin/catalog-products-manager'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
@@ -69,9 +71,19 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   }))
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div>
+        <Link
+          href="/admin"
+          className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Admin
+        </Link>
         <h1 className="text-2xl font-semibold">Catalog</h1>
+        <p className="text-sm text-muted-foreground">
+          {rows.length} product{rows.length === 1 ? '' : 's'}
+        </p>
       </div>
 
       <CatalogProductsManager

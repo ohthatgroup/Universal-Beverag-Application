@@ -1,25 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Package, Search } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
-import { useCatalog, type CatalogTab } from '@/lib/hooks/useCatalog'
+import { useCatalog } from '@/lib/hooks/useCatalog'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import type { CatalogProduct, GroupByOption, PalletDeal } from '@/lib/types'
-import { formatCurrency, formatDeliveryDate, getProductDisplayName, getProductPackLabel } from '@/lib/utils'
-import { QuantitySelector } from '@/components/catalog/quantity-selector'
+import type { Usual } from '@/lib/server/portal-usuals'
+import {
+  formatCurrency,
+  formatDeliveryDate,
+  getProductDisplayName,
+  getProductPackLabel,
+} from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { BrandChips, SizeChips } from '@/components/catalog/filter-chips'
+import { BrowseRow } from '@/components/catalog/browse-row'
+import { CartSummaryBar } from '@/components/catalog/cart-summary-bar'
+import { QuantitySelector } from '@/components/catalog/quantity-selector'
+import { ReviewOrderSheet, type ReviewItem } from '@/components/catalog/review-order-sheet'
+import { PalletDetailDialog } from '@/components/catalog/pallet-detail-dialog'
 
 interface OrderBuilderProps {
   token: string
@@ -36,22 +39,12 @@ interface OrderBuilderProps {
     unit_price: number
   }>
   productToPalletDealIds: Record<string, string[]>
+  usuals: Usual[]
 }
 
 function itemKey(productId: string | null, palletDealId: string | null) {
   if (productId) return `product:${productId}`
   return `pallet:${palletDealId}`
-}
-
-type ReviewItem = {
-  key: string
-  label: string
-  details: string
-  quantity: number
-  unitPrice: number
-  lineTotal: number
-  type: 'product' | 'pallet'
-  id: string
 }
 
 export function OrderBuilder({
@@ -64,67 +57,52 @@ export function OrderBuilder({
   defaultGroupBy,
   initialItems,
   productToPalletDealIds,
+  usuals,
 }: OrderBuilderProps) {
   const router = useRouter()
   const basePath = buildCustomerPortalBasePath(token) ?? '/portal'
 
-  const [activeTab, setActiveTab] = useState<CatalogTab>('all')
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(['new-items']))
-  const [palletFilterProductId, setPalletFilterProductId] = useState<string | null>(null)
+  const [browseExpanded, setBrowseExpanded] = useState(false)
+  const [palletsExpanded, setPalletsExpanded] = useState(false)
+  const [palletDetailId, setPalletDetailId] = useState<string | null>(null)
 
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
-    const nextState: Record<string, number> = {}
+    const initial: Record<string, number> = {}
     for (const item of initialItems) {
-      nextState[itemKey(item.product_id, item.pallet_deal_id)] = item.quantity
+      initial[itemKey(item.product_id, item.pallet_deal_id)] = item.quantity
     }
-    return nextState
+    return initial
   })
 
-  const { filters, setFilters, grouped, newItems, isFilterActive, availableBrands, availableSizes } = useCatalog({
-    products,
-    defaultGroupBy: defaultGroupBy === 'size' ? 'size' : 'brand',
-  })
+  const { filters, setFilters, grouped, isFilterActive, availableBrands, availableSizes } =
+    useCatalog({
+      products,
+      defaultGroupBy: defaultGroupBy === 'size' ? 'size' : 'brand',
+    })
 
   const { save, flush } = useAutoSavePortal({
     orderId,
     token,
-    onError: (saveError) => {
-      setError(saveError.message)
-    },
+    onError: (saveError) => setError(saveError.message),
     onSuccess: () => {
       setStatusMessage('Saved')
       setTimeout(() => setStatusMessage(null), 1000)
     },
   })
 
-  const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
+  const productById = useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products]
+  )
   const palletById = useMemo(
-    () => new Map(palletDeals.map((palletDeal) => [palletDeal.id, palletDeal])),
+    () => new Map(palletDeals.map((deal) => [deal.id, deal])),
     [palletDeals]
   )
-
-  useEffect(() => {
-    const allowed = new Set<string>(['new-items', 'single', 'mixed'])
-    for (const group of grouped) {
-      allowed.add(group.key)
-    }
-    setExpandedGroups((prev) => {
-      const next = new Set<string>()
-      for (const key of prev) {
-        if (allowed.has(key)) next.add(key)
-      }
-      if (!next.has('new-items')) next.add('new-items')
-      if (next.size === prev.size && Array.from(next).every((key) => prev.has(key))) {
-        return prev
-      }
-      return next
-    })
-  }, [grouped])
 
   const setProductQuantity = (product: CatalogProduct, quantity: number) => {
     const key = itemKey(product.id, null)
@@ -132,24 +110,23 @@ export function OrderBuilder({
     save({ productId: product.id, quantity, unitPrice: product.effective_price })
   }
 
-  const setPalletQuantity = (palletDeal: PalletDeal, quantity: number) => {
-    const key = itemKey(null, palletDeal.id)
+  const setPalletQuantity = (deal: PalletDeal, quantity: number) => {
+    const key = itemKey(null, deal.id)
     setQuantities((prev) => ({ ...prev, [key]: quantity }))
-    save({ palletDealId: palletDeal.id, quantity, unitPrice: palletDeal.price })
+    save({ palletDealId: deal.id, quantity, unitPrice: deal.price })
   }
 
-  const toggleGroup = (groupKey: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(groupKey)) next.delete(groupKey)
-      else next.add(groupKey)
-      return next
-    })
-  }
+  const usualProductIds = useMemo(() => new Set(usuals.map((u) => u.productId)), [usuals])
+
+  const browseList = useMemo(() => {
+    const all = grouped.flatMap((group) => group.products)
+    if (isFilterActive) return all
+    return all.filter((product) => !usualProductIds.has(product.id))
+  }, [grouped, isFilterActive, usualProductIds])
 
   const reviewItems = useMemo<ReviewItem[]>(() => {
     return Object.entries(quantities)
-      .filter(([, quantity]) => quantity > 0)
+      .filter(([, qty]) => qty > 0)
       .map(([key, quantity]) => {
         if (key.startsWith('product:')) {
           const id = key.replace('product:', '')
@@ -157,51 +134,46 @@ export function OrderBuilder({
           if (!product) return null
           const unitPrice = product.effective_price
           const packLabel = getProductPackLabel(product)
-          const displayName = getProductDisplayName(product, product.brand?.name ?? null)
           return {
             key,
-            label: displayName,
+            label: getProductDisplayName(product, product.brand?.name ?? null),
             details: packLabel ?? '',
             quantity,
             unitPrice,
             lineTotal: unitPrice * quantity,
-            type: 'product' as const,
-            id,
           }
         }
         const id = key.replace('pallet:', '')
-        const palletDeal = palletById.get(id)
-        if (!palletDeal) return null
-        const unitPrice = palletDeal.price
+        const deal = palletById.get(id)
+        if (!deal) return null
+        const unitPrice = deal.price
         return {
           key,
-          label: palletDeal.title,
-          details: palletDeal.description ?? '',
+          label: deal.title,
+          details: deal.description ?? '',
           quantity,
           unitPrice,
           lineTotal: unitPrice * quantity,
-          type: 'pallet' as const,
-          id,
         }
       })
-      .filter((item): item is ReviewItem => Boolean(item))
+      .filter((entry): entry is ReviewItem => Boolean(entry))
   }, [quantities, productById, palletById])
 
   const totalItems = reviewItems.reduce((sum, item) => sum + item.quantity, 0)
   const totalValue = reviewItems.reduce((sum, item) => sum + item.lineTotal, 0)
 
-  const updateReviewQuantity = (item: ReviewItem, quantity: number) => {
-    if (item.type === 'product') {
-      const product = productById.get(item.id)
+  const updateReviewQuantity = (key: string, quantity: number) => {
+    if (key.startsWith('product:')) {
+      const product = productById.get(key.replace('product:', ''))
       if (product) setProductQuantity(product, quantity)
       return
     }
-    const pallet = palletById.get(item.id)
-    if (pallet) setPalletQuantity(pallet, quantity)
+    const deal = palletById.get(key.replace('pallet:', ''))
+    if (deal) setPalletQuantity(deal, quantity)
   }
 
   const resetAll = async () => {
-    if (reviewItems.length === 0) return
+    if (totalItems === 0) return
     setIsResetting(true)
     setError(null)
 
@@ -232,7 +204,9 @@ export function OrderBuilder({
       await flush()
     } catch (flushError) {
       setIsSubmitting(false)
-      setError(flushError instanceof Error ? flushError.message : 'Failed to save all changes before submit')
+      setError(
+        flushError instanceof Error ? flushError.message : 'Failed to save all changes before submit'
+      )
       return
     }
 
@@ -244,7 +218,10 @@ export function OrderBuilder({
       },
       body: JSON.stringify({ status: 'submitted' }),
     })
-    const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null
+
     setIsSubmitting(false)
     if (!response.ok) {
       setError(payload?.error?.message ?? 'Failed to submit order')
@@ -255,500 +232,205 @@ export function OrderBuilder({
     router.refresh()
   }
 
-  const openPalletsForProduct = (productId: string) => {
-    setPalletFilterProductId(productId)
-    setActiveTab('pallets')
-  }
-
-  const renderBrandLogo = (
-    logoUrl: string | null | undefined,
-    brandName: string | null | undefined,
-    className: string
-  ) => {
-    if (!logoUrl) return null
-    return (
-      <img
-        src={logoUrl}
-        alt={`${brandName ?? 'Brand'} logo`}
-        className={className}
-      />
-    )
-  }
-
-  const renderProductRow = (product: CatalogProduct, isCardLayout: boolean) => {
-    const key = itemKey(product.id, null)
-    const quantity = quantities[key] ?? 0
-    const packLabel = getProductPackLabel(product) ?? 'N/A'
-    const displayName = getProductDisplayName(product, product.brand?.name ?? null)
-    const hasPalletLink = (productToPalletDealIds[product.id] ?? []).length > 0
-    const showInlineBrandLogo = filters.groupBy === 'size'
-    const brandLogo = showInlineBrandLogo
-      ? renderBrandLogo(
-          product.brand?.logo_url,
-          product.brand?.name,
-          isCardLayout
-            ? 'h-12 w-full object-contain object-left'
-            : 'h-10 w-full object-contain object-left'
-        )
-      : null
-
-    if (isCardLayout) {
-      return (
-        <div key={product.id} className="rounded-lg border p-3 space-y-3">
-          {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={product.title}
-              className="h-40 w-full rounded-md object-cover"
-            />
-          ) : (
-            <div className="flex h-40 w-full items-center justify-center rounded-md bg-muted">
-              <Package className="h-8 w-8 text-muted-foreground" />
-            </div>
-          )}
-          <div>
-            {showInlineBrandLogo && brandLogo ? <div className="mb-1">{brandLogo}</div> : null}
-            <div className="font-semibold">{displayName}</div>
-            <div className="text-xs text-muted-foreground">{packLabel}</div>
-            {showPrices && (
-              <div className="mt-1 text-sm">{formatCurrency(product.effective_price)}</div>
-            )}
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            {hasPalletLink ? (
-              <Button type="button" size="sm" variant="ghost" onClick={() => openPalletsForProduct(product.id)}>
-                Save with a pallet
-              </Button>
-            ) : <span />}
-            <QuantitySelector quantity={quantity} onChange={(value) => setProductQuantity(product, value)} />
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <div key={product.id} className="flex items-center justify-between gap-3 border-b px-2 py-2.5 last:border-b-0">
-        <div className="min-w-0 flex-1">
-          {showInlineBrandLogo && brandLogo ? <div className="mb-1">{brandLogo}</div> : null}
-          <div className="font-medium">{displayName}</div>
-          <div className="text-xs text-muted-foreground">
-            {packLabel}
-            {showPrices && <> - {formatCurrency(product.effective_price)}</>}
-          </div>
-          {hasPalletLink && (
-            <Button type="button" size="sm" variant="ghost" className="mt-1 h-7 px-2 text-xs" onClick={() => openPalletsForProduct(product.id)}>
-              Save with a pallet
-            </Button>
-          )}
-        </div>
-        <QuantitySelector quantity={quantity} onChange={(value) => setProductQuantity(product, value)} />
-      </div>
-    )
-  }
-
-  const filteredPalletDeals = useMemo(() => {
-    if (!palletFilterProductId) return palletDeals
-    const allowed = new Set(productToPalletDealIds[palletFilterProductId] ?? [])
-    return palletDeals.filter((deal) => allowed.has(deal.id))
-  }, [palletDeals, palletFilterProductId, productToPalletDealIds])
-
-  const filteredPalletGroups = useMemo(
-    () => ({
-      single: filteredPalletDeals.filter((deal) => deal.pallet_type === 'single'),
-      mixed: filteredPalletDeals.filter((deal) => deal.pallet_type === 'mixed'),
-    }),
-    [filteredPalletDeals]
-  )
-
-  const palletFilterProduct = palletFilterProductId ? productById.get(palletFilterProductId) : null
+  const showUsuals = !isFilterActive && usuals.length > 0
 
   return (
-    <div className="pb-28 md:pb-0">
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6">
-        <div className="space-y-4">
-          <header className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              {activeTab === 'pallets' ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="-ml-2"
-                  onClick={() => {
-                    setPalletFilterProductId(null)
-                    setActiveTab('all')
-                  }}
-                >
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Purchase Catalog
-                </Button>
-              ) : (
-                <Button asChild variant="ghost" size="sm" className="-ml-2">
-                  <Link href={`${basePath}/orders`}>
-                    <ArrowLeft className="mr-1 h-4 w-4" />
-                    Back
-                  </Link>
-                </Button>
-              )}
-              <span className="text-sm font-medium">{formatDeliveryDate(deliveryDate)}</span>
-            </div>
-            {activeTab === 'all' ? (
-              <Button
-                type="button"
-                size="lg"
-                className="h-11 px-5"
-                onClick={() => setActiveTab('pallets')}
-              >
-                Save With Pallets
-              </Button>
-            ) : null}
-          </header>
+    <div className="pb-28 md:pb-8">
+      <header className="flex items-center justify-between gap-2 pb-2">
+        <Button asChild variant="ghost" size="sm" className="-ml-2">
+          <Link href={`${basePath}/orders`}>
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back
+          </Link>
+        </Button>
+        <span className="text-sm font-medium">{formatDeliveryDate(deliveryDate)}</span>
+      </header>
 
-          {activeTab === 'all' && (
-            <div className="space-y-3">
+      {palletDeals.length > 0 && (
+        <div className="border-y py-2 text-sm">
+          <button
+            type="button"
+            onClick={() => setPalletsExpanded((p) => !p)}
+            className="flex w-full items-center justify-between text-left text-muted-foreground hover:text-foreground"
+          >
+            <span>
+              {palletDeals.length} pallet {palletDeals.length === 1 ? 'deal' : 'deals'} available
+            </span>
+            <span className="text-xs">{palletsExpanded ? 'Hide' : 'View'}</span>
+          </button>
+          {palletsExpanded && (
+            <div className="mt-3 divide-y rounded-md border">
+              {palletDeals.map((deal) => {
+                const qty = quantities[`pallet:${deal.id}`] ?? 0
+                const isSingle = deal.pallet_type === 'single'
+                return (
+                  <div key={deal.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setPalletDetailId(deal.id)}
+                      className="min-w-0 flex-1 text-left hover:opacity-80"
+                    >
+                      <div className="text-sm font-medium underline-offset-2 hover:underline">
+                        {deal.title}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {deal.savings_text}
+                        {showPrices && <> · {formatCurrency(deal.price)}</>}
+                      </div>
+                    </button>
+                    {isSingle ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={qty > 0 ? 'default' : 'outline'}
+                        onClick={() => setPalletQuantity(deal, qty > 0 ? 0 : 1)}
+                      >
+                        {qty > 0 ? 'Added' : 'Add'}
+                      </Button>
+                    ) : (
+                      <QuantitySelector
+                        quantity={qty}
+                        onChange={(next) => setPalletQuantity(deal, next)}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="pt-4">
+        {showUsuals ? (
+          <div className="divide-y rounded-md border">
+            {usuals
+              .map((u) => ({ usual: u, product: productById.get(u.productId) }))
+              .filter((e) => e.product)
+              .map(({ usual, product }) => {
+                const p = product!
+                const qty = quantities[`product:${p.id}`] ?? 0
+                return (
+                  <div key={p.id} className="flex items-center gap-3 px-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">
+                        {getProductDisplayName(p, p.brand?.name ?? null)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {getProductPackLabel(p) ?? ''}
+                        {showPrices && <> · {formatCurrency(p.effective_price)}</>}
+                      </div>
+                    </div>
+                    <QuantitySelector
+                      quantity={qty}
+                      onChange={(next) => setProductQuantity(p, next)}
+                    />
+                  </div>
+                )
+              })}
+          </div>
+        ) : null}
+
+        <div className="pt-4">
+          {!browseExpanded && !isFilterActive ? (
+            <button
+              type="button"
+              onClick={() => setBrowseExpanded(true)}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Add something else →
+            </button>
+          ) : (
+            <section className="space-y-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  All products
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {browseList.length} {browseList.length === 1 ? 'product' : 'products'}
+                </span>
+              </div>
+
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search products..."
                   className="pl-9"
                   value={filters.searchQuery}
-                  onChange={(event) => setFilters((prev) => ({ ...prev, searchQuery: event.target.value }))}
+                  onChange={(event) =>
+                    setFilters((prev) => ({ ...prev, searchQuery: event.target.value }))
+                  }
                 />
               </div>
-              <div className="flex gap-2">
-                <Select
-                  value={filters.brandId ?? 'all'}
-                  onValueChange={(value) => setFilters((prev) => ({ ...prev, brandId: value === 'all' ? null : value }))}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All brands</SelectItem>
-                    {availableBrands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={filters.sizeFilter ?? 'all'}
-                  onValueChange={(value) => setFilters((prev) => ({ ...prev, sizeFilter: value === 'all' ? null : value }))}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All sizes</SelectItem>
-                    {availableSizes.map((size) => (
-                      <SelectItem key={size} value={size}>{size}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Group:</span>
-                <Select
-                  value={filters.groupBy}
-                  onValueChange={(value: 'brand' | 'size') => setFilters((prev) => ({ ...prev, groupBy: value }))}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="brand">Brand</SelectItem>
-                    <SelectItem value="size">Size</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'all' && isFilterActive && (
-            <div className="rounded-lg border">
-              <div className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Filtered Results
+              <div className="space-y-2">
+                <SizeChips
+                  sizes={availableSizes}
+                  selectedSize={filters.sizeFilter}
+                  onSelect={(sizeFilter) => setFilters((prev) => ({ ...prev, sizeFilter }))}
+                />
+                <BrandChips
+                  brands={availableBrands}
+                  selectedBrandId={filters.brandId}
+                  onSelect={(brandId) => setFilters((prev) => ({ ...prev, brandId }))}
+                />
               </div>
-              <div className="border-t">
-                {(grouped[0]?.products ?? []).map((product) => renderProductRow(product, false))}
-                {(grouped[0]?.products ?? []).length === 0 && (
-                  <div className="px-4 py-3 text-sm text-muted-foreground">No products found.</div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'all' && !isFilterActive && newItems.length > 0 && (
-            <div className="rounded-lg border">
-              <button
-                type="button"
-                onClick={() => toggleGroup('new-items')}
-                className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
-              >
-                <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">New Items</span>
-                {expandedGroups.has('new-items')
-                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-              </button>
-              {expandedGroups.has('new-items') && (
-                <div className="grid gap-3 border-t p-3 md:grid-cols-2">
-                  {newItems.map((product) => renderProductRow(product, true))}
+              {browseList.length > 0 ? (
+                <div className="divide-y rounded-md border">
+                  {browseList.map((product) => (
+                    <BrowseRow
+                      key={product.id}
+                      product={product}
+                      quantity={quantities[`product:${product.id}`] ?? 0}
+                      onChange={(next) => setProductQuantity(product, next)}
+                      showPrices={showPrices}
+                      hasPalletDeal={(productToPalletDealIds[product.id] ?? []).length > 0}
+                    />
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'all' && !isFilterActive && grouped.map((group) => {
-            const isExpanded = expandedGroups.has(group.key)
-            const groupBrandName = filters.groupBy === 'brand'
-              ? group.products[0]?.brand?.name ?? null
-              : null
-            const groupBrandLogo = filters.groupBy === 'brand'
-              ? group.products[0]?.brand?.logo_url ?? null
-              : null
-            return (
-              <div key={group.key} className="rounded-lg border">
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.key)}
-                  className="flex w-full items-center gap-2 px-4 py-3 hover:bg-muted/30"
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    {filters.groupBy === 'brand' && groupBrandLogo
-                      ? renderBrandLogo(groupBrandLogo, groupBrandName, 'h-7 w-auto max-w-[7rem] object-contain object-left')
-                      : null}
-                    <span className="truncate">{group.label}</span>
-                  </span>
-                  {isExpanded
-                    ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t">
-                    {group.products.map((product) => renderProductRow(product, false))}
-                    {group.products.length === 0 && (
-                      <div className="px-4 py-3 text-sm text-muted-foreground">No products in this group.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-
-          {activeTab === 'pallets' && (
-            <div className="space-y-4">
-              {palletFilterProduct && (
-                <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-                  <span>
-                    Pallets containing: <span className="font-medium">{getProductDisplayName(palletFilterProduct, palletFilterProduct.brand?.name ?? null)}</span>
-                  </span>
-                  <Button size="sm" variant="ghost" onClick={() => setPalletFilterProductId(null)}>Clear</Button>
-                </div>
-              )}
-
-              {filteredPalletDeals.length > 0 ? (
-                ([
-                  { label: 'Single Pallets', key: 'single', deals: filteredPalletGroups.single },
-                  { label: 'Mixed Pallets', key: 'mixed', deals: filteredPalletGroups.mixed },
-                ] as const).map((section) => {
-                  if (section.deals.length === 0) return null
-                  const isExpanded = expandedGroups.has(section.key)
-                  return (
-                    <div key={section.key} className="rounded-lg border">
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(section.key)}
-                        className="flex w-full items-center gap-2 px-4 py-3 text-right hover:bg-muted/30"
-                      >
-                        <span className="ml-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                          {section.label}
-                        </span>
-                        {isExpanded
-                          ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                      </button>
-
-                      {isExpanded && (
-                        <div className="grid gap-3 border-t p-3 md:grid-cols-2">
-                          {section.deals.map((palletDeal) => {
-                            const key = itemKey(null, palletDeal.id)
-                            const quantity = quantities[key] ?? 0
-                            const isSingle = palletDeal.pallet_type === 'single'
-                            return (
-                              <div key={palletDeal.id} className="rounded-lg border p-3 space-y-3">
-                                {palletDeal.image_url ? (
-                                  <img
-                                    src={palletDeal.image_url}
-                                    alt={palletDeal.title}
-                                    className="h-40 w-full rounded-md object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-40 w-full items-center justify-center rounded-md bg-muted">
-                                    <Package className="h-8 w-8 text-muted-foreground" />
-                                  </div>
-                                )}
-                                <div>
-                                  <div className="font-semibold">{palletDeal.title}</div>
-                                  {palletDeal.description && (
-                                    <div className="text-xs text-muted-foreground">{palletDeal.description}</div>
-                                  )}
-                                  {palletDeal.savings_text && (
-                                    <div className="text-xs text-emerald-600">{palletDeal.savings_text}</div>
-                                  )}
-                                  {showPrices && (
-                                    <div className="mt-1 text-sm">{formatCurrency(palletDeal.price)}</div>
-                                  )}
-                                </div>
-                                <div className="flex justify-end">
-                                  {isSingle ? (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant={quantity > 0 ? 'default' : 'outline'}
-                                      onClick={() => setPalletQuantity(palletDeal, quantity > 0 ? 0 : 1)}
-                                    >
-                                      {quantity > 0 ? 'Selected' : 'Select'}
-                                    </Button>
-                                  ) : (
-                                    <QuantitySelector quantity={quantity} onChange={(value) => setPalletQuantity(palletDeal, value)} />
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
               ) : (
-                <div className="py-4 text-sm text-muted-foreground">No active pallet deals.</div>
+                <p className="text-sm text-muted-foreground">No products match your filters.</p>
               )}
-            </div>
+            </section>
           )}
         </div>
-
-        <aside className="hidden md:block">
-          <div className="sticky top-4 flex max-h-[calc(100vh-1rem)] flex-col rounded-lg border bg-background p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Review</div>
-              <Button type="button" size="sm" variant="ghost" onClick={resetAll} disabled={isResetting || totalItems === 0}>
-                {isResetting ? 'Resetting...' : 'Reset All'}
-              </Button>
-            </div>
-
-            <div className="mt-3 min-h-0 flex-1 space-y-0 overflow-y-auto pr-1">
-              {reviewItems.length > 0 ? (
-                reviewItems.map((item) => (
-                  <div key={item.key} className="border-b py-3 last:border-0">
-                    <div className="font-medium">{item.label}</div>
-                    {item.details && <div className="text-xs text-muted-foreground">{item.details}</div>}
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      {showPrices ? (
-                        <div className="text-xs text-muted-foreground">
-                          {formatCurrency(item.unitPrice)} x {item.quantity}
-                        </div>
-                      ) : (
-                        <div />
-                      )}
-                      <div className="flex items-center gap-2">
-                        {showPrices && <span className="text-sm font-medium">{formatCurrency(item.lineTotal)}</span>}
-                        <QuantitySelector quantity={item.quantity} onChange={(value) => updateReviewQuantity(item, value)} />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-4 text-sm text-muted-foreground">No items added yet.</div>
-              )}
-            </div>
-
-            <div className="mt-3 space-y-3 border-t pt-3">
-              {error && <p className="text-xs text-destructive">{error}</p>}
-              <div className="flex items-center justify-between text-sm">
-                <span>{totalItems} items</span>
-                {showPrices && <span className="font-semibold">{formatCurrency(totalValue)}</span>}
-              </div>
-              <Button className="w-full" size="lg" onClick={submitOrder} disabled={totalItems === 0 || isSubmitting}>
-                {isSubmitting ? 'Submitting...' : (
-                  <>Submit Order <Check className="ml-1 h-4 w-4" /></>
-                )}
-              </Button>
-            </div>
-          </div>
-        </aside>
       </div>
 
-      {totalItems > 0 && (
-        <div className="fixed inset-x-0 bottom-16 z-30 border-t bg-background p-3 md:hidden">
-          <div className="mx-auto max-w-4xl">
-            <Button className="w-full" size="lg" onClick={() => setIsReviewOpen(true)}>
-              Review Order ({totalItems} items)
-              {showPrices && <span className="ml-2 opacity-80">- {formatCurrency(totalValue)}</span>}
-            </Button>
-          </div>
-        </div>
-      )}
+      <CartSummaryBar
+        itemCount={totalItems}
+        totalValue={totalValue}
+        showPrices={showPrices}
+        onReview={() => setIsReviewOpen(true)}
+      />
 
-      <Sheet open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-        <SheetContent side="bottom" className="mx-auto h-[88vh] w-full max-w-lg rounded-t-xl p-0 [&>button.absolute]:hidden">
-          <div className="flex h-full flex-col gap-3 p-4">
-            <div className="mx-auto h-1.5 w-12 rounded-full bg-muted" />
+      <ReviewOrderSheet
+        open={isReviewOpen}
+        onOpenChange={setIsReviewOpen}
+        deliveryDate={deliveryDate}
+        items={reviewItems}
+        itemCount={totalItems}
+        totalValue={totalValue}
+        showPrices={showPrices}
+        error={error}
+        isResetting={isResetting}
+        isSubmitting={isSubmitting}
+        onReset={resetAll}
+        onChangeQuantity={updateReviewQuantity}
+        onSubmit={submitOrder}
+      />
 
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-base font-semibold">Review Order</h2>
-                <p className="text-xs text-muted-foreground">{formatDeliveryDate(deliveryDate)}</p>
-              </div>
-              <Button type="button" size="sm" variant="ghost" onClick={resetAll} disabled={isResetting || totalItems === 0}>
-                {isResetting ? 'Resetting...' : 'Reset All'}
-              </Button>
-            </div>
-
-            <div className="flex-1 space-y-0 overflow-y-auto">
-              {reviewItems.length > 0 ? (
-                reviewItems.map((item) => (
-                  <div key={item.key} className="border-b py-3 last:border-0">
-                    <div className="font-medium">{item.label}</div>
-                    {item.details && <div className="text-xs text-muted-foreground">{item.details}</div>}
-                    <div className="mt-2 flex items-center justify-between">
-                      {showPrices ? (
-                        <div className="text-sm text-muted-foreground">
-                          {formatCurrency(item.unitPrice)} x {item.quantity}
-                        </div>
-                      ) : (
-                        <div />
-                      )}
-                      <div className="flex items-center gap-3">
-                        {showPrices && <span className="text-sm font-medium">{formatCurrency(item.lineTotal)}</span>}
-                        <QuantitySelector quantity={item.quantity} onChange={(value) => updateReviewQuantity(item, value)} />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-4 text-sm text-muted-foreground">No items added yet.</div>
-              )}
-            </div>
-
-            <div className="space-y-3 border-t pt-3">
-              {error && <p className="text-xs text-destructive">{error}</p>}
-              <div className="flex items-center justify-between text-sm">
-                <span>{totalItems} items</span>
-                {showPrices && <span className="font-semibold">{formatCurrency(totalValue)}</span>}
-              </div>
-              <Button className="w-full" size="lg" onClick={submitOrder} disabled={totalItems === 0 || isSubmitting}>
-                {isSubmitting ? 'Submitting...' : (
-                  <>Submit Order <Check className="ml-1 h-4 w-4" /></>
-                )}
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <PalletDetailDialog
+        open={palletDetailId !== null}
+        onOpenChange={(next) => {
+          if (!next) setPalletDetailId(null)
+        }}
+        deal={palletDetailId ? palletById.get(palletDetailId) ?? null : null}
+        showPrices={showPrices}
+      />
 
       {statusMessage && (
-        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-md bg-foreground px-3 py-1 text-xs text-background">
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-md bg-foreground px-3 py-1 text-xs text-background">
           {statusMessage}
         </div>
       )}

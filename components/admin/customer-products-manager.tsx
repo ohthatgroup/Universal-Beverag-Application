@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -33,6 +33,7 @@ export interface CustomerProductOverrideData {
   productId: string
   excluded: boolean
   customPrice: number | null
+  isUsual: boolean
 }
 
 interface CustomerProductsManagerProps {
@@ -45,6 +46,7 @@ interface CustomerProductsManagerProps {
 
 interface ProductDraftState {
   hidden: boolean
+  isUsual: boolean
   savedCustomPrice: number | null
   draftCustomPrice: string
 }
@@ -72,6 +74,7 @@ function buildInitialDrafts(
       const savedCustomPrice = override?.customPrice ?? null
       nextState[product.id] = {
         hidden: override?.excluded ?? false,
+        isUsual: override?.isUsual ?? false,
         savedCustomPrice,
         draftCustomPrice: savedCustomPrice === null ? '' : String(savedCustomPrice),
       }
@@ -181,6 +184,7 @@ export function CustomerProductsManager({
       ...prev,
       [productId]: {
         hidden: prev[productId]?.hidden ?? false,
+        isUsual: prev[productId]?.isUsual ?? false,
         savedCustomPrice: prev[productId]?.savedCustomPrice ?? null,
         draftCustomPrice: prev[productId]?.draftCustomPrice ?? '',
         ...patch,
@@ -205,6 +209,7 @@ export function CustomerProductsManager({
           productId,
           hidden,
           customPrice: current.savedCustomPrice,
+          isUsual: current.isUsual,
         }),
       })
 
@@ -217,6 +222,45 @@ export function CustomerProductsManager({
     } catch (toggleError) {
       updateDraft(productId, { hidden: previousHidden })
       setError(toggleError instanceof Error ? toggleError.message : 'Failed to update product visibility')
+    } finally {
+      setSavingToggleIds((prev) => {
+        const next = new Set(prev)
+        next.delete(productId)
+        return next
+      })
+    }
+  }
+
+  const saveUsualState = async (productId: string, isUsual: boolean) => {
+    const current = drafts[productId]
+    if (!current || savingToggleIds.has(productId)) return
+
+    const previousIsUsual = current.isUsual
+    updateDraft(productId, { isUsual })
+    setSavingToggleIds((prev) => new Set(prev).add(productId))
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/customers/${customerId}/products`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          hidden: current.hidden,
+          customPrice: current.savedCustomPrice,
+          isUsual,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
+        throw new Error(payload?.error?.message ?? 'Failed to pin product')
+      }
+
+      setSuccess(isUsual ? 'Pinned to usuals' : 'Unpinned')
+    } catch (toggleError) {
+      updateDraft(productId, { isUsual: previousIsUsual })
+      setError(toggleError instanceof Error ? toggleError.message : 'Failed to pin product')
     } finally {
       setSavingToggleIds((prev) => {
         const next = new Set(prev)
@@ -391,6 +435,7 @@ export function CustomerProductsManager({
         ...prev,
         [created.id]: {
           hidden: false,
+          isUsual: false,
           savedCustomPrice: null,
           draftCustomPrice: '',
         },
@@ -568,17 +613,38 @@ export function CustomerProductsManager({
                           )}
                         </div>
 
-                        <label className="relative inline-flex h-5 w-9 cursor-pointer items-center">
-                          <input
-                            type="checkbox"
-                            checked={hidden}
-                            className="peer sr-only"
+                        <div className="flex flex-col items-end gap-2">
+                          <button
+                            type="button"
+                            aria-label={draft?.isUsual ? 'Unpin from usuals' : 'Pin to usuals'}
+                            aria-pressed={draft?.isUsual ?? false}
                             disabled={toggleSaving}
-                            onChange={(event) => void saveHiddenState(product.id, event.target.checked)}
-                          />
-                          <span className="h-5 w-9 rounded-full bg-input transition-colors peer-checked:bg-primary" />
-                          <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
-                        </label>
+                            onClick={() => void saveUsualState(product.id, !(draft?.isUsual ?? false))}
+                            className={cn(
+                              'inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-muted',
+                              (draft?.isUsual ?? false) ? 'text-amber-500' : 'text-muted-foreground'
+                            )}
+                          >
+                            <Star
+                              className="h-4 w-4"
+                              fill={(draft?.isUsual ?? false) ? 'currentColor' : 'none'}
+                            />
+                          </button>
+                          <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Hide
+                            <span className="relative inline-flex h-5 w-9 cursor-pointer items-center">
+                              <input
+                                type="checkbox"
+                                checked={hidden}
+                                className="peer sr-only"
+                                disabled={toggleSaving}
+                                onChange={(event) => void saveHiddenState(product.id, event.target.checked)}
+                              />
+                              <span className="h-5 w-9 rounded-full bg-input transition-colors peer-checked:bg-primary" />
+                              <span className="absolute left-[2px] h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     </div>
                   )
@@ -595,6 +661,7 @@ export function CustomerProductsManager({
                       {customPricing && (
                         <th className="px-4 py-2 text-right font-medium">Custom Price</th>
                       )}
+                      <th className="px-4 py-2 text-center font-medium">Pin</th>
                       <th className="px-4 py-2 text-center font-medium">Hide</th>
                     </tr>
                   </thead>
@@ -631,6 +698,24 @@ export function CustomerProductsManager({
                             </td>
                           ) : null}
                           <td className="px-4 py-2 text-center">
+                            <button
+                              type="button"
+                              aria-label={draft?.isUsual ? 'Unpin from usuals' : 'Pin to usuals'}
+                              aria-pressed={draft?.isUsual ?? false}
+                              disabled={toggleSaving}
+                              onClick={() => void saveUsualState(product.id, !(draft?.isUsual ?? false))}
+                              className={cn(
+                                'inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-muted',
+                                (draft?.isUsual ?? false) ? 'text-amber-500' : 'text-muted-foreground'
+                              )}
+                            >
+                              <Star
+                                className="h-4 w-4"
+                                fill={(draft?.isUsual ?? false) ? 'currentColor' : 'none'}
+                              />
+                            </button>
+                          </td>
+                          <td className="px-4 py-2 text-center">
                             <label className="relative inline-flex h-5 w-9 cursor-pointer items-center">
                               <input
                                 type="checkbox"
@@ -654,25 +739,36 @@ export function CustomerProductsManager({
         </div>
       )}
 
+      {/*
+        Autosave-style indicator — replaces the old sticky save/discard footer.
+        Per st-9 design theory: prices should autosave per-row with debounce;
+        this visible bar is a transitional pattern until the row-level autosave
+        is wired. Engineer TODO (see docs/st-9-engineer-followups.md): move
+        price writes to a 500ms debounced per-row PATCH and drop this banner.
+      */}
       {customPricing && hasDirtyPrices && (
-        <div className="fixed inset-x-0 bottom-16 z-40 border-t bg-background/95 p-3 backdrop-blur md:bottom-0">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
-            <div className="text-sm">
-              <span className="font-medium">{dirtyPriceIds.length}</span> unsaved price change
-              {dirtyPriceIds.length === 1 ? '' : 's'}
-              {hasInvalidDirtyPrices ? ' (fix invalid values to save)' : ''}
-            </div>
+        <div className="sticky bottom-20 z-30 mx-auto w-full md:bottom-4">
+          <div className="mx-auto flex max-w-md items-center justify-between gap-3 rounded-full border border-amber-500/30 bg-amber-50/90 px-4 py-2 text-sm shadow-lg backdrop-blur">
+            <span className="text-amber-900">
+              {dirtyPriceIds.length} price{dirtyPriceIds.length === 1 ? '' : 's'} pending
+              {hasInvalidDirtyPrices ? ' — fix invalid' : ''}
+            </span>
             <div className="flex items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={discardDirtyPrices} disabled={isSavingPrices}>
+              <button
+                type="button"
+                onClick={discardDirtyPrices}
+                disabled={isSavingPrices}
+                className="text-xs text-amber-900/70 hover:text-amber-900"
+              >
                 Discard
-              </Button>
+              </button>
               <Button
                 type="button"
                 size="sm"
                 onClick={saveDirtyPrices}
                 disabled={isSavingPrices || hasInvalidDirtyPrices}
               >
-                {isSavingPrices ? 'Saving...' : 'Save Changes'}
+                {isSavingPrices ? 'Saving…' : 'Save'}
               </Button>
             </div>
           </div>

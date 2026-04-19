@@ -43,18 +43,21 @@ export type Database = {
           product_id: string
           excluded: boolean
           custom_price: number | null
+          is_usual: boolean
         }
         Insert: {
           customer_id: string
           product_id: string
           excluded?: boolean
           custom_price?: number | null
+          is_usual?: boolean
         }
         Update: {
           customer_id?: string
           product_id?: string
           excluded?: boolean
           custom_price?: number | null
+          is_usual?: boolean
         }
         Relationships: [
           {

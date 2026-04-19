@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { ArrowLeft } from 'lucide-react'
 import { PalletDealContentsEditor } from '@/components/admin/pallet-deal-contents-editor'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { LiveQuerySelect } from '@/components/admin/live-query-select'
@@ -8,13 +10,15 @@ import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { getProductPackLabel } from '@/lib/utils'
+import { getProductPackLabel, getProductSizeLabel } from '@/lib/utils'
 
 interface PalletDetailPageProps {
   params: Promise<{ id: string }>
   searchParams?: Promise<{
     q?: string
     content?: string
+    brand?: string
+    size?: string
   }>
 }
 
@@ -27,6 +31,8 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
   const searchTerm = searchQuery.toLowerCase()
   const contentParam = (resolvedSearchParams?.content ?? 'all').trim()
   const contentFilter = contentParam === 'included' || contentParam === 'excluded' ? contentParam : 'all'
+  const brandFilter = (resolvedSearchParams?.brand ?? 'all').trim() || 'all'
+  const sizeFilter = (resolvedSearchParams?.size ?? 'all').trim() || 'all'
 
   const [{ rows: palletDealRows }, { rows: products }, { rows: items }, { rows: brands }] = await Promise.all([
     db.query<{
@@ -65,7 +71,7 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
        where pallet_deal_id = $1`,
       [id]
     ),
-    db.query<{ id: string; name: string }>('select id, name from brands'),
+    db.query<{ id: string; name: string }>('select id, name from brands order by sort_order asc'),
   ])
   const palletDeal = palletDealRows[0] ?? null
   if (!palletDeal) notFound()
@@ -81,11 +87,24 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
     return brandLabel ? `${brandLabel} - ${product.title}` : product.title
   }
 
+  // Build the distinct size options from products so the size filter mirrors what's in the catalog
+  const sizeOptionsSet = new Set<string>()
+  for (const product of products ?? []) {
+    const sizeLabel = getProductSizeLabel(product)
+    if (sizeLabel) sizeOptionsSet.add(sizeLabel)
+  }
+  const sizeOptions = Array.from(sizeOptionsSet).sort((a, b) => a.localeCompare(b))
+
   const includedCount = (items ?? []).filter((item) => item.quantity > 0).length
   const filteredProducts = (products ?? []).filter((product) => {
     const quantity = itemByProduct.get(product.id)?.quantity ?? 0
     if (contentFilter === 'included' && quantity <= 0) return false
     if (contentFilter === 'excluded' && quantity > 0) return false
+    if (brandFilter !== 'all' && product.brand_id !== brandFilter) return false
+    if (sizeFilter !== 'all') {
+      const sizeLabel = getProductSizeLabel(product)
+      if (sizeLabel !== sizeFilter) return false
+    }
     if (!searchTerm) return true
     const haystack = [getProductTitleWithBrand(product), getProductPackLabel(product) ?? '']
       .join(' ')
@@ -130,9 +149,16 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
   return (
     <div className="space-y-6">
       <div>
+        <Link
+          href="/admin/catalog/pallets"
+          className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Pallet deals
+        </Link>
         <h1 className="text-2xl font-semibold">{palletDeal.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {palletDeal.pallet_type} - {palletDeal.is_active ? 'Active' : 'Inactive'} - {includedCount} products
+          {palletDeal.pallet_type} · {palletDeal.is_active ? 'Active' : 'Inactive'} · {includedCount} products
         </p>
       </div>
 
@@ -178,22 +204,42 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
 
         <div className="min-w-0 space-y-4 overflow-hidden rounded-lg border p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Contents</h2>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="space-y-2">
             <LiveQueryInput
               placeholder="Search deal items..."
               initialValue={searchQuery}
-              className="w-full sm:w-72"
+              className="w-full"
             />
-            <LiveQuerySelect
-              paramKey="content"
-              initialValue={contentFilter}
-              className="w-full sm:w-44"
-              options={[
-                { value: 'all', label: 'All items' },
-                { value: 'included', label: 'Included' },
-                { value: 'excluded', label: 'Not included' },
-              ]}
-            />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <LiveQuerySelect
+                paramKey="brand"
+                initialValue={brandFilter}
+                className="w-full"
+                options={[
+                  { value: 'all', label: 'All brands' },
+                  ...(brands ?? []).map((brand) => ({ value: brand.id, label: brand.name })),
+                ]}
+              />
+              <LiveQuerySelect
+                paramKey="size"
+                initialValue={sizeFilter}
+                className="w-full"
+                options={[
+                  { value: 'all', label: 'All sizes' },
+                  ...sizeOptions.map((size) => ({ value: size, label: size })),
+                ]}
+              />
+              <LiveQuerySelect
+                paramKey="content"
+                initialValue={contentFilter}
+                className="w-full"
+                options={[
+                  { value: 'all', label: 'All items' },
+                  { value: 'included', label: 'Included' },
+                  { value: 'excluded', label: 'Not included' },
+                ]}
+              />
+            </div>
           </div>
 
           <PalletDealContentsEditor

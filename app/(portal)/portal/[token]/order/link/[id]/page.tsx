@@ -3,6 +3,7 @@ import { OrderBuilder } from '@/components/catalog/order-builder'
 import { CustomerOrderReadonly } from '@/components/orders/customer-order-readonly'
 import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
+import { getUsualsForCustomer } from '@/lib/server/portal-usuals'
 import type { Brand, CatalogProduct, CustomerProduct, OrderStatus, PalletDeal, Product } from '@/lib/types'
 import { getProductDisplayName, getProductPackLabel } from '@/lib/utils'
 
@@ -132,7 +133,7 @@ export default async function PortalOrderLinkPage({
     )
   }
 
-  const [productsResult, brandsResult, customerProductsResult, palletDealsResult, orderItemsResult] =
+  const [productsResult, brandsResult, customerProductsResult, palletDealsResult, orderItemsResult, usuals] =
     await Promise.all([
       db.query<Product>(
         `select id, brand_id, customer_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, is_new, is_discontinued, tags, case_length, case_width, case_height, sort_order, created_at::text, updated_at::text
@@ -170,6 +171,7 @@ export default async function PortalOrderLinkPage({
          where order_id = $1 and quantity > 0`,
         [order.id]
       ),
+      getUsualsForCustomer(db, customerId),
     ])
 
   const palletDealIds = palletDealsResult.rows.map((deal) => deal.id)
@@ -218,6 +220,7 @@ export default async function PortalOrderLinkPage({
       defaultGroupBy={profile.default_group}
       initialItems={orderItemsResult.rows}
       productToPalletDealIds={productToPalletDealIds}
+      usuals={usuals}
     />
   )
 }
