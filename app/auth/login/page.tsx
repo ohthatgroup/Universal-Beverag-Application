@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { getAuthClient } from '@/lib/auth/client'
+import { toSafeLoginErrorMessage, toSafePasswordResetRequestErrorMessage } from '@/lib/auth/safe-messages'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -53,7 +54,7 @@ function LoginContent() {
       }
 
       if (exchangeError) {
-        setMessage(exchangeError.message)
+        setMessage(toSafeLoginErrorMessage(exchangeError))
         setIsExchangingCode(false)
         return
       }
@@ -86,7 +87,7 @@ function LoginContent() {
     setIsLoading(false)
 
     if (signInError) {
-      setMessage(signInError.message)
+      setMessage(toSafeLoginErrorMessage(signInError))
       return
     }
 
@@ -125,7 +126,7 @@ function LoginContent() {
     setIsResetting(false)
 
     if (!response.ok) {
-      setMessage(payload?.error?.message ?? 'Unable to start password reset.')
+      setMessage(toSafePasswordResetRequestErrorMessage(payload?.error))
       return
     }
 

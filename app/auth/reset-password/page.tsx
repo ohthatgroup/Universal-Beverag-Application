@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { getAuthClient } from '@/lib/auth/client'
+import { toSafePasswordResetCompletionErrorMessage } from '@/lib/auth/safe-messages'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,14 +23,16 @@ function ResetPasswordContent() {
   const code = searchParams.get('code')
   const token = searchParams.get('token')
   const email = searchParams.get('email')?.trim().toLowerCase() ?? ''
-  const isEmailCodeFlow = !code && !token
+  const isCodeFlow = Boolean(code)
+  const isEmailCodeFlow = !isCodeFlow && !token
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [otp, setOtp] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [isPreparingSession, setIsPreparingSession] = useState(Boolean(code))
+  const [isPreparingSession, setIsPreparingSession] = useState(isCodeFlow)
+  const [isCodeSessionReady, setIsCodeSessionReady] = useState(!isCodeFlow)
   const [authClient, setAuthClient] = useState<ReturnType<typeof getAuthClient> | null>(null)
 
   useEffect(() => {
@@ -41,19 +44,23 @@ function ResetPasswordContent() {
   useEffect(() => {
     if (!authClient || !code) {
       setIsPreparingSession(false)
+      setIsCodeSessionReady(!isCodeFlow)
       return
     }
 
     let isCancelled = false
 
     const exchangeCode = async () => {
+      setIsCodeSessionReady(false)
       const { error } = await authClient.exchangeCodeForSession(code)
       if (isCancelled) {
         return
       }
 
       if (error) {
-        setMessage(error.message)
+        setMessage(toSafePasswordResetCompletionErrorMessage(error))
+      } else {
+        setIsCodeSessionReady(true)
       }
       setIsPreparingSession(false)
     }
@@ -63,7 +70,7 @@ function ResetPasswordContent() {
     return () => {
       isCancelled = true
     }
-  }, [authClient, code])
+  }, [authClient, code, isCodeFlow])
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -89,7 +96,18 @@ function ResetPasswordContent() {
     let error: { message?: string } | null = null
 
     try {
-      if (token) {
+      if (isCodeFlow) {
+        if (!isCodeSessionReady) {
+          setMessage('This password reset link is invalid or expired. Request a new reset email and try again.')
+          setIsLoading(false)
+          return
+        }
+
+        const result = await betterAuthClient.resetPassword({
+          newPassword: password,
+        })
+        error = result?.error ?? null
+      } else if (token) {
         const result = await betterAuthClient.resetPassword({
           newPassword: password,
           token,
@@ -124,7 +142,7 @@ function ResetPasswordContent() {
     setIsLoading(false)
 
     if (error) {
-      setMessage(error.message ?? 'Unable to reset password.')
+      setMessage(toSafePasswordResetCompletionErrorMessage(error))
       return
     }
 
@@ -202,7 +220,11 @@ function ResetPasswordContent() {
                 />
               </div>
 
-              <Button disabled={!betterAuthClient || isLoading || isPreparingSession} type="submit" className="w-full">
+              <Button
+                disabled={!betterAuthClient || isLoading || isPreparingSession || (isCodeFlow && !isCodeSessionReady)}
+                type="submit"
+                className="w-full"
+              >
                 {isPreparingSession
                   ? 'Preparing...'
                   : isLoading

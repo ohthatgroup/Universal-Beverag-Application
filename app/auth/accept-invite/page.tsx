@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { triggerStaffInvitePasswordSetup } from '@/lib/server/staff-invites'
+import { isRouteError } from '@/lib/server/route-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,10 @@ export default async function AcceptInvitePage({
 
   const result = await triggerStaffInvitePasswordSetup(token).catch((error) => ({
     status: 'error' as const,
-    message: error instanceof Error ? error.message : 'Unable to process this invite.',
+    message:
+      isRouteError(error) && error.code === 'rate_limited'
+        ? 'A password setup email was sent recently. Check your inbox or wait a few minutes before trying again.'
+        : 'Unable to process this invite.',
   }))
 
   if (result.status === 'pending') {

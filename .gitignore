@@ -42,7 +42,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 Universal Beverages Price list MAR. 25 25 DRINKS (2).xlsx
-/tests
-/tests
+/tests/*
+!/tests/unit/
+/tests/unit/*
+!/tests/unit/auth-safe-messages.test.ts
 /scripts
 /docs

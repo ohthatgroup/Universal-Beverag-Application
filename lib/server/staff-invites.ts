@@ -4,6 +4,7 @@ import { getAuth } from '@/lib/auth/server'
 import { RouteError } from '@/lib/server/auth'
 import { getRequestDb } from '@/lib/server/db'
 import { ensureNeonAuthUser } from '@/lib/server/neon-auth-users'
+import { consumeRateLimit, getEnvRateLimit } from '@/lib/server/rate-limit'
 
 export interface StaffListRow {
   id: string
@@ -16,6 +17,15 @@ export interface StaffListRow {
   invite_status: 'pending' | 'accepted' | 'revoked' | null
   last_sent_at: string | null
 }
+
+const invitePasswordSetupRateLimit = getEnvRateLimit(
+  'STAFF_INVITE_PASSWORD_SETUP_RATE_LIMIT_MAX',
+  'STAFF_INVITE_PASSWORD_SETUP_RATE_LIMIT_WINDOW_MS',
+  {
+    maxRequests: 2,
+    windowMs: 15 * 60 * 1000,
+  }
+)
 
 function requireInviteSignerSecret() {
   const secret = process.env.NEON_AUTH_COOKIE_SECRET?.trim()
@@ -341,6 +351,11 @@ export async function triggerStaffInvitePasswordSetup(token: string) {
   }
 
   const invite = validation.invite
+  consumeRateLimit({
+    key: ['staff-invite-password-setup', invite.id].join(':'),
+    ...invitePasswordSetupRateLimit,
+  })
+
   const displayName = invite.contact_name?.trim() || invite.business_name?.trim() || invite.email
   const authUserId = await ensureNeonAuthUser({
     email: invite.email,

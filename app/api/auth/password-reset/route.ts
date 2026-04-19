@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
 import { getAuth } from '@/lib/auth/server'
 import { buildPasswordResetCallbackUrl } from '@/lib/config/public-url'
@@ -13,6 +14,10 @@ const resetRateLimit = getEnvRateLimit(
     windowMs: 10 * 60 * 1000,
   }
 )
+
+function hashEmailForAudit(email: string) {
+  return createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
+}
 
 export async function POST(request: Request) {
   const requestId = getRequestId(request)
@@ -33,12 +38,12 @@ export async function POST(request: Request) {
       throw new RouteError(
         502,
         'password_reset_request_failed',
-        result.error.message || 'Unable to start password reset'
+        'Unable to start password reset'
       )
     }
 
     logApiEvent(requestId, 'password_reset_requested', {
-      email: payload.email,
+      emailHash: hashEmailForAudit(payload.email),
     })
 
     return apiOk({ ok: true }, 200, requestId)
