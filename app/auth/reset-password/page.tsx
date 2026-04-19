@@ -17,8 +17,6 @@ export default function ResetPasswordPage() {
 }
 
 function ResetPasswordContent() {
-  const authClient = getAuthClient()
-  const betterAuthClient = authClient.getBetterAuthInstance()
   const router = useRouter()
   const searchParams = useSearchParams()
   const code = searchParams.get('code')
@@ -32,9 +30,16 @@ function ResetPasswordContent() {
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isPreparingSession, setIsPreparingSession] = useState(Boolean(code))
+  const [authClient, setAuthClient] = useState<ReturnType<typeof getAuthClient> | null>(null)
 
   useEffect(() => {
-    if (!code) {
+    setAuthClient(getAuthClient())
+  }, [])
+
+  const betterAuthClient = authClient?.getBetterAuthInstance() ?? null
+
+  useEffect(() => {
+    if (!authClient || !code) {
       setIsPreparingSession(false)
       return
     }
@@ -63,6 +68,11 @@ function ResetPasswordContent() {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setMessage(null)
+
+    if (!betterAuthClient) {
+      setMessage('Authentication is still loading. Please try again.')
+      return
+    }
 
     if (password.length < 8) {
       setMessage('Password must be at least 8 characters.')
@@ -171,6 +181,7 @@ function ResetPasswordContent() {
                 <Input
                   id="new-password"
                   type="password"
+                  autoComplete="new-password"
                   required
                   minLength={8}
                   value={password}
@@ -183,6 +194,7 @@ function ResetPasswordContent() {
                 <Input
                   id="confirm-password"
                   type="password"
+                  autoComplete="new-password"
                   required
                   minLength={8}
                   value={confirmPassword}
@@ -190,7 +202,7 @@ function ResetPasswordContent() {
                 />
               </div>
 
-              <Button disabled={isLoading || isPreparingSession} type="submit" className="w-full">
+              <Button disabled={!betterAuthClient || isLoading || isPreparingSession} type="submit" className="w-full">
                 {isPreparingSession
                   ? 'Preparing...'
                   : isLoading

@@ -17,7 +17,6 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
-  const authClient = getAuthClient()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') ?? '/admin/dashboard'
@@ -31,9 +30,14 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [isExchangingCode, setIsExchangingCode] = useState(false)
+  const [authClient, setAuthClient] = useState<ReturnType<typeof getAuthClient> | null>(null)
 
   useEffect(() => {
-    if (!code || isExchangingCode) {
+    setAuthClient(getAuthClient())
+  }, [])
+
+  useEffect(() => {
+    if (!authClient || !code || isExchangingCode) {
       return
     }
 
@@ -66,6 +70,10 @@ function LoginContent() {
 
   const onSalesmanLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!authClient) {
+      setMessage('Authentication is still loading. Please try again.')
+      return
+    }
     setIsLoading(true)
     setMessage(null)
     setSuccessMessage(null)
@@ -86,6 +94,11 @@ function LoginContent() {
   }
 
   const onForgotPassword = async () => {
+    if (!authClient) {
+      setMessage('Authentication is still loading. Please try again.')
+      return
+    }
+
     if (!salesmanEmail) {
       setMessage('Enter your email address first, then click Forgot password.')
       return
@@ -163,6 +176,7 @@ function LoginContent() {
                 <Input
                   id="salesman-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={salesmanEmail}
                   onChange={(event) => setSalesmanEmail(event.target.value)}
@@ -174,13 +188,14 @@ function LoginContent() {
                 <Input
                   id="salesman-password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
               </div>
 
-              <Button disabled={isLoading || isExchangingCode} type="submit" className="w-full">
+              <Button disabled={!authClient || isLoading || isExchangingCode} type="submit" className="w-full">
                 {isLoading ? 'Signing in...' : 'Sign in'}
               </Button>
             </form>
@@ -189,7 +204,7 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={onForgotPassword}
-                disabled={isResetting || isExchangingCode}
+                disabled={!authClient || isResetting || isExchangingCode}
                 className="text-sm text-muted-foreground underline hover:text-foreground disabled:opacity-50"
               >
                 {isResetting ? 'Sending...' : 'Forgot password?'}
