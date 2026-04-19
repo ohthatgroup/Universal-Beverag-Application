@@ -16,7 +16,17 @@ const badgeVariants = cva(
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         success:
           "border-transparent bg-success text-success-foreground hover:bg-success/80",
+        warning:
+          "border-transparent bg-warning text-warning-foreground hover:bg-warning/80",
         outline: "text-foreground",
+        draft:
+          "border-transparent bg-status-draft-bg text-status-draft",
+        submitted:
+          "border-transparent bg-status-submitted-bg text-status-submitted",
+        delivered:
+          "border-transparent bg-status-delivered-bg text-status-delivered",
+        cancelled:
+          "border-transparent bg-status-cancelled-bg text-status-cancelled",
       },
     },
     defaultVariants: {

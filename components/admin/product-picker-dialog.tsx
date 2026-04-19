@@ -15,6 +15,7 @@ export interface PickerProduct {
   title: string
   brandLabel: string
   packLabel: string
+  sizeLabel?: string
   price: number
 }
 
@@ -24,6 +25,9 @@ interface ProductPickerDialogProps {
   title: string
   triggerLabel: string
   products: PickerProduct[]
+  previouslyOrderedIds?: string[]
+  triggerVariant?: 'default' | 'outline' | 'ghost'
+  triggerSize?: 'sm' | 'default'
 }
 
 export function ProductPickerDialog({
@@ -32,13 +36,23 @@ export function ProductPickerDialog({
   title,
   triggerLabel,
   products,
+  previouslyOrderedIds = [],
+  triggerVariant = 'default',
+  triggerSize = 'sm',
 }: ProductPickerDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('all')
+  const [size, setSize] = useState('all')
+  const [showPrevious, setShowPrevious] = useState(false)
   const [isAddingId, setIsAddingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const previouslyOrderedSet = useMemo(
+    () => new Set(previouslyOrderedIds),
+    [previouslyOrderedIds]
+  )
 
   const brands = useMemo(() => {
     const unique = new Set<string>()
@@ -48,15 +62,29 @@ export function ProductPickerDialog({
     return Array.from(unique).sort((left, right) => left.localeCompare(right))
   }, [products])
 
+  const sizes = useMemo(() => {
+    const unique = new Set<string>()
+    for (const product of products) {
+      const label = product.sizeLabel ?? product.packLabel
+      if (label) unique.add(label)
+    }
+    return Array.from(unique).sort((left, right) => left.localeCompare(right))
+  }, [products])
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     return products.filter((product) => {
       if (brand !== 'all' && product.brandLabel !== brand) return false
+      const sizeLabel = product.sizeLabel ?? product.packLabel
+      if (size !== 'all' && sizeLabel !== size) return false
+      if (showPrevious && !previouslyOrderedSet.has(product.id)) return false
       if (!normalized) return true
-      const haystack = [product.title, product.brandLabel, product.packLabel].join(' ').toLowerCase()
+      const haystack = [product.title, product.brandLabel, product.packLabel]
+        .join(' ')
+        .toLowerCase()
       return haystack.includes(normalized)
     })
-  }, [products, brand, query])
+  }, [products, brand, size, showPrevious, previouslyOrderedSet, query])
 
   const addProduct = async (product: PickerProduct) => {
     setIsAddingId(product.id)
@@ -81,14 +109,14 @@ export function ProductPickerDialog({
       return
     }
 
-    setOpen(false)
+    // Keep the dialog open so the salesman can add more items inline.
     router.refresh()
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size={triggerSize} variant={triggerVariant}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           {triggerLabel}
         </Button>
@@ -102,20 +130,22 @@ export function ProductPickerDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-col space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search products..."
-                className="pl-9"
-              />
-            </div>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search products..."
+              className="pl-9"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
             <select
               value={brand}
               onChange={(event) => setBrand(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm sm:w-48"
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              aria-label="Filter by brand"
             >
               <option value="all">All brands</option>
               {brands.map((entry) => (
@@ -124,7 +154,34 @@ export function ProductPickerDialog({
                 </option>
               ))}
             </select>
+            <select
+              value={size}
+              onChange={(event) => setSize(event.target.value)}
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              aria-label="Filter by size"
+            >
+              <option value="all">All sizes</option>
+              {sizes.map((entry) => (
+                <option key={entry} value={entry}>
+                  {entry}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {previouslyOrderedIds.length > 0 && (
+            <label className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={showPrevious}
+                onChange={(event) => setShowPrevious(event.target.checked)}
+              />
+              <span>Show previously ordered only</span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {previouslyOrderedIds.length}
+              </span>
+            </label>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -155,6 +212,12 @@ export function ProductPickerDialog({
                 </div>
               ))
             )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
+              Close
+            </Button>
           </div>
         </div>
       </DialogContent>

@@ -20,16 +20,21 @@ interface StaffTableManagerProps {
   rows: StaffListRow[]
 }
 
-function formatInviteDate(value: string | null) {
-  if (!value) return '-'
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value))
-  } catch {
-    return value
-  }
+function StatusDot({ status }: { status: StaffListRow['status'] }) {
+  const dotColor =
+    status === 'active'
+      ? 'bg-green-500'
+      : status === 'invited'
+        ? 'bg-yellow-500'
+        : 'bg-muted-foreground/40'
+  const label = status === 'active' ? 'Active' : status === 'invited' ? 'Invited' : 'Disabled'
+  return (
+    <span
+      className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`}
+      aria-label={label}
+      title={label}
+    />
+  )
 }
 
 export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps) {
@@ -104,130 +109,66 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
     <div className="space-y-3">
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="space-y-0 md:hidden">
-        {rows.map((row) => (
-          <div key={row.id} className="border-b py-3 last:border-0">
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-medium">{row.displayName}</div>
-                  <div className="text-xs text-muted-foreground">{row.email ?? 'No email'}</div>
-                </div>
-                <span className="rounded-full border px-2 py-0.5 text-xs font-medium capitalize">
-                  {row.status}
-                </span>
+      <ul className="divide-y rounded-lg border bg-card">
+        {rows.map((row) => {
+          const inviteTitle = row.status === 'invited' ? 'Resend invite' : 'Send invite'
+          return (
+            <li key={row.id} className="flex items-center gap-3 px-3 py-3">
+              <StatusDot status={row.status} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{row.displayName}</div>
+                <div className="truncate text-xs text-muted-foreground">{row.email ?? 'No email'}</div>
               </div>
 
-              <div className="text-xs text-muted-foreground">
-                Last invite sent: {formatInviteDate(row.lastInviteSentAt)}
-              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {row.inviteUrl ? <CopyUrlButton url={row.inviteUrl} iconOnly /> : null}
 
-              <div className="flex flex-wrap gap-2">
-                {row.inviteUrl ? <CopyUrlButton url={row.inviteUrl} label="Copy Invite" /> : null}
                 {!row.disabled ? (
                   <>
                     <Button
-                      size="sm"
-                      variant="outline"
+                      type="button"
+                      size="icon"
+                      variant="ghost"
                       disabled={busyId === row.id}
                       onClick={() => sendInvite(row)}
+                      aria-label={inviteTitle}
+                      title={inviteTitle}
                     >
-                      <Mail className="mr-1.5 h-3.5 w-3.5" />
-                      {row.status === 'invited' ? 'Resend' : 'Send Invite'}
+                      <Mail className="h-4 w-4" />
                     </Button>
                     {row.status === 'invited' ? (
                       <Button
-                        size="sm"
-                        variant="outline"
+                        type="button"
+                        size="icon"
+                        variant="ghost"
                         disabled={busyId === row.id}
                         onClick={() => revokeInvite(row)}
+                        aria-label="Revoke invite"
+                        title="Revoke invite"
                       >
-                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                        Revoke
+                        <RotateCcw className="h-4 w-4" />
                       </Button>
                     ) : null}
                   </>
                 ) : null}
+
                 <Button
-                  size="sm"
-                  variant={row.disabled ? 'outline' : 'destructive'}
+                  type="button"
+                  size="icon"
+                  variant="ghost"
                   disabled={busyId === row.id}
                   onClick={() => toggleDisabled(row)}
+                  aria-label={row.disabled ? 'Enable access' : 'Disable access'}
+                  title={row.disabled ? 'Enable access' : 'Disable access'}
+                  className={row.disabled ? '' : 'text-destructive hover:text-destructive'}
                 >
-                  <ShieldOff className="mr-1.5 h-3.5 w-3.5" />
-                  {row.disabled ? 'Enable' : 'Disable'}
+                  <ShieldOff className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="hidden rounded-lg border md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium">Name</th>
-              <th className="px-4 py-3 text-left font-medium">Email</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Last Invite</th>
-              <th className="px-4 py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b last:border-0">
-                <td className="px-4 py-3 font-medium">{row.displayName}</td>
-                <td className="px-4 py-3 text-muted-foreground">{row.email ?? '-'}</td>
-                <td className="px-4 py-3">
-                  <span className="rounded-full border px-2 py-0.5 text-xs font-medium capitalize">
-                    {row.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{formatInviteDate(row.lastInviteSentAt)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {row.inviteUrl ? <CopyUrlButton url={row.inviteUrl} label="Copy Invite" /> : null}
-                    {!row.disabled ? (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busyId === row.id}
-                          onClick={() => sendInvite(row)}
-                        >
-                          <Mail className="mr-1.5 h-3.5 w-3.5" />
-                          {row.status === 'invited' ? 'Resend' : 'Send Invite'}
-                        </Button>
-                        {row.status === 'invited' ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busyId === row.id}
-                            onClick={() => revokeInvite(row)}
-                          >
-                            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                            Revoke
-                          </Button>
-                        ) : null}
-                      </>
-                    ) : null}
-                    <Button
-                      size="sm"
-                      variant={row.disabled ? 'outline' : 'destructive'}
-                      disabled={busyId === row.id}
-                      onClick={() => toggleDisabled(row)}
-                    >
-                      <ShieldOff className="mr-1.5 h-3.5 w-3.5" />
-                      {row.disabled ? 'Enable' : 'Disable'}
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

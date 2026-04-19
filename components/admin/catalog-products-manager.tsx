@@ -1,14 +1,29 @@
 'use client'
 
-import { useEffect, useMemo, useState, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { GripVertical, Plus, Trash2 } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowDownToLine,
+  ArrowUp,
+  ArrowUpToLine,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { moveSelectedRows, reorderByDrag } from '@/lib/reorder'
+import { moveSelectedRows } from '@/lib/reorder'
 import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency, PACK_UOM_OPTIONS } from '@/lib/utils'
 
@@ -40,12 +55,11 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
   const router = useRouter()
   const [rows, setRows] = useState<CatalogProductRow[]>(products)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [draggingId, setDraggingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showCreateRow, setShowCreateRow] = useState(false)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [editMode, setEditMode] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
-  const [movePosition, setMovePosition] = useState('1')
   const [createBrandValue, setCreateBrandValue] = useState('')
   const [createBrandName, setCreateBrandName] = useState('')
   const [createSizeUnitValue, setCreateSizeUnitValue] = useState('')
@@ -111,20 +125,24 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
     setSelectedIds(new Set(rows.map((row) => row.id)))
   }
 
-  const onDropRow = (targetId: string) => {
-    if (busy || searchIsActive || !draggingId || draggingId === targetId) return
-    const nextRows = reorderByDrag(rows, draggingId, targetId)
+  const moveRowBy = (id: string, mode: 'up' | 'down' | 'top' | 'bottom') => {
+    if (busy || searchIsActive) return
+    const singleton = new Set([id])
+    let nextRows = rows
+    if (mode === 'top') {
+      nextRows = moveSelectedRows(rows, singleton, 'top', null)
+    } else if (mode === 'bottom') {
+      nextRows = moveSelectedRows(rows, singleton, 'bottom', null)
+    } else {
+      const index = rows.findIndex((r) => r.id === id)
+      if (index < 0) return
+      const swapWith = mode === 'up' ? index - 1 : index + 1
+      if (swapWith < 0 || swapWith >= rows.length) return
+      const copy = [...rows]
+      ;[copy[index], copy[swapWith]] = [copy[swapWith], copy[index]]
+      nextRows = copy
+    }
     if (nextRows === rows) return
-    void applyOrder(nextRows)
-  }
-
-  const moveSelected = (mode: 'top' | 'bottom' | 'position') => {
-    if (busy || searchIsActive || selectedRows.length === 0) return
-
-    const desiredPosition = Number.isFinite(Number(movePosition)) ? Number(movePosition) : null
-    const nextRows = moveSelectedRows(rows, selectedIds, mode, desiredPosition)
-    if (nextRows === rows) return
-
     void applyOrder(nextRows)
   }
 
@@ -224,7 +242,7 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
       if (!response.ok) {
         throw new Error(result?.error?.message ?? 'Failed to create product')
       }
-      setShowCreateRow(false)
+      setShowCreateDialog(false)
       event.currentTarget.reset()
       setCreateBrandValue('')
       setCreateBrandName('')
@@ -252,36 +270,46 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <Button
-          type="button"
-          size="sm"
-          onClick={() =>
-            setShowCreateRow((prev) => {
-              const next = !prev
-              if (!next) {
-                setCreateBrandValue('')
-                setCreateBrandName('')
-                setCreateSizeUnitValue('')
-                setCreateSizeUnitName('')
-              }
-              return next
-            })
-          }
-        >
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          {showCreateRow ? 'Cancel' : 'Add Product'}
-        </Button>
+      {/* Search dominates; pen toggles edit mode; plus opens create-product modal */}
+      <div className="flex items-center gap-2">
         <LiveQueryInput
           placeholder="Search products..."
           initialValue={searchQuery}
-          className="w-full sm:w-80"
+          className="flex-1"
         />
+        <Button
+          type="button"
+          size="icon"
+          variant={editMode ? 'default' : 'outline'}
+          aria-label={editMode ? 'Exit edit mode' : 'Enter edit mode'}
+          title={editMode ? 'Exit edit mode' : 'Edit: show checkboxes + reorder arrows'}
+          onClick={() => {
+            setEditMode((prev) => {
+              const next = !prev
+              if (!next) setSelectedIds(new Set())
+              return next
+            })
+          }}
+        >
+          {editMode ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          aria-label="New product"
+          title="New product"
+          onClick={() => setShowCreateDialog(true)}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
       </div>
 
-      {showCreateRow && (
-        <div className="rounded-lg border border-dashed p-3">
-          <form onSubmit={onCreateProduct} className="grid gap-3 md:grid-cols-3">
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-[42rem] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>New product</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={onCreateProduct} className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="create-brand-id">Brand</Label>
               <select
@@ -355,35 +383,21 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
               <input type="checkbox" name="is_new" className="h-4 w-4" />
               Mark as new
             </label>
-            <div className="md:col-span-3">
+            <div className="md:col-span-2 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'Create Product'}
+                {isCreating ? 'Creating...' : 'Create product'}
               </Button>
             </div>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {selectedCount > 0 && (
+      {editMode && selectedCount > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
           <span className="text-sm text-muted-foreground">{selectedCount} selected</span>
-          <Button type="button" size="sm" variant="outline" disabled={busy || searchIsActive} onClick={() => moveSelected('top')}>
-            Move Top
-          </Button>
-          <Button type="button" size="sm" variant="outline" disabled={busy || searchIsActive} onClick={() => moveSelected('bottom')}>
-            Move Bottom
-          </Button>
-          <Input
-            value={movePosition}
-            onChange={(event) => setMovePosition(event.target.value)}
-            className="h-8 w-20"
-            inputMode="numeric"
-            placeholder="Pos"
-            disabled={busy || searchIsActive}
-          />
-          <Button type="button" size="sm" variant="outline" disabled={busy || searchIsActive} onClick={() => moveSelected('position')}>
-            Move To
-          </Button>
           <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={deleteSelected}>
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />
             Delete
@@ -394,8 +408,8 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
         </div>
       )}
 
-      {searchIsActive && (
-        <p className="text-xs text-muted-foreground">Clear search to enable drag reorder and move actions.</p>
+      {searchIsActive && editMode && (
+        <p className="text-xs text-muted-foreground">Clear search to enable reorder arrows.</p>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -403,24 +417,29 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
         <p className="text-sm text-muted-foreground">No products available.</p>
       ) : (
         <>
+          {/* Mobile list */}
           <div className="space-y-0 md:hidden">
-            {rows.map((row) => (
+            {rows.map((row, index) => (
               <div
                 key={row.id}
-                className="flex cursor-pointer items-start gap-2 border-b py-3 last:border-0"
-                onClick={(event) => onRowClick(event, row.id)}
-                onKeyDown={(event) => onRowKeyDown(event, row.id)}
-                role="button"
-                tabIndex={0}
+                className="flex items-start gap-2 border-b py-3 last:border-0"
               >
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4"
-                  checked={selectedIds.has(row.id)}
-                  onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                  onClick={(event) => event.stopPropagation()}
-                />
-                <div className="min-w-0 flex-1">
+                {editMode && (
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4"
+                    checked={selectedIds.has(row.id)}
+                    onChange={(event) => toggleSelected(row.id, event.target.checked)}
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label={`Select ${row.title}`}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={(event) => onRowClick(event, row.id)}
+                  onKeyDown={(event) => onRowKeyDown(event, row.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <div className="truncate text-sm font-medium">{row.title}</div>
                   <div className="text-xs text-muted-foreground">
                     {row.brandName ?? 'No brand'} - {row.packLabel ?? 'N/A'}
@@ -428,56 +447,66 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                   <div className="text-xs text-muted-foreground">
                     {formatCurrency(row.price)} - {row.isDiscontinued ? 'Discontinued' : row.isNew ? 'New' : 'Active'}
                   </div>
-                </div>
+                </button>
+                {editMode && !searchIsActive && (
+                  <ReorderArrows
+                    disabled={busy}
+                    isFirst={index === 0}
+                    isLast={index === rows.length - 1}
+                    onUp={() => moveRowBy(row.id, 'up')}
+                    onTop={() => moveRowBy(row.id, 'top')}
+                    onDown={() => moveRowBy(row.id, 'down')}
+                    onBottom={() => moveRowBy(row.id, 'bottom')}
+                  />
+                )}
               </div>
             ))}
           </div>
 
+          {/* Desktop table — no drag; arrows only in edit mode */}
           <div className="hidden rounded-lg border md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="w-10 px-2 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={(event) => toggleAll(event.target.checked)}
-                      disabled={busy}
-                    />
-                  </th>
-                  <th className="w-10 px-2 py-3 text-left">#</th>
+                  {editMode && (
+                    <th className="w-10 px-2 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={(event) => toggleAll(event.target.checked)}
+                        disabled={busy}
+                        aria-label="Select all"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left font-medium">Flavor / Details</th>
                   <th className="px-4 py-3 text-left font-medium">Brand</th>
                   <th className="px-4 py-3 text-left font-medium">Pack</th>
                   <th className="px-4 py-3 text-right font-medium">Price</th>
                   <th className="px-4 py-3 text-left font-medium">Status</th>
+                  {editMode && <th className="w-36 px-2 py-3 text-left font-medium">Order</th>}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {rows.map((row, index) => (
                   <tr
                     key={row.id}
-                    draggable={!busy && !searchIsActive}
-                    onDragStart={() => setDraggingId(row.id)}
-                    onDragOver={(event: DragEvent<HTMLTableRowElement>) => event.preventDefault()}
-                    onDrop={() => onDropRow(row.id)}
-                    onDragEnd={() => setDraggingId(null)}
                     className={`cursor-pointer border-b last:border-0 hover:bg-muted/30 ${selectedIds.has(row.id) ? 'bg-muted/30' : ''}`}
                     onClick={(event) => onRowClick(event, row.id)}
                     onKeyDown={(event) => onRowKeyDown(event, row.id)}
                     tabIndex={0}
                     role="button"
                   >
-                    <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(row.id)}
-                        onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                      />
-                    </td>
-                    <td className="px-2 py-3 text-muted-foreground">
-                      <GripVertical className="h-4 w-4" data-no-row-nav="true" />
-                    </td>
+                    {editMode && (
+                      <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={(event) => toggleSelected(row.id, event.target.checked)}
+                          aria-label={`Select ${row.title}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-medium">{row.title}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.brandName ?? '-'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.packLabel ?? '-'}</td>
@@ -487,6 +516,19 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                       {!row.isDiscontinued && row.isNew && <span className="text-xs text-primary">New</span>}
                       {!row.isDiscontinued && !row.isNew && <span className="text-xs text-muted-foreground">Active</span>}
                     </td>
+                    {editMode && (
+                      <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
+                        <ReorderArrows
+                          disabled={busy || searchIsActive}
+                          isFirst={index === 0}
+                          isLast={index === rows.length - 1}
+                          onUp={() => moveRowBy(row.id, 'up')}
+                          onTop={() => moveRowBy(row.id, 'top')}
+                          onDown={() => moveRowBy(row.id, 'down')}
+                          onBottom={() => moveRowBy(row.id, 'bottom')}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -494,6 +536,70 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+function ReorderArrows({
+  disabled,
+  isFirst,
+  isLast,
+  onUp,
+  onDown,
+  onTop,
+  onBottom,
+}: {
+  disabled: boolean
+  isFirst: boolean
+  isLast: boolean
+  onUp: () => void
+  onDown: () => void
+  onTop: () => void
+  onBottom: () => void
+}) {
+  const stop = (e: MouseEvent) => e.stopPropagation()
+  return (
+    <div className="flex items-center gap-1" onClick={stop}>
+      <button
+        type="button"
+        aria-label="Move to top"
+        title="Move to top"
+        disabled={disabled || isFirst}
+        onClick={onTop}
+        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+      >
+        <ArrowUpToLine className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="Move up"
+        title="Move up"
+        disabled={disabled || isFirst}
+        onClick={onUp}
+        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+      >
+        <ArrowUp className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="Move down"
+        title="Move down"
+        disabled={disabled || isLast}
+        onClick={onDown}
+        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+      >
+        <ArrowDown className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="Move to bottom"
+        title="Move to bottom"
+        disabled={disabled || isLast}
+        onClick={onBottom}
+        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+      >
+        <ArrowDownToLine className="h-4 w-4" />
+      </button>
     </div>
   )
 }

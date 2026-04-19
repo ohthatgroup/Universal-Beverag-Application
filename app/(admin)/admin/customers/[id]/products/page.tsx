@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
 import {
   CustomerProductsManager,
   type CustomerBrandOption,
@@ -66,8 +67,8 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
          order by sort_order asc, title asc`,
         [id]
       ),
-      db.query<{ product_id: string; excluded: boolean | null; custom_price: number | null }>(
-        `select product_id, excluded, custom_price
+      db.query<{ product_id: string; excluded: boolean | null; custom_price: number | null; is_usual: boolean | null }>(
+        `select product_id, excluded, custom_price, is_usual
          from customer_products
          where customer_id = $1`,
         [id]
@@ -139,20 +140,21 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
     productId: override.product_id,
     excluded: Boolean(override.excluded),
     customPrice: override.custom_price ?? null,
+    isUsual: Boolean(override.is_usual),
   }))
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href={`/admin/customers/${id}`} className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-          {customerName}
-        </Link>
-        <h1 className="text-2xl font-semibold">Products by Brand</h1>
-        {customer.custom_pricing && (
-          <p className="mt-1 text-sm text-muted-foreground">Custom pricing enabled</p>
-        )}
-      </div>
+      <PageHeader
+        title="Products by Brand"
+        description={customer.custom_pricing ? 'Custom pricing enabled' : undefined}
+        breadcrumb={
+          <Link href={`/admin/customers/${id}`} className="inline-flex items-center gap-1.5 hover:text-foreground">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {customerName}
+          </Link>
+        }
+      />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <LiveQueryInput

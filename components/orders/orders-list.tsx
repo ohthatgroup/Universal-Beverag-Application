@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { buildCustomerOrderDeepLink, buildCustomerPortalOrderDatePath } from '@/lib/portal-links'
-import type { Order, OrderStatus } from '@/lib/types'
-import { addDays, formatCurrency, formatDeliveryDate, getStatusIcon, getStatusLabel, todayISODate } from '@/lib/utils'
+import type { Order } from '@/lib/types'
+import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Money } from '@/components/ui/money'
+import { StatusChip } from '@/components/ui/status-chip'
 import {
   Dialog,
   DialogContent,
@@ -28,21 +30,13 @@ import {
 
 interface OrdersListProps {
   token: string
-  currentOrders: Order[]
-  pastOrders: Order[]
+  orders: Order[]
+  variant: 'current' | 'past'
   showPrices: boolean
+  emptyMessage?: string
 }
 
-function StatusText({ status }: { status: OrderStatus }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
-      <span>{getStatusIcon(status)}</span>
-      <span>{getStatusLabel(status)}</span>
-    </span>
-  )
-}
-
-export function OrdersList({ token, currentOrders, pastOrders, showPrices }: OrdersListProps) {
+export function OrdersList({ token, orders, variant, showPrices, emptyMessage }: OrdersListProps) {
   const router = useRouter()
   const [reorderDate, setReorderDate] = useState(addDays(todayISODate(), 1))
   const [selectedReorderOrderId, setSelectedReorderOrderId] = useState<string | null>(null)
@@ -63,10 +57,6 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
   }
 
   const getOrderHref = (orderId: string) => buildCustomerOrderDeepLink(token, orderId) ?? '/portal'
-
-  const navigateToOrder = (orderId: string) => {
-    router.push(getOrderHref(orderId))
-  }
 
   const openReorderDialog = (orderId: string) => {
     setError(null)
@@ -163,17 +153,17 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
     router.refresh()
   }
 
-  const renderMobileCard = (order: Order, section: 'current' | 'past') => (
-    <div key={order.id} className="border-b py-4 last:border-0">
-      <div className="flex items-center justify-between">
-        <div>
+  const renderCard = (order: Order) => (
+    <div key={order.id} className="rounded-lg border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <div className="font-medium">{formatDeliveryDate(order.delivery_date)}</div>
           <div className="text-xs text-muted-foreground">
             {order.item_count} items
-            {showPrices && <span> · {formatCurrency(order.total)}</span>}
+            {showPrices && <span> · <Money value={order.total} /></span>}
           </div>
         </div>
-        <StatusText status={order.status} />
+        <StatusChip status={order.status} />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -193,7 +183,7 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
           </a>
         </Button>
 
-        {order.status === 'submitted' && section === 'current' && (
+        {order.status === 'submitted' && variant === 'current' && (
           <Button
             size="sm"
             variant="outline"
@@ -204,7 +194,7 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
           </Button>
         )}
 
-        {section === 'past' && (
+        {variant === 'past' && (
           <>
             <Button size="sm" variant="outline" onClick={() => openReorderDialog(order.id)}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -222,7 +212,7 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
           </>
         )}
 
-        {order.status !== 'draft' && section === 'current' && (
+        {order.status !== 'draft' && variant === 'current' && (
           <Button size="sm" variant="outline" onClick={() => openReorderDialog(order.id)}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Reorder
@@ -232,133 +222,18 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
     </div>
   )
 
-  const renderDesktopTable = (orders: Order[], section: 'current' | 'past') => (
-    <div className="hidden md:block rounded-lg border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="px-4 py-3 text-left font-medium">Date</th>
-            <th className="px-4 py-3 text-left font-medium">Items</th>
-            {showPrices && <th className="px-4 py-3 text-right font-medium">Total</th>}
-            <th className="px-4 py-3 text-left font-medium">Status</th>
-            <th className="px-4 py-3 text-right font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => (
-            <tr
-              key={order.id}
-              className="cursor-pointer border-b last:border-0 hover:bg-muted/30"
-              onClick={() => navigateToOrder(order.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  navigateToOrder(order.id)
-                }
-              }}
-              tabIndex={0}
-              role="button"
-            >
-              <td className="px-4 py-3 font-medium">{formatDeliveryDate(order.delivery_date)}</td>
-              <td className="px-4 py-3 text-muted-foreground">{order.item_count}</td>
-              {showPrices && (
-                <td className="px-4 py-3 text-right">{formatCurrency(order.total)}</td>
-              )}
-              <td className="px-4 py-3">
-                <StatusText status={order.status} />
-              </td>
-              <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                <div className="flex items-center justify-end gap-1">
-                  {order.status === 'draft' && (
-                    <Button asChild size="sm" variant="ghost">
-                      <Link href={getOrderHref(order.id)}>
-                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                        Edit
-                      </Link>
-                    </Button>
-                  )}
-                  <Button asChild size="sm" variant="ghost">
-                    <a href={`/api/portal/orders/${order.id}/csv?token=${token}`}>
-                      <Download className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                  {order.status === 'submitted' && section === 'current' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={cancellingOrderId === order.id}
-                      onClick={() => cancelOrder(order.id)}
-                    >
-                      {cancellingOrderId === order.id ? '...' : 'Cancel'}
-                    </Button>
-                  )}
-                  {order.status !== 'draft' && (
-                    <Button size="sm" variant="ghost" onClick={() => openReorderDialog(order.id)}>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  {section === 'past' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeleteOrderId(order.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-3">
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* Current Orders */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Current Orders
-        </h2>
-        {currentOrders.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No active orders.</p>
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="md:hidden">
-              {currentOrders.map((order) => renderMobileCard(order, 'current'))}
-            </div>
-            {/* Desktop table */}
-            {renderDesktopTable(currentOrders, 'current')}
-          </>
-        )}
-      </section>
+      {orders.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {emptyMessage ?? (variant === 'current' ? 'No active orders.' : 'No order history yet.')}
+        </p>
+      ) : (
+        <div className="space-y-2">{orders.map(renderCard)}</div>
+      )}
 
-      {/* Past Orders */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Previous Orders
-        </h2>
-        {pastOrders.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No order history yet.</p>
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="md:hidden">
-              {pastOrders.map((order) => renderMobileCard(order, 'past'))}
-            </div>
-            {/* Desktop table */}
-            {renderDesktopTable(pastOrders, 'past')}
-          </>
-        )}
-      </section>
-
-      {/* Reorder dialog with arrow date picker */}
       <Dialog open={isReorderDialogOpen} onOpenChange={setIsReorderDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -378,23 +253,23 @@ export function OrdersList({ token, currentOrders, pastOrders, showPrices }: Ord
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <Button
-              className="w-full"
-              onClick={cloneOrder}
-              disabled={
-                !selectedReorderOrderId ||
-                (selectedReorderOrderId !== null && reorderingOrderId === selectedReorderOrderId)
-              }
-            >
-              {selectedReorderOrderId !== null && reorderingOrderId === selectedReorderOrderId
-                ? 'Cloning...'
-                : 'Clone Order'}
-            </Button>
+            <div className="flex justify-end">
+              <Button
+                onClick={cloneOrder}
+                disabled={
+                  !selectedReorderOrderId ||
+                  (selectedReorderOrderId !== null && reorderingOrderId === selectedReorderOrderId)
+                }
+              >
+                {selectedReorderOrderId !== null && reorderingOrderId === selectedReorderOrderId
+                  ? 'Cloning...'
+                  : 'Clone Order'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
       <AlertDialog open={!!deleteOrderId} onOpenChange={(open) => !open && setDeleteOrderId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -1,5 +1,8 @@
-import { DateSelectorCard } from '@/components/orders/date-selector-card'
 import { OrdersList } from '@/components/orders/orders-list'
+import { PortalGreeting } from '@/components/portal/portal-greeting'
+import { StartOrderHero } from '@/components/portal/start-order-hero'
+import { DraftResumeStrip } from '@/components/portal/draft-resume-strip'
+import { PastOrdersSection } from '@/components/portal/past-orders-section'
 import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { todayISODate } from '@/lib/utils'
@@ -68,22 +71,42 @@ export default async function PortalHome({
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Universal Beverages</h1>
+  const nextDeliveryDate = draftsResult.rows[0]?.delivery_date ?? today
 
-      <DateSelectorCard
-        token={token}
-        drafts={draftsResult.rows.map((order) => ({
-          deliveryDate: order.delivery_date,
-          itemCount: order.item_count ?? 0,
-        }))}
+  const draftsForStrip = draftsResult.rows.map((order) => ({
+    orderId: order.id,
+    deliveryDate: order.delivery_date,
+    itemCount: order.item_count ?? 0,
+  }))
+
+  const nonDraftCurrentOrders = currentOrders.filter((order) => order.status !== 'draft')
+
+  return (
+    <div className="space-y-8">
+      <PortalGreeting
+        businessName={profile.business_name}
+        contactName={profile.contact_name}
       />
 
-      <OrdersList
+      <StartOrderHero token={token} initialDate={nextDeliveryDate} />
+
+      <DraftResumeStrip token={token} drafts={draftsForStrip} />
+
+      {nonDraftCurrentOrders.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-h3 text-muted-foreground">Upcoming & recent</h2>
+          <OrdersList
+            token={token}
+            orders={nonDraftCurrentOrders}
+            variant="current"
+            showPrices={profile.show_prices}
+          />
+        </section>
+      )}
+
+      <PastOrdersSection
         token={token}
-        currentOrders={currentOrders}
-        pastOrders={pastOrders}
+        orders={pastOrders}
         showPrices={profile.show_prices}
       />
     </div>

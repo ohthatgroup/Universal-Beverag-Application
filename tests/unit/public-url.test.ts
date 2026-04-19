@@ -18,15 +18,26 @@ describe('public URL helpers', () => {
     process.env.NEXT_PUBLIC_APP_URL = originalEnv.NEXT_PUBLIC_APP_URL
     process.env.APP_URL = originalEnv.APP_URL
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('returns the configured app host without trailing slash', () => {
+    delete process.env.APP_URL
     process.env.NEXT_PUBLIC_APP_URL = 'https://preview.example.com/'
 
     expect(getPublicAppUrl()).toBe('https://preview.example.com')
   })
 
+  it('prefers a secure APP_URL in production when NEXT_PUBLIC_APP_URL is a local dev host', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    process.env.NEXT_PUBLIC_APP_URL = 'http://127.0.0.1:3000'
+    process.env.APP_URL = 'https://universal.example.com/'
+
+    expect(getPublicAppUrl()).toBe('https://universal.example.com')
+  })
+
   it('builds absolute URLs from relative paths', () => {
+    delete process.env.APP_URL
     process.env.NEXT_PUBLIC_APP_URL = 'https://preview.example.com/'
 
     expect(buildAbsoluteUrl('/order/link/abc')).toBe(
@@ -36,6 +47,7 @@ describe('public URL helpers', () => {
   })
 
   it('builds callback URLs with encoded next path', () => {
+    delete process.env.APP_URL
     process.env.NEXT_PUBLIC_APP_URL = 'https://preview.example.com/'
 
     expect(buildAuthCallbackUrl('/order/link/abc')).toBe(
@@ -62,6 +74,7 @@ describe('public URL helpers', () => {
   })
 
   it('falls back to the configured app URL for interactive URLs outside the browser', () => {
+    delete process.env.APP_URL
     process.env.NEXT_PUBLIC_APP_URL = 'https://preview.example.com/'
 
     expect(getInteractiveAppOrigin()).toBe('https://preview.example.com')

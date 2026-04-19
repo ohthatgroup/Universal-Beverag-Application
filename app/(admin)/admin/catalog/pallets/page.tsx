@@ -1,10 +1,10 @@
-import { redirect } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { PalletDealsManager, type PalletDealRow } from '@/components/admin/pallet-deals-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
-import { Button } from '@/components/ui/button'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
+import { createEmptyPalletAction } from './actions'
 
 interface PalletsPageProps {
   searchParams?: Promise<{
@@ -29,22 +29,6 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
     description: string | null
   }>('select id, title, pallet_type, price, is_active, description from pallet_deals order by sort_order asc')
 
-  async function createEmptyPallet() {
-    'use server'
-
-    await requirePageAuth(['salesman'])
-    const actionDb = await getRequestDb()
-
-    const { rows } = await actionDb.query<{ id: string }>(
-      `insert into pallet_deals (title, pallet_type, price, savings_text, description, is_active, sort_order)
-       values ('New Pallet Deal', 'single', 0.01, null, null, true, coalesce((select max(sort_order) from pallet_deals), -1) + 1)
-       returning id`
-    )
-
-    if (!rows[0]) throw new Error('Failed to create pallet deal')
-    redirect(`/admin/catalog/pallets/${rows[0].id}`)
-  }
-
   const deals = palletDeals.filter((deal) => {
     if (!searchTerm) return true
     const haystack = [deal.title ?? '', deal.description ?? '', deal.pallet_type ?? '']
@@ -62,30 +46,32 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
+        <Link
+          href="/admin"
+          className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Admin
+        </Link>
         <h1 className="text-2xl font-semibold">Pallet Deals</h1>
+        <p className="text-sm text-muted-foreground">
+          {rows.length} deal{rows.length === 1 ? '' : 's'}
+        </p>
       </div>
 
-      <div className="space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
-        <div className="flex items-center gap-2">
-          <form action={createEmptyPallet}>
-            <Button size="sm" type="submit">
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              New Pallet
-            </Button>
-          </form>
-        </div>
-        <div className="flex items-center gap-2">
-          <LiveQueryInput
-            placeholder="Search pallets..."
-            initialValue={searchQuery}
-            className="w-full sm:w-80"
-          />
-        </div>
-      </div>
+      <LiveQueryInput
+        placeholder="Search pallets..."
+        initialValue={searchQuery}
+        className="w-full"
+      />
 
-      <PalletDealsManager deals={rows} searchQuery={searchQuery} />
+      <PalletDealsManager
+        deals={rows}
+        searchQuery={searchQuery}
+        createAction={createEmptyPalletAction}
+      />
     </div>
   )
 }

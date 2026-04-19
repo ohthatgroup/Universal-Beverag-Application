@@ -12,6 +12,7 @@ const updateCustomerProductSchema = z.object({
   productId: z.string().uuid(),
   hidden: z.boolean().optional(),
   customPrice: z.number().min(0).nullable().optional(),
+  isUsual: z.boolean().optional(),
 })
 
 const bulkPriceUpdateSchema = z.object({
@@ -87,8 +88,9 @@ export async function PUT(
 
     const hidden = payload.hidden ?? false
     const customPrice = payload.customPrice ?? null
+    const isUsual = payload.isUsual ?? false
 
-    if (!hidden && customPrice === null) {
+    if (!hidden && customPrice === null && !isUsual) {
       await db.query(
         `delete from customer_products where customer_id = $1 and product_id = $2`,
         [id, payload.productId]
@@ -97,11 +99,11 @@ export async function PUT(
     }
 
     await db.query(
-      `insert into customer_products (customer_id, product_id, excluded, custom_price)
-       values ($1, $2, $3, $4)
+      `insert into customer_products (customer_id, product_id, excluded, custom_price, is_usual)
+       values ($1, $2, $3, $4, $5)
        on conflict (customer_id, product_id)
-       do update set excluded = EXCLUDED.excluded, custom_price = EXCLUDED.custom_price`,
-      [id, payload.productId, hidden, customPrice]
+       do update set excluded = EXCLUDED.excluded, custom_price = EXCLUDED.custom_price, is_usual = EXCLUDED.is_usual`,
+      [id, payload.productId, hidden, customPrice, isUsual]
     )
 
     logApiEvent(requestId, 'customer_product_updated', {
@@ -152,8 +154,9 @@ export async function PATCH(
       product_id: string
       excluded: boolean | null
       custom_price: number | null
+      is_usual: boolean | null
     }>(
-      `select product_id, excluded, custom_price
+      `select product_id, excluded, custom_price, is_usual
        from customer_products
        where customer_id = $1 and product_id = any($2::uuid[])`,
       [id, productIds]
@@ -162,7 +165,11 @@ export async function PATCH(
     const existingByProductId = new Map(
       existingRows.map((row) => [
         row.product_id,
-        { excluded: Boolean(row.excluded), customPrice: row.custom_price },
+        {
+          excluded: Boolean(row.excluded),
+          customPrice: row.custom_price,
+          isUsual: Boolean(row.is_usual),
+        },
       ])
     )
 
@@ -172,13 +179,15 @@ export async function PATCH(
       product_id: string
       excluded: boolean
       custom_price: number | null
+      is_usual: boolean
     }> = []
 
     for (const update of updates) {
       const existing = existingByProductId.get(update.productId)
       const excluded = existing?.excluded ?? false
+      const isUsual = existing?.isUsual ?? false
 
-      if (!excluded && update.customPrice === null) {
+      if (!excluded && update.customPrice === null && !isUsual) {
         toDelete.push(update.productId)
       } else {
         toUpsert.push({
@@ -186,6 +195,7 @@ export async function PATCH(
           product_id: update.productId,
           excluded,
           custom_price: update.customPrice,
+          is_usual: isUsual,
         })
       }
     }
@@ -201,11 +211,11 @@ export async function PATCH(
     if (toUpsert.length > 0) {
       for (const row of toUpsert) {
         await db.query(
-          `insert into customer_products (customer_id, product_id, excluded, custom_price)
-           values ($1, $2, $3, $4)
+          `insert into customer_products (customer_id, product_id, excluded, custom_price, is_usual)
+           values ($1, $2, $3, $4, $5)
            on conflict (customer_id, product_id)
-           do update set excluded = EXCLUDED.excluded, custom_price = EXCLUDED.custom_price`,
-          [row.customer_id, row.product_id, row.excluded, row.custom_price]
+           do update set excluded = EXCLUDED.excluded, custom_price = EXCLUDED.custom_price, is_usual = EXCLUDED.is_usual`,
+          [row.customer_id, row.product_id, row.excluded, row.custom_price, row.is_usual]
         )
       }
     }

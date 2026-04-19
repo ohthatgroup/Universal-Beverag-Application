@@ -212,10 +212,8 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
   )
 
   const statusTabs: Array<{ label: string; value: 'all' | OrderStatus }> = [
-    { label: 'All', value: 'all' },
-    { label: 'Submitted', value: 'submitted' },
+    { label: 'Needs review', value: 'submitted' },
     { label: 'Drafts', value: 'draft' },
-    { label: 'Delivered', value: 'delivered' },
   ]
 
   function buildQuery(overrides: Record<string, string | undefined>) {
@@ -368,16 +366,18 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
 
   return (
     <section className="space-y-4">
-      <h2 className="text-lg font-semibold">Orders</h2>
+      {/* FAB: primary action in the thumb zone */}
+      <button
+        type="button"
+        aria-label="New order"
+        onClick={() => { setDraftDialogOpen(true); setDraftError(null); setNewCustomerMode(false); setSelectedCustomerId(''); setNewBizName(''); setNewEmail('') }}
+        className="fixed bottom-6 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg backdrop-blur transition-transform hover:scale-105 md:bottom-8"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
 
-      {/* Top controls: stacked by row on mobile */}
+      {/* Filter row */}
       <div className="space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => { setDraftDialogOpen(true); setDraftError(null); setNewCustomerMode(false); setSelectedCustomerId(''); setNewBizName(''); setNewEmail('') }}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Draft Order
-          </Button>
-        </div>
         <div className="flex items-center gap-2">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -391,7 +391,7 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
         </div>
       </div>
 
-      {/* Status filter tabs */}
+      {/* Status filter chips — two verbs only */}
       <div className="flex flex-wrap gap-2">
         {statusTabs.map((tab) => (
           <Button
@@ -465,52 +465,34 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                 {formatDeliveryDate(deliveryDate)}
               </h3>
 
-              {/* Mobile cards */}
-              <div className="space-y-0 md:hidden">
+              {/* Mobile cards — minimal: row is a tap target, status is a read-only pill */}
+              <ul className="divide-y rounded-xl border bg-card md:hidden">
                 {dateOrders.map((order) => {
-                  const checked = selectedOrderIds.has(order.id)
+                  const status = asOrderStatus(order.status)
                   return (
-                    <div
-                      key={order.id}
-                      className={`border-b py-3 last:border-0 ${checked ? 'bg-muted/30' : ''}`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          className="mt-1 h-4 w-4"
-                          checked={checked}
-                          onChange={(event) => toggleSelectOrder(order.id, event.target.checked)}
-                        />
+                    <li key={order.id}>
+                      <Link
+                        href={orderDetailHref(order.id)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
+                      >
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <Link href={orderDetailHref(order.id)} className="min-w-0 flex-1">
-                              <div className="font-medium text-sm truncate">
-                                {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {order.item_count ?? 0} items - {formatCurrency(order.total ?? 0)}
-                              </div>
-                            </Link>
-                            <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
+                          <div className="truncate text-sm font-medium">
+                            {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
                           </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                              <a href={`/api/orders/${order.id}/csv`}>
-                                <Download className="mr-1 h-3 w-3" />
-                                CSV
-                              </a>
-                            </Button>
-                            <DeepLinkButton
-                              orderId={order.id}
-                              customerToken={order.customer_id ? tokenByCustomerId.get(order.customer_id) ?? null : null}
-                            />
+                          <div className="text-xs text-muted-foreground">
+                            {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
                           </div>
                         </div>
-                      </div>
-                    </div>
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_VARIANT_CLASSES[status]}`}
+                        >
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </span>
+                      </Link>
+                    </li>
                   )
                 })}
-              </div>
+              </ul>
 
               {/* Desktop table */}
               <div className="hidden md:block rounded-lg border">

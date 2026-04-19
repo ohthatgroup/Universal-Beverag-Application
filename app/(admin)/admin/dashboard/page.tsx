@@ -1,33 +1,14 @@
-import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
 import { OrdersSection } from '@/components/admin/orders-section'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { formatDeliveryDate, todayISODate } from '@/lib/utils'
 
 export default async function DashboardPage() {
   await requirePageAuth(['salesman'])
   const db = await getRequestDb()
-  const today = todayISODate()
 
-  const [
-    ordersTodayCount,
-    draftOrdersCount,
-    activeCustomersCount,
-    submittedOrdersCount,
-    activeProductsCount,
-    activePalletsCount,
-    ordersResponse,
-    customersResponse,
-  ] = await Promise.all([
-    db.query<{ count: string }>('select count(*)::text as count from orders where delivery_date = $1', [today]),
-    db.query<{ count: string }>("select count(*)::text as count from orders where status = 'draft'"),
-    db.query<{ count: string }>("select count(*)::text as count from profiles where role = 'customer'"),
+  const [submittedOrdersCount, draftOrdersCount, ordersResponse, customersResponse] = await Promise.all([
     db.query<{ count: string }>("select count(*)::text as count from orders where status = 'submitted'"),
-    db.query<{ count: string }>(
-      'select count(*)::text as count from products where customer_id is null and is_discontinued = false'
-    ),
-    db.query<{ count: string }>("select count(*)::text as count from pallet_deals where is_active = true"),
+    db.query<{ count: string }>("select count(*)::text as count from orders where status = 'draft'"),
     db.query<{
       id: string
       customer_id: string | null
@@ -56,63 +37,16 @@ export default async function DashboardPage() {
     ),
   ])
 
-  const stats = [
-    {
-      label: 'Orders Today',
-      value: Number(ordersTodayCount.rows[0]?.count ?? 0),
-      href: `/admin/dashboard?deliveryDate=${today}`,
-    },
-    {
-      label: 'Pending Review',
-      value: Number(submittedOrdersCount.rows[0]?.count ?? 0),
-      href: '/admin/dashboard?status=submitted',
-    },
-    {
-      label: 'Drafts',
-      value: Number(draftOrdersCount.rows[0]?.count ?? 0),
-      href: '/admin/dashboard?status=draft',
-    },
-    {
-      label: 'Customers',
-      value: Number(activeCustomersCount.rows[0]?.count ?? 0),
-      href: '/admin/customers',
-    },
-    {
-      label: 'Products',
-      value: Number(activeProductsCount.rows[0]?.count ?? 0),
-      href: '/admin/catalog',
-    },
-    {
-      label: 'Pallets',
-      value: Number(activePalletsCount.rows[0]?.count ?? 0),
-      href: '/admin/catalog/pallets',
-    },
-  ]
+  const submitted = Number(submittedOrdersCount.rows[0]?.count ?? 0)
+  const drafts = Number(draftOrdersCount.rows[0]?.count ?? 0)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">{formatDeliveryDate(today)}</p>
-      </div>
-
-      {/* Stat cards - 2 cols mobile, 3 cols desktop */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        {stats.map((stat) => (
-          <Link key={stat.label} href={stat.href}>
-            <Card className="transition-colors hover:bg-muted/50">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-left">
-                    <div className="text-sm text-muted-foreground">{stat.label}</div>
-                    <div className="text-2xl font-semibold leading-tight">{stat.value}</div>
-                  </div>
-                  <span className="text-xs font-medium text-muted-foreground">Open</span>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+        <h1 className="text-2xl font-semibold">Today</h1>
+        <p className="text-sm text-muted-foreground">
+          {submitted} need review · {drafts} drafts
+        </p>
       </div>
 
       <OrdersSection

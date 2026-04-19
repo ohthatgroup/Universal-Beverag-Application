@@ -1,4 +1,7 @@
-import { addDays, formatCurrency, getStatusIcon, todayISODate } from '@/lib/utils'
+import { addDays, todayISODate } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/page-header'
+import { Money } from '@/components/ui/money'
+import { StatusChip } from '@/components/ui/status-chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -82,10 +85,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Reports</h1>
-        <p className="text-sm text-muted-foreground">Revenue and order trends for the selected date range.</p>
-      </div>
+      <PageHeader title="Reports" description="Revenue and order trends for the selected date range." />
 
       <form className="grid gap-4 rounded-lg border p-4 md:grid-cols-[1fr_1fr_auto]">
         <div className="space-y-2">
@@ -110,7 +110,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </div>
         <div className="rounded-lg border p-4">
           <div className="text-sm text-muted-foreground">Revenue</div>
-          <div className="mt-2 text-3xl font-semibold">{formatCurrency(revenue)}</div>
+          <div className="mt-2 text-3xl"><Money value={revenue} /></div>
         </div>
         <div className="rounded-lg border p-4">
           <div className="text-sm text-muted-foreground">Items Sold</div>
@@ -127,12 +127,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               <div key={order.id} className="flex items-center justify-between gap-4 rounded-md border p-3">
                 <div>
                   <div className="font-medium">{order.delivery_date}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {getStatusIcon(order.status as OrderStatus)} {order.status}
-                  </div>
+                  <StatusChip status={order.status as OrderStatus} className="mt-1" />
                 </div>
                 <div className="text-right">
-                  <div className="font-medium">{formatCurrency(Number(order.total ?? 0))}</div>
+                  <Money value={Number(order.total ?? 0)} />
                   <div className="text-sm text-muted-foreground">{order.item_count ?? 0} items</div>
                 </div>
               </div>
@@ -151,7 +149,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   <div className="text-sm text-muted-foreground">{row.brandName ?? 'Unassigned brand'}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-medium">{formatCurrency(row.revenue)}</div>
+                  <Money value={row.revenue} />
                   <div className="text-sm text-muted-foreground">{row.quantity} sold</div>
                 </div>
               </div>

@@ -238,15 +238,17 @@ export function getStatusLabel(status: OrderStatus): string {
   }[status]
 }
 
-export function getStatusVariant(
-  status: OrderStatus
-): 'default' | 'secondary' | 'outline' | 'success' {
+export type StatusBadgeVariant = 'draft' | 'submitted' | 'delivered' | 'cancelled'
+
+export function getStatusVariant(status: OrderStatus): StatusBadgeVariant {
   return {
-    draft: 'outline',
-    submitted: 'default',
-    delivered: 'success',
-  }[status] as 'default' | 'secondary' | 'outline' | 'success'
+    draft: 'draft',
+    submitted: 'submitted',
+    delivered: 'delivered',
+  }[status] as StatusBadgeVariant
 }
+
+// ─── Debounce ─────────────────────────────────────────────────────────────
 
 export function getStatusIcon(status: OrderStatus): string {
   return {
@@ -255,8 +257,6 @@ export function getStatusIcon(status: OrderStatus): string {
     delivered: '✓',
   }[status]
 }
-
-// ─── Debounce ─────────────────────────────────────────────────────────────
 
 export function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
   fn: T,
