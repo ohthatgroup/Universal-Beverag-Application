@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth/server'
+import { getAuth } from '@/lib/auth/server'
 import { getRequestDb } from '@/lib/server/db'
 import { RouteError } from '@/lib/server/route-error'
 import { markPendingStaffInvitesAccepted } from '@/lib/server/staff-invites'
@@ -19,6 +19,7 @@ export async function getAuthContext(): Promise<
   | (AuthContext & { hasSession: true })
   | { hasSession: false }
 > {
+  const auth = getAuth()
   const { data: session, error } = await auth.getSession()
 
   if (error || !session?.user) {

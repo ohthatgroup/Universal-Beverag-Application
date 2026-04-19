@@ -1,5 +1,5 @@
 import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/lib/server/api'
-import { auth } from '@/lib/auth/server'
+import { getAuth } from '@/lib/auth/server'
 import { buildPasswordResetCallbackUrl } from '@/lib/config/public-url'
 import { buildRateLimitKey, consumeRateLimit, getEnvRateLimit } from '@/lib/server/rate-limit'
 import { RouteError } from '@/lib/server/auth'
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     })
 
     const payload = await parseBody(request, passwordResetRequestSchema)
-    const result = await auth.requestPasswordReset({
+    const result = await getAuth().requestPasswordReset({
       email: payload.email,
       redirectTo: buildPasswordResetCallbackUrl(),
     })

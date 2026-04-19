@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth/server'
+import { getAuth } from '@/lib/auth/server'
 import { getAuthContext, isRouteError } from '@/lib/server/auth'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +11,7 @@ export default async function PostLoginPage() {
     }
 
     if (isRouteError(error) && error.code === 'admin_disabled') {
-      void auth.signOut().catch(() => undefined)
+      void getAuth().signOut().catch(() => undefined)
       redirect('/auth/login?error=admin_disabled')
     }
 

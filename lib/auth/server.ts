@@ -8,9 +8,17 @@ function requireEnv(name: string) {
   return value
 }
 
-export const auth = createNeonAuth({
-  baseUrl: requireEnv('NEON_AUTH_BASE_URL'),
-  cookies: {
-    secret: requireEnv('NEON_AUTH_COOKIE_SECRET'),
-  },
-})
+type ServerAuth = ReturnType<typeof createNeonAuth>
+
+let authInstance: ServerAuth | null = null
+
+export function getAuth(): ServerAuth {
+  authInstance ??= createNeonAuth({
+    baseUrl: requireEnv('NEON_AUTH_BASE_URL'),
+    cookies: {
+      secret: requireEnv('NEON_AUTH_COOKIE_SECRET'),
+    },
+  })
+
+  return authInstance
+}

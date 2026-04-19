@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomUUID } from 'crypto'
 import { buildAbsoluteUrl, buildPasswordResetCallbackUrl } from '@/lib/config/public-url'
-import { auth } from '@/lib/auth/server'
+import { getAuth } from '@/lib/auth/server'
 import { RouteError } from '@/lib/server/auth'
 import { getRequestDb } from '@/lib/server/db'
 import { ensureNeonAuthUser } from '@/lib/server/neon-auth-users'
@@ -347,7 +347,7 @@ export async function triggerStaffInvitePasswordSetup(token: string) {
     name: displayName,
   })
 
-  await auth.requestPasswordReset({
+  await getAuth().requestPasswordReset({
     email: invite.email,
     redirectTo: buildPasswordResetCallbackUrl(),
   })
