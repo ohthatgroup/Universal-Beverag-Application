@@ -4,7 +4,6 @@ import { PalletDealsManager, type PalletDealRow } from '@/components/admin/palle
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { createEmptyPalletAction } from './actions'
 
 interface PalletsPageProps {
   searchParams?: Promise<{
@@ -70,7 +69,6 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
       <PalletDealsManager
         deals={rows}
         searchQuery={searchQuery}
-        createAction={createEmptyPalletAction}
       />
     </div>
   )
