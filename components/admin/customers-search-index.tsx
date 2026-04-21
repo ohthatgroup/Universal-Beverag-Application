@@ -17,6 +17,18 @@ function toStatus(value: string | null): OrderStatus | null {
   return null
 }
 
+function statusLabel(status: OrderStatus | null): string | null {
+  if (!status) return null
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+function formatOrderMeta(date: string | null, status: OrderStatus | null): string | null {
+  if (!date) return null
+  const datePart = formatShortDate(date)
+  const label = statusLabel(status)
+  return label ? `${datePart} · ${label}` : datePart
+}
+
 export interface CustomerIndexRow {
   id: string
   businessName: string
@@ -96,6 +108,7 @@ export function CustomersSearchIndex({ rows, recentIds = [] }: CustomersSearchIn
             <ul className="mt-1">
               {recents.map((r) => {
                 const status = toStatus(r.lastOrderStatus)
+                const meta = formatOrderMeta(r.lastOrderDate, status)
                 return (
                   <li key={r.id}>
                     <Link
@@ -104,9 +117,9 @@ export function CustomersSearchIndex({ rows, recentIds = [] }: CustomersSearchIn
                     >
                       {status ? <StatusDot status={status} /> : <span className="h-2 w-2 shrink-0" aria-hidden />}
                       <span className="font-medium">{r.businessName}</span>
-                      {r.lastOrderDate && (
+                      {meta && (
                         <span className="ml-auto text-xs text-muted-foreground">
-                          {formatShortDate(r.lastOrderDate)}
+                          {meta}
                         </span>
                       )}
                     </Link>
@@ -160,6 +173,7 @@ export function CustomersSearchIndex({ rows, recentIds = [] }: CustomersSearchIn
             )}
             {results.map((r) => {
               const status = toStatus(r.lastOrderStatus)
+              const meta = formatOrderMeta(r.lastOrderDate, status)
               return (
                 <li key={r.id}>
                   <Link
@@ -171,7 +185,7 @@ export function CustomersSearchIndex({ rows, recentIds = [] }: CustomersSearchIn
                       <span className="font-medium">{r.businessName}</span>
                       <span className="text-xs text-muted-foreground">
                         {r.email ?? r.phone ?? '—'}
-                        {r.lastOrderDate && ` · ${formatShortDate(r.lastOrderDate)}`}
+                        {meta && ` · ${meta}`}
                       </span>
                     </div>
                   </Link>

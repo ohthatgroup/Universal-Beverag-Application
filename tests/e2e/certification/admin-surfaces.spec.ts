@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test'
 import { credentials, loginWithPassword } from '../helpers/auth'
 
 const adminRoutes = [
-  { path: '/admin/dashboard', heading: 'Dashboard' },
-  { path: '/admin/customers', heading: 'Customers' },
-  { path: '/admin/catalog', heading: 'Catalog' },
-  { path: '/admin/brands', heading: 'Brands' },
-  { path: '/admin/staff', heading: 'Staff' },
-  { path: '/admin/reports', heading: 'Reports' },
+  { path: '/admin/dashboard', text: 'Today', kind: 'heading' },
+  { path: '/admin/customers', text: 'All customers', kind: 'text' },
+  { path: '/admin/catalog', text: 'Catalog', kind: 'heading' },
+  { path: '/admin/brands', text: 'Brands', kind: 'heading' },
+  { path: '/admin/staff', text: 'Staff', kind: 'heading' },
+  { path: '/admin/reports', text: 'Reports', kind: 'heading' },
 ]
 
 test.describe('ST-9 admin surface certification', () => {
@@ -18,7 +18,11 @@ test.describe('ST-9 admin surface certification', () => {
     for (const route of adminRoutes) {
       await page.goto(route.path)
       await expect(page).toHaveURL(new RegExp(`${route.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`))
-      await expect(page.getByRole('heading', { name: route.heading })).toBeVisible()
+      const target =
+        route.kind === 'heading'
+          ? page.getByRole('heading', { name: route.text })
+          : page.getByText(route.text)
+      await expect(target).toBeVisible()
     }
   })
 
@@ -27,6 +31,6 @@ test.describe('ST-9 admin surface certification', () => {
     await loginWithPassword(page, salesman.email, salesman.password, '/admin/orders')
 
     await expect(page).toHaveURL(/\/admin\/dashboard/)
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
   })
 })

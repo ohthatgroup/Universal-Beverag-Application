@@ -67,8 +67,9 @@ export default async function AdminOrderDetailPage({
             email: string | null
             phone: string | null
             access_token: string | null
+            default_group: string | null
           }>(
-            `select id, business_name, contact_name, email, phone, access_token
+            `select id, business_name, contact_name, email, phone, access_token, default_group
              from profiles
              where id = $1
              limit 1`,
@@ -234,6 +235,7 @@ export default async function AdminOrderDetailPage({
             triggerLabel="Add"
             products={pickerProducts}
             previouslyOrderedIds={previouslyOrderedIds}
+            defaultGroupBy={customer?.default_group === 'size' ? 'size' : 'brand'}
           />
         ) : null
       }

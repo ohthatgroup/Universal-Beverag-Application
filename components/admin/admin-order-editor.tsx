@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ChevronDown,
@@ -127,64 +127,21 @@ export function AdminOrderEditor({
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="min-w-0">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {backLabel || 'Back'}
-        </button>
-        <h1 className="text-2xl font-semibold">{customerName}</h1>
-        <div className="mt-1 text-sm text-muted-foreground">
-          {formatDeliveryDate(deliveryDate)}
-        </div>
-      </div>
-
-      {/* Status meta row (label is supplied by OrderStatusForm itself) */}
-      <div className="flex items-center gap-2 text-sm">
-        <OrderStatusForm orderId={orderId} initialStatus={status} />
-      </div>
-
-      {/* Primary action bar: Share dropdown + overflow */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
-        {shareLink ? (
+      {/* Collapsed header */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel || 'Back'}
+          </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" size="sm" className="gap-1.5">
-                <Share2 className="h-3.5 w-3.5" />
-                {shareCopied ? 'Copied' : 'Share with customer'}
-                <ChevronDown className="ml-0.5 h-3.5 w-3.5 opacity-80" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44">
-              <DropdownMenuItem onClick={copyShareLink}>
-                <Copy className="mr-2 h-3.5 w-3.5" />
-                Copy link
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={shareViaSms}>
-                <MessageSquare className="mr-2 h-3.5 w-3.5" />
-                Share via SMS
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={shareViaEmail} disabled={!customerEmail}>
-                <Mail className="mr-2 h-3.5 w-3.5" />
-                Share via email
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button size="sm" variant="outline" disabled title="Customer has no portal token">
-            No share link
-          </Button>
-        )}
-        {markDeliveredSlot}
-        <div className="ml-auto">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" aria-label="More actions">
-                <MoreVertical className="h-3.5 w-3.5" />
+              <Button size="icon" variant="ghost" aria-label="More actions">
+                <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
@@ -204,37 +161,66 @@ export function AdminOrderEditor({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
 
-      {/* Customer contact line */}
-      {(customerEmail || customerPhone || customerHref) && (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          {customerEmail && (
-            <a
-              href={`mailto:${customerEmail}`}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {customerEmail}
-            </a>
-          )}
-          {customerPhone && (
-            <a
-              href={`tel:${customerPhone}`}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {customerPhone}
-            </a>
-          )}
-          {customerHref && (
-            <Link
-              href={customerHref}
-              className="text-muted-foreground hover:text-foreground hover:underline"
-            >
-              View customer
-            </Link>
-          )}
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold leading-tight tracking-tight">{customerName}</h1>
+          <div className="mt-0.5 text-sm text-muted-foreground">
+            {formatDeliveryDate(deliveryDate)}
+          </div>
         </div>
-      )}
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <OrderStatusForm orderId={orderId} initialStatus={status} />
+          {markDeliveredSlot}
+          {shareLink ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" size="sm" className="gap-1.5">
+                  <Share2 className="h-3.5 w-3.5" />
+                  {shareCopied ? 'Copied' : 'Share'}
+                  <ChevronDown className="ml-0.5 h-3.5 w-3.5 opacity-80" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                <DropdownMenuItem onClick={copyShareLink}>
+                  <Copy className="mr-2 h-3.5 w-3.5" />
+                  Copy link
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={shareViaSms}>
+                  <MessageSquare className="mr-2 h-3.5 w-3.5" />
+                  Share via SMS
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={shareViaEmail} disabled={!customerEmail}>
+                  <Mail className="mr-2 h-3.5 w-3.5" />
+                  Share via email
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+
+        {(customerEmail || customerPhone || customerHref) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            {customerEmail && (
+              <a href={`mailto:${customerEmail}`} className="hover:text-foreground">
+                {customerEmail}
+              </a>
+            )}
+            {customerEmail && (customerPhone || customerHref) && <span aria-hidden>·</span>}
+            {customerPhone && (
+              <a href={`tel:${customerPhone}`} className="hover:text-foreground">
+                {customerPhone}
+              </a>
+            )}
+            {customerPhone && customerHref && <span aria-hidden>·</span>}
+            {customerHref && (
+              <Link href={customerHref} className="hover:text-foreground hover:underline">
+                View customer
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Items — "+ Add" anchored right of the section title */}
       <section className="space-y-3">
@@ -266,57 +252,101 @@ export function AdminOrderEditor({
 
 function AdminOrderLine({ item }: { item: AdminOrderEditorItem }) {
   // Design-only: unit-price override + delete-line remain stub handlers.
-  const [overridePrice, setOverridePrice] = useState<string>(item.unitPrice.toFixed(2))
+  const [unitPrice, setUnitPrice] = useState<number>(item.unitPrice)
   const [quantity, setQuantity] = useState(item.quantity)
+  const [editingPrice, setEditingPrice] = useState(false)
+  const [draftPrice, setDraftPrice] = useState<string>(item.unitPrice.toFixed(2))
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingPrice) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [editingPrice])
 
   const TitleEl = item.href ? Link : 'div'
   const titleProps = item.href ? { href: item.href } : {}
 
+  const commitPrice = () => {
+    const parsed = Number.parseFloat(draftPrice)
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      setUnitPrice(parsed)
+    } else {
+      setDraftPrice(unitPrice.toFixed(2))
+    }
+    setEditingPrice(false)
+  }
+
+  const cancelPrice = () => {
+    setDraftPrice(unitPrice.toFixed(2))
+    setEditingPrice(false)
+  }
+
+  const lineTotal = unitPrice * quantity
+
   return (
-    <div className="flex items-start gap-3 px-3 py-3">
+    <div className="flex items-center gap-3 px-3 py-3">
       <div className="min-w-0 flex-1">
         <TitleEl
           {...(titleProps as { href: string })}
-          className="block text-sm font-medium hover:underline"
+          className="block truncate text-sm font-medium hover:underline"
         >
           {item.label}
         </TitleEl>
-        {item.pack && <div className="text-xs text-muted-foreground">{item.pack}</div>}
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          {formatCurrency(item.unitPrice)} × {item.quantity} ={' '}
-          <span className="font-medium text-foreground">
-            {formatCurrency(item.lineTotal)}
-          </span>
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            Override
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={overridePrice}
-              onChange={(e) => setOverridePrice(e.target.value)}
-              className="h-7 w-20 text-xs"
-              aria-label="Unit price override"
-            />
-          </label>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-            aria-label="Remove line"
-            title="Remove this line (TODO: wire to DELETE endpoint)"
-          >
-            <Trash2 className="h-3 w-3" />
-            Remove
-          </button>
-        </div>
+        {item.pack && <div className="truncate text-xs text-muted-foreground">{item.pack}</div>}
       </div>
 
       <div className="shrink-0">
         <QuantitySelector quantity={quantity} onChange={setQuantity} />
       </div>
+
+      <div className="w-20 shrink-0 text-right text-sm tabular-nums">
+        {editingPrice ? (
+          <Input
+            ref={inputRef}
+            type="number"
+            step="0.01"
+            min="0"
+            value={draftPrice}
+            onChange={(e) => setDraftPrice(e.target.value)}
+            onBlur={commitPrice}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitPrice()
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                cancelPrice()
+              }
+            }}
+            className="h-7 w-20 text-right text-sm tabular-nums"
+            aria-label="Unit price"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingPrice(true)}
+            className="w-full text-right underline decoration-dotted underline-offset-2 hover:text-foreground"
+            aria-label="Edit unit price"
+          >
+            {formatCurrency(unitPrice)}
+          </button>
+        )}
+      </div>
+
+      <div className="w-24 shrink-0 text-right text-sm font-medium tabular-nums">
+        {formatCurrency(lineTotal)}
+      </div>
+
+      <button
+        type="button"
+        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        aria-label="Remove line"
+        title="Remove this line (TODO: wire to DELETE endpoint)"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
     </div>
   )
 }

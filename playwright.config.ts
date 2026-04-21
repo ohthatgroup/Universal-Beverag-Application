@@ -1,4 +1,7 @@
+import { loadEnvConfig } from '@next/env'
 import { defineConfig, devices } from '@playwright/test'
+
+loadEnvConfig(process.cwd())
 
 const PORT = Number(process.env.PORT ?? 3000)
 const explicitBaseURL = process.env.PLAYWRIGHT_BASE_URL?.trim()
@@ -20,7 +23,7 @@ export default defineConfig({
         command: 'npx next start -H 0.0.0.0',
         url: `http://127.0.0.1:${PORT}/auth/login`,
         timeout: 120_000,
-        reuseExistingServer: !process.env.CI,
+        reuseExistingServer: false,
         stdout: 'pipe',
         stderr: 'pipe',
       }

@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { formatCurrency } from '@/lib/utils'
+import { BrandChips, GroupByChips, SizeChips } from '@/components/catalog/filter-chips'
+import type { Brand } from '@/lib/types'
+import { cn, formatCurrency } from '@/lib/utils'
 
 type DialogMode = 'order' | 'customer'
 
@@ -28,6 +30,7 @@ interface ProductPickerDialogProps {
   previouslyOrderedIds?: string[]
   triggerVariant?: 'default' | 'outline' | 'ghost'
   triggerSize?: 'sm' | 'default'
+  defaultGroupBy?: 'brand' | 'size'
 }
 
 export function ProductPickerDialog({
@@ -39,13 +42,15 @@ export function ProductPickerDialog({
   previouslyOrderedIds = [],
   triggerVariant = 'default',
   triggerSize = 'sm',
+  defaultGroupBy = 'brand',
 }: ProductPickerDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [brand, setBrand] = useState('all')
-  const [size, setSize] = useState('all')
+  const [brandLabels, setBrandLabels] = useState<string[]>([])
+  const [sizes, setSizes] = useState<string[]>([])
   const [showPrevious, setShowPrevious] = useState(false)
+  const [groupBy, setGroupBy] = useState<'brand' | 'size'>(defaultGroupBy)
   const [isAddingId, setIsAddingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,15 +59,17 @@ export function ProductPickerDialog({
     [previouslyOrderedIds]
   )
 
-  const brands = useMemo(() => {
+  const availableBrands = useMemo<Brand[]>(() => {
     const unique = new Set<string>()
     for (const product of products) {
       if (product.brandLabel) unique.add(product.brandLabel)
     }
-    return Array.from(unique).sort((left, right) => left.localeCompare(right))
+    return Array.from(unique)
+      .sort((left, right) => left.localeCompare(right))
+      .map((name) => ({ id: name, name } as Brand))
   }, [products])
 
-  const sizes = useMemo(() => {
+  const availableSizes = useMemo(() => {
     const unique = new Set<string>()
     for (const product of products) {
       const label = product.sizeLabel ?? product.packLabel
@@ -73,10 +80,12 @@ export function ProductPickerDialog({
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
+    const brandSet = new Set(brandLabels)
+    const sizeSet = new Set(sizes)
     return products.filter((product) => {
-      if (brand !== 'all' && product.brandLabel !== brand) return false
+      if (brandSet.size > 0 && !brandSet.has(product.brandLabel)) return false
       const sizeLabel = product.sizeLabel ?? product.packLabel
-      if (size !== 'all' && sizeLabel !== size) return false
+      if (sizeSet.size > 0 && !(sizeLabel && sizeSet.has(sizeLabel))) return false
       if (showPrevious && !previouslyOrderedSet.has(product.id)) return false
       if (!normalized) return true
       const haystack = [product.title, product.brandLabel, product.packLabel]
@@ -84,7 +93,25 @@ export function ProductPickerDialog({
         .toLowerCase()
       return haystack.includes(normalized)
     })
-  }, [products, brand, size, showPrevious, previouslyOrderedSet, query])
+  }, [products, brandLabels, sizes, showPrevious, previouslyOrderedSet, query])
+
+  const isNarrowed = brandLabels.length > 0 || sizes.length > 0 || query.trim().length > 0
+  const renderFlat = isNarrowed
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, PickerProduct[]>()
+    for (const product of filtered) {
+      const key = groupBy === 'brand'
+        ? (product.brandLabel || 'Other')
+        : (product.sizeLabel ?? product.packLabel ?? 'Other')
+      const existing = map.get(key) ?? []
+      existing.push(product)
+      map.set(key, existing)
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([label, items]) => ({ label, items }))
+  }, [filtered, groupBy])
 
   const addProduct = async (product: PickerProduct) => {
     setIsAddingId(product.id)
@@ -140,33 +167,28 @@ export function ProductPickerDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={brand}
-              onChange={(event) => setBrand(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              aria-label="Filter by brand"
-            >
-              <option value="all">All brands</option>
-              {brands.map((entry) => (
-                <option key={entry} value={entry}>
-                  {entry}
-                </option>
-              ))}
-            </select>
-            <select
-              value={size}
-              onChange={(event) => setSize(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              aria-label="Filter by size"
-            >
-              <option value="all">All sizes</option>
-              {sizes.map((entry) => (
-                <option key={entry} value={entry}>
-                  {entry}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <GroupByChips groupBy={groupBy} onChange={setGroupBy} />
+            <SizeChips
+              sizes={availableSizes}
+              selectedSizes={sizes}
+              onToggle={(s) =>
+                setSizes((prev) =>
+                  prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+                )
+              }
+              onClear={() => setSizes([])}
+            />
+            <BrandChips
+              brands={availableBrands}
+              selectedBrandIds={brandLabels}
+              onToggle={(id) =>
+                setBrandLabels((prev) =>
+                  prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+                )
+              }
+              onClear={() => setBrandLabels([])}
+            />
           </div>
 
           {previouslyOrderedIds.length > 0 && (
@@ -185,32 +207,27 @@ export function ProductPickerDialog({
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <div className="min-h-0 max-h-[58vh] space-y-0 overflow-y-auto rounded-md border sm:max-h-[420px]">
+          <div className={cn(
+            'min-h-0 max-h-[58vh] overflow-y-auto rounded-md border sm:max-h-[420px]',
+            renderFlat ? 'space-y-0' : 'p-0'
+          )}>
             {filtered.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">No products found.</p>
+            ) : renderFlat ? (
+              filtered.map((product) => renderPickerRow(product, isAddingId, addProduct))
             ) : (
-              filtered.map((product) => (
-                <div key={product.id} className="flex flex-col gap-2 border-b px-3 py-2.5 last:border-0 sm:flex-row sm:items-center sm:gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{product.title}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {product.brandLabel} - {product.packLabel}
+              <div className="divide-y">
+                {grouped.map((section) => (
+                  <section key={section.label}>
+                    <div className="sticky top-0 z-10 bg-background/95 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+                      {groupBy === 'brand' ? 'Brand' : 'Size'}: {section.label}
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 sm:justify-end sm:gap-3">
-                    <div className="text-sm text-muted-foreground">{formatCurrency(product.price)}</div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0"
-                      disabled={isAddingId === product.id}
-                      onClick={() => addProduct(product)}
-                    >
-                      {isAddingId === product.id ? 'Adding...' : 'Add'}
-                    </Button>
-                  </div>
-                </div>
-              ))
+                    <div className="divide-y">
+                      {section.items.map((product) => renderPickerRow(product, isAddingId, addProduct))}
+                    </div>
+                  </section>
+                ))}
+              </div>
             )}
           </div>
 
@@ -222,5 +239,34 @@ export function ProductPickerDialog({
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function renderPickerRow(
+  product: PickerProduct,
+  isAddingId: string | null,
+  addProduct: (product: PickerProduct) => void,
+) {
+  return (
+    <div key={product.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{product.title}</div>
+        <div className="text-xs text-muted-foreground">
+          {product.brandLabel} - {product.packLabel}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 sm:justify-end sm:gap-3">
+        <div className="text-sm text-muted-foreground">{formatCurrency(product.price)}</div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0"
+          disabled={isAddingId === product.id}
+          onClick={() => addProduct(product)}
+        >
+          {isAddingId === product.id ? 'Adding...' : 'Add'}
+        </Button>
+      </div>
+    </div>
   )
 }

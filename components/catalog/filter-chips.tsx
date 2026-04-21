@@ -28,28 +28,30 @@ function FacetRow({ label, children }: FacetRowProps) {
 
 interface BrandChipsProps {
   brands: Brand[]
-  selectedBrandId: string | null
-  onSelect: (brandId: string | null) => void
+  selectedBrandIds: string[]
+  onToggle: (brandId: string) => void
+  onClear?: () => void
   collapseAfter?: number
 }
 
 export function BrandChips({
   brands,
-  selectedBrandId,
-  onSelect,
+  selectedBrandIds,
+  onToggle,
+  onClear,
   collapseAfter = 8,
 }: BrandChipsProps) {
   const [expanded, setExpanded] = useState(false)
   if (brands.length === 0) return null
 
+  const selectedSet = new Set(selectedBrandIds)
   const needsCollapse = brands.length > collapseAfter
-  const selectedIsHidden =
+  const anySelectedHidden =
     needsCollapse &&
     !expanded &&
-    selectedBrandId !== null &&
-    brands.findIndex((b) => b.id === selectedBrandId) >= collapseAfter
+    brands.some((b, i) => i >= collapseAfter && selectedSet.has(b.id))
 
-  const visible = needsCollapse && !expanded && !selectedIsHidden
+  const visible = needsCollapse && !expanded && !anySelectedHidden
     ? brands.slice(0, collapseAfter)
     : brands
 
@@ -58,12 +60,12 @@ export function BrandChips({
   return (
     <FacetRow label="Brand">
       {visible.map((brand) => {
-        const active = brand.id === selectedBrandId
+        const active = selectedSet.has(brand.id)
         return (
           <button
             key={brand.id}
             type="button"
-            onClick={() => onSelect(active ? null : brand.id)}
+            onClick={() => onToggle(brand.id)}
             className={cn(chipBase, active ? chipActive : chipIdle)}
           >
             {brand.name}
@@ -80,34 +82,45 @@ export function BrandChips({
           <ChevronDown className="h-3 w-3" />
         </button>
       )}
+      {selectedBrandIds.length > 0 && onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          className={cn(chipBase, chipIdle, 'text-muted-foreground')}
+        >
+          Clear
+        </button>
+      )}
     </FacetRow>
   )
 }
 
 interface SizeChipsProps {
   sizes: string[]
-  selectedSize: string | null
-  onSelect: (size: string | null) => void
+  selectedSizes: string[]
+  onToggle: (size: string) => void
+  onClear?: () => void
   collapseAfter?: number
 }
 
 export function SizeChips({
   sizes,
-  selectedSize,
-  onSelect,
+  selectedSizes,
+  onToggle,
+  onClear,
   collapseAfter = 10,
 }: SizeChipsProps) {
   const [expanded, setExpanded] = useState(false)
   if (sizes.length === 0) return null
 
+  const selectedSet = new Set(selectedSizes)
   const needsCollapse = sizes.length > collapseAfter
-  const selectedIsHidden =
+  const anySelectedHidden =
     needsCollapse &&
     !expanded &&
-    selectedSize !== null &&
-    sizes.indexOf(selectedSize) >= collapseAfter
+    sizes.some((s, i) => i >= collapseAfter && selectedSet.has(s))
 
-  const visible = needsCollapse && !expanded && !selectedIsHidden
+  const visible = needsCollapse && !expanded && !anySelectedHidden
     ? sizes.slice(0, collapseAfter)
     : sizes
 
@@ -116,12 +129,12 @@ export function SizeChips({
   return (
     <FacetRow label="Size">
       {visible.map((size) => {
-        const active = size === selectedSize
+        const active = selectedSet.has(size)
         return (
           <button
             key={size}
             type="button"
-            onClick={() => onSelect(active ? null : size)}
+            onClick={() => onToggle(size)}
             className={cn(chipBase, active ? chipActive : chipIdle)}
           >
             {size}
@@ -138,9 +151,43 @@ export function SizeChips({
           <ChevronDown className="h-3 w-3" />
         </button>
       )}
+      {selectedSizes.length > 0 && onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          className={cn(chipBase, chipIdle, 'text-muted-foreground')}
+        >
+          Clear
+        </button>
+      )}
     </FacetRow>
   )
 }
 
 // Back-compat alias so callers importing SizeFilterMenu still work until swapped.
 export const SizeFilterMenu = SizeChips
+
+interface GroupByChipsProps {
+  groupBy: 'brand' | 'size'
+  onChange: (next: 'brand' | 'size') => void
+}
+
+export function GroupByChips({ groupBy, onChange }: GroupByChipsProps) {
+  return (
+    <FacetRow label="Group">
+      {(['brand', 'size'] as const).map((value) => {
+        const active = groupBy === value
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChange(value)}
+            className={cn(chipBase, active ? chipActive : chipIdle)}
+          >
+            {value === 'brand' ? 'Brand' : 'Size'}
+          </button>
+        )
+      })}
+    </FacetRow>
+  )
+}

@@ -14,6 +14,7 @@ import {
   todayISODate,
 } from '@/lib/utils'
 import { StatusDot } from '@/components/ui/status-dot'
+import { CustomerSettingsInline } from '@/components/admin/customer-settings-inline'
 import type { OrderStatus } from '@/lib/types'
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -34,8 +35,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       state: string | null
       zip: string | null
       access_token: string | null
+      show_prices: boolean | null
+      custom_pricing: boolean | null
+      default_group: string | null
     }>(
-      `select id, business_name, contact_name, email, phone, address, city, state, zip, access_token
+      `select id, business_name, contact_name, email, phone, address, city, state, zip, access_token,
+              show_prices, custom_pricing, default_group
        from profiles
        where id = $1 and role = 'customer'
        limit 1`,
@@ -170,6 +175,19 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         )}
 
         <CustomerStartOrderButton />
+
+      {/* Customer settings — inline autosave */}
+      <section className="space-y-2">
+        <h2 className="px-1 text-xs font-medium text-muted-foreground">
+          Customer settings
+        </h2>
+        <CustomerSettingsInline
+          customerId={customer.id}
+          initialShowPrices={customer.show_prices ?? true}
+          initialCustomPricing={customer.custom_pricing ?? false}
+          initialDefaultGroup={customer.default_group === 'size' ? 'size' : 'brand'}
+        />
+      </section>
 
       {/* Recent orders ledger */}
       <section className="space-y-2">

@@ -29,7 +29,7 @@ It answers a different question than the certification matrix:
 - Route: `/auth/accept-invite?token=...`
 - Audience: invited salesman
 - Supported outcomes:
-  - valid pending invite -> triggers password setup/reset email -> redirects to `/auth/reset-email-sent`
+  - valid pending invite -> renders the dedicated invite-setup form
   - accepted invite -> "Invite Already Used"
   - revoked invite -> "Invite Revoked"
   - disabled account -> "Account Disabled"
@@ -39,10 +39,11 @@ It answers a different question than the certification matrix:
 
 - Route: `/auth/reset-password`
 - Audience: salesman
+- Reset request starts from: `/auth/login`
 - Supported entry modes:
   - reset via `code`
   - reset via `token`
-  - reset via `email + otp`
+- Direct access without `code` or `token` reroutes to `/`
 - Supported actions:
   - set new password
   - confirm password

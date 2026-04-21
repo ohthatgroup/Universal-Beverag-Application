@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Star } from 'lucide-react'
+import { Check, Plus, RotateCcw, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -123,7 +123,7 @@ export function CustomerProductsManager({
   const [localGroups, setLocalGroups] = useState<CustomerProductGroupData[]>(groups)
   const [drafts, setDrafts] = useState<Record<string, ProductDraftState>>(() => buildInitialDrafts(groups, overrides))
   const [savingToggleIds, setSavingToggleIds] = useState<Set<string>>(new Set())
-  const [isSavingPrices, setIsSavingPrices] = useState(false)
+  const [priceRowState, setPriceRowState] = useState<Record<string, 'saving' | 'saved' | 'error'>>({})
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [isCreatingCustomProduct, setIsCreatingCustomProduct] = useState(false)
   const [createForm, setCreateForm] = useState<CreateCustomProductFormState>(DEFAULT_CREATE_FORM)
@@ -144,40 +144,7 @@ export function CustomerProductsManager({
     return () => window.clearTimeout(timer)
   }, [success])
 
-  const products = useMemo(() => localGroups.flatMap((group) => group.products), [localGroups])
   const brandsById = useMemo(() => new Map(brands.map((brand) => [brand.id, brand.name])), [brands])
-
-  const dirtyPriceIds = useMemo(() => {
-    if (!customPricing) return []
-    const dirtyIds: string[] = []
-
-    for (const product of products) {
-      const draft = drafts[product.id]
-      if (!draft) continue
-
-      const parsed = parseCustomPriceInput(draft.draftCustomPrice)
-      if (!parsed.valid) {
-        dirtyIds.push(product.id)
-        continue
-      }
-
-      if (!pricesMatch(parsed.value, draft.savedCustomPrice)) {
-        dirtyIds.push(product.id)
-      }
-    }
-
-    return dirtyIds
-  }, [customPricing, drafts, products])
-
-  const hasDirtyPrices = dirtyPriceIds.length > 0
-
-  const hasInvalidDirtyPrices = useMemo(() => {
-    if (!customPricing || dirtyPriceIds.length === 0) return false
-    return dirtyPriceIds.some((productId) => {
-      const draft = drafts[productId]
-      return draft ? !parseCustomPriceInput(draft.draftCustomPrice).valid : false
-    })
-  }, [customPricing, dirtyPriceIds, drafts])
 
   const updateDraft = (productId: string, patch: Partial<ProductDraftState>) => {
     setDrafts((prev) => ({
@@ -270,72 +237,57 @@ export function CustomerProductsManager({
     }
   }
 
-  const discardDirtyPrices = () => {
-    setDrafts((prev) => {
-      const next = { ...prev }
-      for (const productId of dirtyPriceIds) {
-        const draft = next[productId]
-        if (!draft) continue
-        next[productId] = {
-          ...draft,
-          draftCustomPrice: draft.savedCustomPrice === null ? '' : String(draft.savedCustomPrice),
-        }
-      }
-      return next
-    })
-    setError(null)
-  }
+  const savePriceOnBlur = async (productId: string) => {
+    if (!customPricing) return
+    const draft = drafts[productId]
+    if (!draft) return
 
-  const saveDirtyPrices = async () => {
-    if (!customPricing || dirtyPriceIds.length === 0 || isSavingPrices) return
-
-    const updates: Array<{ productId: string; customPrice: number | null }> = []
-    for (const productId of dirtyPriceIds) {
-      const draft = drafts[productId]
-      if (!draft) continue
-      const parsed = parseCustomPriceInput(draft.draftCustomPrice)
-      if (!parsed.valid) {
-        setError('Please enter valid custom prices before saving')
-        return
-      }
-      updates.push({ productId, customPrice: parsed.value })
+    const parsed = parseCustomPriceInput(draft.draftCustomPrice)
+    if (!parsed.valid) {
+      setPriceRowState((s) => ({ ...s, [productId]: 'error' }))
+      return
+    }
+    if (pricesMatch(parsed.value, draft.savedCustomPrice)) {
+      setPriceRowState((s) => {
+        if (!s[productId]) return s
+        const next = { ...s }
+        delete next[productId]
+        return next
+      })
+      return
     }
 
-    setIsSavingPrices(true)
-    setError(null)
-
+    setPriceRowState((s) => ({ ...s, [productId]: 'saving' }))
     try {
       const response = await fetch(`/api/customers/${customerId}/products`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates }),
+        body: JSON.stringify({ updates: [{ productId, customPrice: parsed.value }] }),
       })
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
-        throw new Error(payload?.error?.message ?? 'Failed to save custom prices')
-      }
-
-      const nextByProductId = new Map(updates.map((update) => [update.productId, update.customPrice]))
+      if (!response.ok) throw new Error('save failed')
       setDrafts((prev) => {
-        const next = { ...prev }
-        for (const [productId, customPrice] of nextByProductId.entries()) {
-          const draft = next[productId]
-          if (!draft) continue
-          next[productId] = {
-            ...draft,
-            savedCustomPrice: customPrice,
-            draftCustomPrice: customPrice === null ? '' : String(customPrice),
-          }
+        const current = prev[productId]
+        if (!current) return prev
+        return {
+          ...prev,
+          [productId]: {
+            ...current,
+            savedCustomPrice: parsed.value,
+            draftCustomPrice: parsed.value === null ? '' : String(parsed.value),
+          },
         }
-        return next
       })
-
-      setSuccess(`Saved ${updates.length} price change${updates.length === 1 ? '' : 's'}`)
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save custom prices')
-    } finally {
-      setIsSavingPrices(false)
+      setPriceRowState((s) => ({ ...s, [productId]: 'saved' }))
+      setTimeout(() => {
+        setPriceRowState((s) => {
+          if (s[productId] !== 'saved') return s
+          const next = { ...s }
+          delete next[productId]
+          return next
+        })
+      }, 1200)
+    } catch {
+      setPriceRowState((s) => ({ ...s, [productId]: 'error' }))
     }
   }
 
@@ -451,10 +403,8 @@ export function CustomerProductsManager({
     }
   }
 
-  const rootPaddingClass = customPricing && hasDirtyPrices ? 'pb-24 md:pb-20' : ''
-
   return (
-    <div className={cn('space-y-4', rootPaddingClass)}>
+    <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -604,12 +554,19 @@ export function CustomerProductsManager({
                             {product.packLabel} - {formatCurrency(product.price)}
                           </div>
                           {customPricing && (
-                            <Input
-                              value={draft?.draftCustomPrice ?? ''}
-                              placeholder="Custom price"
-                              className={cn('mt-1.5 h-8 text-xs', hasInvalidPrice && 'border-destructive')}
-                              onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
-                            />
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <Input
+                                value={draft?.draftCustomPrice ?? ''}
+                                placeholder="Custom price"
+                                className={cn('h-8 text-xs', hasInvalidPrice && 'border-destructive')}
+                                onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
+                                onBlur={() => void savePriceOnBlur(product.id)}
+                              />
+                              <PriceRowIndicator
+                                state={priceRowState[product.id]}
+                                onRetry={() => void savePriceOnBlur(product.id)}
+                              />
+                            </div>
                           )}
                         </div>
 
@@ -689,12 +646,19 @@ export function CustomerProductsManager({
                           <td className="px-4 py-2 text-right">{formatCurrency(product.price)}</td>
                           {customPricing ? (
                             <td className="px-4 py-2 text-right">
-                              <Input
-                                value={draft?.draftCustomPrice ?? ''}
-                                placeholder="-"
-                                className={cn('ml-auto h-8 w-28 text-right text-xs', hasInvalidPrice && 'border-destructive')}
-                                onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
-                              />
+                              <div className="flex items-center justify-end gap-2">
+                                <PriceRowIndicator
+                                  state={priceRowState[product.id]}
+                                  onRetry={() => void savePriceOnBlur(product.id)}
+                                />
+                                <Input
+                                  value={draft?.draftCustomPrice ?? ''}
+                                  placeholder="-"
+                                  className={cn('h-8 w-28 text-right text-xs', hasInvalidPrice && 'border-destructive')}
+                                  onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
+                                  onBlur={() => void savePriceOnBlur(product.id)}
+                                />
+                              </div>
                             </td>
                           ) : null}
                           <td className="px-4 py-2 text-center">
@@ -739,41 +703,35 @@ export function CustomerProductsManager({
         </div>
       )}
 
-      {/*
-        Autosave-style indicator — replaces the old sticky save/discard footer.
-        Per st-9 design theory: prices should autosave per-row with debounce;
-        this visible bar is a transitional pattern until the row-level autosave
-        is wired. Engineer TODO (see docs/st-9-engineer-followups.md): move
-        price writes to a 500ms debounced per-row PATCH and drop this banner.
-      */}
-      {customPricing && hasDirtyPrices && (
-        <div className="sticky bottom-20 z-30 mx-auto w-full md:bottom-4">
-          <div className="mx-auto flex max-w-md items-center justify-between gap-3 rounded-full border border-amber-500/30 bg-amber-50/90 px-4 py-2 text-sm shadow-lg backdrop-blur">
-            <span className="text-amber-900">
-              {dirtyPriceIds.length} price{dirtyPriceIds.length === 1 ? '' : 's'} pending
-              {hasInvalidDirtyPrices ? ' — fix invalid' : ''}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={discardDirtyPrices}
-                disabled={isSavingPrices}
-                className="text-xs text-amber-900/70 hover:text-amber-900"
-              >
-                Discard
-              </button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={saveDirtyPrices}
-                disabled={isSavingPrices || hasInvalidDirtyPrices}
-              >
-                {isSavingPrices ? 'Saving…' : 'Save'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+  )
+}
+
+function PriceRowIndicator({
+  state,
+  onRetry,
+}: {
+  state: 'saving' | 'saved' | 'error' | undefined
+  onRetry: () => void
+}) {
+  if (!state) return null
+  if (state === 'saving') {
+    return <span className="text-xs text-muted-foreground">Saving…</span>
+  }
+  if (state === 'saved') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-green-600">
+        <Check className="h-3 w-3" /> Saved
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onRetry}
+      className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+    >
+      <RotateCcw className="h-3 w-3" /> Retry
+    </button>
   )
 }

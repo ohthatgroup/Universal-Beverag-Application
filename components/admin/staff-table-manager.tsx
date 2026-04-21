@@ -5,6 +5,18 @@ import { Mail, RotateCcw, ShieldOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { CopyUrlButton } from '@/components/admin/copy-url-button'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export interface StaffListRow {
   id: string
@@ -37,11 +49,17 @@ function StatusDot({ status }: { status: StaffListRow['status'] }) {
   )
 }
 
+type ConfirmState =
+  | { type: 'revoke'; row: StaffListRow }
+  | { type: 'disable'; row: StaffListRow }
+  | null
+
 export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps) {
   const router = useRouter()
   const [rows, setRows] = useState(initialRows)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<ConfirmState>(null)
 
   useEffect(() => {
     setRows(initialRows)
@@ -142,9 +160,10 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
                         size="icon"
                         variant="ghost"
                         disabled={busyId === row.id}
-                        onClick={() => revokeInvite(row)}
+                        onClick={() => setConfirm({ type: 'revoke', row })}
                         aria-label="Revoke invite"
                         title="Revoke invite"
+                        className="text-destructive hover:text-destructive"
                       >
                         <RotateCcw className="h-4 w-4" />
                       </Button>
@@ -157,7 +176,7 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
                   size="icon"
                   variant="ghost"
                   disabled={busyId === row.id}
-                  onClick={() => toggleDisabled(row)}
+                  onClick={() => (row.disabled ? toggleDisabled(row) : setConfirm({ type: 'disable', row }))}
                   aria-label={row.disabled ? 'Enable access' : 'Disable access'}
                   title={row.disabled ? 'Enable access' : 'Disable access'}
                   className={row.disabled ? '' : 'text-destructive hover:text-destructive'}
@@ -169,6 +188,43 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
           )
         })}
       </ul>
+
+      <AlertDialog
+        open={confirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirm(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm?.type === 'revoke' ? 'Revoke invite?' : 'Disable access?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm?.type === 'revoke'
+                ? `The invite link for ${confirm.row.displayName} will stop working.`
+                : confirm?.type === 'disable'
+                  ? `${confirm.row.displayName} will lose access to the admin portal.`
+                  : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants({ variant: 'destructive' }))}
+              onClick={() => {
+                if (!confirm) return
+                const { type, row } = confirm
+                setConfirm(null)
+                if (type === 'revoke') void revokeInvite(row)
+                else void toggleDisabled(row)
+              }}
+            >
+              {confirm?.type === 'revoke' ? 'Revoke invite' : 'Disable access'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
