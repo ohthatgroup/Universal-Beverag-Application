@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { formatCurrency } from '@/lib/utils'
 import type { PalletDeal } from '@/lib/types'
 
@@ -30,6 +31,8 @@ interface PalletDetailDialogProps {
   deal: PalletDeal | null
   items?: PalletDetailItem[]
   showPrices: boolean
+  quantity?: number
+  onChange?: (next: number) => void
 }
 
 export function PalletDetailDialog({
@@ -38,6 +41,8 @@ export function PalletDetailDialog({
   deal,
   items,
   showPrices,
+  quantity,
+  onChange,
 }: PalletDetailDialogProps) {
   if (!deal) return null
 
@@ -121,6 +126,16 @@ export function PalletDetailDialog({
               </div>
             )}
           </div>
+
+          {onChange && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <span className="text-sm font-medium">In your order</span>
+              <QuantitySelector
+                quantity={quantity ?? 0}
+                onChange={onChange}
+              />
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

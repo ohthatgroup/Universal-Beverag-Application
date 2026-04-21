@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AdminFab } from '@/components/admin/admin-fab'
 import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency } from '@/lib/utils'
 
@@ -260,7 +261,7 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
 
   return (
     <div className="space-y-4">
-      {/* Toolbar: pen toggles edit mode; plus creates a new pallet via server action */}
+      {/* Toolbar: pen toggles edit mode */}
       <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
@@ -278,17 +279,14 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
         >
           {editMode ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
         </Button>
-        <Button
-          type="button"
-          size="icon"
-          aria-label="New pallet deal"
-          title="New pallet deal"
-          onClick={() => void createDeal()}
-          disabled={creating}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
       </div>
+
+      <AdminFab
+        icon={<Plus className="h-6 w-6" />}
+        label="New pallet deal"
+        onClick={() => void createDeal()}
+        disabled={creating}
+      />
 
       {editMode && selectedCount > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">

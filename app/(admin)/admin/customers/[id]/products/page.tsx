@@ -146,7 +146,7 @@ export default async function CustomerProductsPage({ params, searchParams }: Cus
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Products by Brand"
+        title="Visibility & pricing"
         description={customer.custom_pricing ? 'Custom pricing enabled' : undefined}
         breadcrumb={
           <Link href={`/admin/customers/${id}`} className="inline-flex items-center gap-1.5 hover:text-foreground">

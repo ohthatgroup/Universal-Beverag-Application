@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, MoreVertical, Plus } from 'lucide-react'
+import { Check, ChevronDown, Copy, Mail, MessageSquare, MoreVertical, Plus, RefreshCcw, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -110,13 +110,13 @@ export function CustomerActionsProvider({
 
 export function CustomerOverflowMenu() {
   const router = useRouter()
-  const { customerId, copied, portalUrl, copyPortal, regenerateToken, deleteCustomer } = useCtx()
+  const { customerId } = useCtx()
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" aria-label="More actions" className="-mr-2">
-          {copied ? <Check className="h-5 w-5 text-green-600" /> : <MoreVertical className="h-5 w-5" />}
+          <MoreVertical className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -126,18 +126,6 @@ export function CustomerOverflowMenu() {
         <DropdownMenuItem onClick={() => router.push(`/admin/customers/${customerId}/products`)}>
           Visibility &amp; pricing
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={copyPortal} disabled={!portalUrl}>
-          Copy portal link
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={regenerateToken}>Regenerate portal link</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={deleteCustomer}
-          className="text-destructive focus:text-destructive"
-        >
-          Delete customer
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -146,16 +134,59 @@ export function CustomerOverflowMenu() {
 export function CustomerStartOrderButton() {
   const { startOrder, isPending, hasDraftToday } = useCtx()
   return (
-    <button
+    <Button
       type="button"
       onClick={startOrder}
       disabled={isPending}
-      className="flex w-full items-center gap-3 rounded-2xl bg-primary px-6 py-5 text-left text-primary-foreground shadow-sm transition hover:opacity-95 disabled:opacity-60"
+      className="gap-2"
     >
-      <Plus className="h-5 w-5" />
-      <span className="text-base font-semibold">
-        {hasDraftToday ? 'Continue draft' : 'Start order'}
-      </span>
-    </button>
+      <Plus className="h-4 w-4" />
+      {hasDraftToday ? 'Continue draft' : 'Start order'}
+    </Button>
+  )
+}
+
+export function CustomerSharePortalMenu() {
+  const { portalUrl, copied, copyPortal, regenerateToken } = useCtx()
+  const disabled = !portalUrl
+
+  const smsHref = portalUrl ? `sms:?body=${encodeURIComponent(`Your portal: ${portalUrl}`)}` : '#'
+  const mailHref = portalUrl
+    ? `mailto:?subject=${encodeURIComponent('Your portal access')}&body=${encodeURIComponent(`Your portal link: ${portalUrl}`)}`
+    : '#'
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="sm" disabled={disabled}>
+          <Share2 className="mr-1.5 h-3.5 w-3.5" />
+          Share portal
+          <ChevronDown className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-48">
+        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void copyPortal() }} disabled={disabled}>
+          {copied ? <Check className="mr-2 h-3.5 w-3.5" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
+          {copied ? 'Copied' : 'Copy portal link'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void regenerateToken() }}>
+          <RefreshCcw className="mr-2 h-3.5 w-3.5" />
+          Regenerate link
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild disabled={disabled}>
+          <a href={smsHref}>
+            <MessageSquare className="mr-2 h-3.5 w-3.5" />
+            Share via SMS
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild disabled={disabled}>
+          <a href={mailHref}>
+            <Mail className="mr-2 h-3.5 w-3.5" />
+            Share via email
+          </a>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

@@ -75,7 +75,7 @@ export function StartOrderHero({ token, initialDate }: StartOrderHeroProps) {
             onClick={() => moveDate(-1)}
             disabled={atToday}
             aria-label="Previous day"
-            className="flex h-full w-8 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30"
+            className="flex h-full w-8 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-muted-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>

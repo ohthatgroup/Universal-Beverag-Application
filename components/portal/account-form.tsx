@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,21 +22,34 @@ export function AccountForm({ token, profile }: AccountFormProps) {
     zip: profile.zip ?? '',
   })
 
-  const [isSaving, setIsSaving] = useState(false)
-  const [feedback, setFeedback] = useState<{
-    type: 'success' | 'error'
-    message: string
-  } | null>(null)
+  type SaveState =
+    | { kind: 'idle' }
+    | { kind: 'saving' }
+    | { kind: 'saved' }
+    | { kind: 'error'; message: string }
+
+  const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' })
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    }
+  }, [])
 
   const handleChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    setFeedback(null)
+    if (saveState.kind === 'saved' || saveState.kind === 'error') {
+      setSaveState({ kind: 'idle' })
+    }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSaving(true)
-    setFeedback(null)
+  const submit = async () => {
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current)
+      savedTimerRef.current = null
+    }
+    setSaveState({ kind: 'saving' })
 
     try {
       const response = await fetch('/api/portal/profile', {
@@ -58,20 +71,34 @@ export function AccountForm({ token, profile }: AccountFormProps) {
           payload && 'error' in payload
             ? payload.error?.message ?? 'Failed to save'
             : 'Failed to save'
-        setFeedback({ type: 'error', message })
+        setSaveState({ kind: 'error', message })
         return
       }
 
-      setFeedback({ type: 'success', message: 'Changes saved' })
+      setSaveState({ kind: 'saved' })
+      savedTimerRef.current = setTimeout(() => {
+        setSaveState({ kind: 'idle' })
+        savedTimerRef.current = null
+      }, 1500)
     } catch {
-      setFeedback({ type: 'error', message: 'Network error — please try again' })
-    } finally {
-      setIsSaving(false)
+      setSaveState({ kind: 'error', message: 'Network error — please try again' })
     }
   }
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    void submit()
+  }
+
+  const buttonLabel =
+    saveState.kind === 'saving'
+      ? 'Saving…'
+      : saveState.kind === 'saved'
+      ? 'Saved ✓'
+      : 'Save changes'
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 pb-24 md:pb-0">
       <div className="space-y-1.5">
         <Label className="text-muted-foreground">Business</Label>
         <p className="text-sm font-medium">{profile.business_name ?? '—'}</p>
@@ -150,21 +177,27 @@ export function AccountForm({ token, profile }: AccountFormProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-2">
-        <Button type="submit" disabled={isSaving}>
-          {isSaving ? 'Saving…' : 'Save changes'}
-        </Button>
-        {feedback && (
-          <p
-            className={
-              feedback.type === 'success'
-                ? 'text-sm text-muted-foreground'
-                : 'text-sm text-destructive'
-            }
-          >
-            {feedback.message}
-          </p>
-        )}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
+        <div className="mx-auto flex max-w-3xl items-center gap-3">
+          <Button type="submit" disabled={saveState.kind === 'saving'}>
+            {buttonLabel}
+          </Button>
+          {saveState.kind === 'saved' && (
+            <p className="text-sm text-muted-foreground">Changes saved</p>
+          )}
+          {saveState.kind === 'error' && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <span>{saveState.message}</span>
+              <button
+                type="button"
+                onClick={() => void submit()}
+                className="font-medium underline-offset-4 hover:underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </form>
   )

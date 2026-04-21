@@ -45,9 +45,7 @@ export default async function StaffPage() {
         </p>
       </div>
 
-      <div className="flex justify-end">
-        <StaffInviteForm />
-      </div>
+      <StaffInviteForm />
 
       <StaffTableManager rows={rows} />
     </div>

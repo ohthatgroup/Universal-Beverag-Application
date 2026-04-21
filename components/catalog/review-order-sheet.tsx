@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogPortal, DialogOverlay, DialogClose, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { X } from 'lucide-react'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { cn, formatCurrency, formatDeliveryDate } from '@/lib/utils'
 
@@ -46,46 +47,30 @@ export function ReviewOrderSheet({
   onChangeQuantity,
   onSubmit,
 }: ReviewOrderSheetProps) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onOpenChange(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onOpenChange])
-
   return (
-    <>
-      <button
-        type="button"
-        aria-hidden={!open}
-        tabIndex={-1}
-        onClick={() => onOpenChange(false)}
-        className={cn(
-          'fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity',
-          open ? 'opacity-100' : 'pointer-events-none opacity-0'
-        )}
-      />
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-hidden={!open}
-        className={cn(
-          'fixed inset-x-0 bottom-0 z-50 mx-auto h-[70vh] max-w-3xl rounded-t-md border-t bg-background shadow-xl transition-transform duration-200 ease-out md:bottom-4 md:left-4 md:right-4 md:h-[70vh] md:rounded-md md:border',
-          open ? 'translate-y-0' : 'translate-y-[calc(100%+1rem)]'
-        )}
-      >
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          className={cn(
+            'fixed z-50 flex flex-col bg-background shadow-xl outline-none',
+            // Mobile: bottom sheet (full width, pinned bottom, ~85vh)
+            'inset-x-0 bottom-0 max-h-[85vh] rounded-t-xl border-t',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
+            // Desktop: centered card
+            'sm:inset-auto sm:left-[50%] sm:top-[50%] sm:max-h-[80vh] sm:w-full sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border',
+            'sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]',
+            'sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]',
+            'sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95'
+          )}
+        >
+          <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
             <div className="min-w-0">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Review order · {formatDeliveryDate(deliveryDate)}
-              </div>
-              <div className="text-sm font-semibold">
-                {itemCount} {itemCount === 1 ? 'item' : 'items'}
-                {showPrices && <> · {formatCurrency(totalValue)}</>}
-              </div>
+              <DialogTitle className="text-base font-semibold">Review your order</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Delivery: {formatDeliveryDate(deliveryDate)}
+              </DialogDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -97,19 +82,21 @@ export function ReviewOrderSheet({
               >
                 {isResetting ? 'Resetting…' : 'Reset all'}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                aria-label="Close review"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </Button>
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  aria-label="Close review"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4">
+          <div className="flex-1 overflow-y-auto px-5 py-3">
             {items.length > 0 ? (
               <ul className="divide-y">
                 {items.map((item) => (
@@ -128,7 +115,9 @@ export function ReviewOrderSheet({
                       )}
                       <div className="flex items-center gap-3">
                         {showPrices && (
-                          <span className="text-sm font-medium">{formatCurrency(item.lineTotal)}</span>
+                          <span className="text-sm font-medium tabular-nums">
+                            {formatCurrency(item.lineTotal)}
+                          </span>
                         )}
                         <QuantitySelector
                           quantity={item.quantity}
@@ -144,27 +133,35 @@ export function ReviewOrderSheet({
             )}
           </div>
 
-          <div className="mx-auto w-full max-w-2xl space-y-3 border-t px-4 py-4">
+          <div className="space-y-3 border-t px-5 py-4">
             {error && <p className="text-xs text-destructive">{error}</p>}
             {showPrices && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total</span>
-                <span className="text-base font-semibold">{formatCurrency(totalValue)}</span>
+                <span className="text-base font-semibold tabular-nums">
+                  {formatCurrency(totalValue)}
+                </span>
               </div>
             )}
-            <Button
-              type="button"
-              variant="accent"
-              size="lg"
-              className="w-full"
-              onClick={onSubmit}
-              disabled={itemCount === 0 || isSubmitting}
-            >
-              {isSubmitting ? 'Submitting…' : 'Submit order'}
-            </Button>
+            <div className="flex items-center justify-end gap-2">
+              <DialogClose asChild>
+                <Button type="button" variant="outline" size="lg">
+                  Edit order
+                </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                variant="accent"
+                size="lg"
+                onClick={onSubmit}
+                disabled={itemCount === 0 || isSubmitting}
+              >
+                {isSubmitting ? 'Submitting…' : 'Submit order'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </aside>
-    </>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </Dialog>
   )
 }

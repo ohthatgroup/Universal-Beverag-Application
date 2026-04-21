@@ -146,31 +146,31 @@ function LoginContent() {
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center justify-center gap-6">
         <h1 className="text-2xl font-semibold">Universal Beverages</h1>
 
-        {(error || message) && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-100/60 p-3 text-sm text-amber-900">
-            {error === 'auth_callback_failed'
-              ? 'The authentication callback failed. Please try again.'
-              : error === 'profile_missing'
-                ? 'You are signed in, but this account is not linked to an admin profile.'
-                : error === 'admin_disabled'
-                  ? 'This admin account is disabled. Contact another salesman if you need access restored.'
-                : error === 'admin_only'
-                  ? 'This sign-in page is for admin access only. Customers should use their portal access link.'
-                : message}
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="rounded-md border border-green-500/30 bg-green-100/60 p-3 text-sm text-green-900">
-            {successMessage}
-          </div>
-        )}
-
         <Card className="w-full border-white/30 bg-white/60 shadow-xl backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-white/5">
           <CardHeader>
-            <CardTitle>Admin Sign In</CardTitle>
+            <CardTitle>Sign in</CardTitle>
           </CardHeader>
           <CardContent>
+            {(error || message) && (
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {error === 'auth_callback_failed'
+                  ? 'The authentication callback failed. Please try again.'
+                  : error === 'profile_missing'
+                    ? 'You are signed in, but this account is not linked to an admin profile.'
+                    : error === 'admin_disabled'
+                      ? 'This admin account is disabled. Contact another salesman if you need access restored.'
+                    : error === 'admin_only'
+                      ? 'This sign-in page is for admin access only. Customers should use their portal access link.'
+                    : message}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+                {successMessage}
+              </div>
+            )}
+
             <form className="space-y-4" onSubmit={onSalesmanLogin}>
               <div className="space-y-2">
                 <Label htmlFor="salesman-email">Email</Label>
@@ -179,6 +179,7 @@ function LoginContent() {
                   type="email"
                   autoComplete="email"
                   required
+                  disabled={isLoading || isExchangingCode}
                   value={salesmanEmail}
                   onChange={(event) => setSalesmanEmail(event.target.value)}
                 />
@@ -191,26 +192,27 @@ function LoginContent() {
                   type="password"
                   autoComplete="current-password"
                   required
+                  disabled={isLoading || isExchangingCode}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
               </div>
 
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={onForgotPassword}
+                  disabled={!authClient || isResetting || isExchangingCode}
+                  className="text-sm text-muted-foreground hover:text-foreground hover:underline disabled:opacity-50"
+                >
+                  {isResetting ? 'Sending…' : 'Forgot password?'}
+                </button>
+              </div>
+
               <Button disabled={!authClient || isLoading || isExchangingCode} type="submit" className="w-full">
-                {isLoading ? 'Signing in...' : 'Sign in'}
+                {isLoading ? 'Signing in…' : 'Sign in'}
               </Button>
             </form>
-
-            <div className="mt-3 text-center">
-              <button
-                type="button"
-                onClick={onForgotPassword}
-                disabled={!authClient || isResetting || isExchangingCode}
-                className="text-sm text-muted-foreground underline hover:text-foreground disabled:opacity-50"
-              >
-                {isResetting ? 'Sending...' : 'Forgot password?'}
-              </button>
-            </div>
           </CardContent>
         </Card>
 

@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DangerZoneDeleteCustomer } from '@/components/admin/danger-zone-delete-customer'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
@@ -74,8 +75,18 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
     redirect(`/admin/customers/${id}`)
   }
 
+  async function deleteCustomer() {
+    'use server'
+    await requirePageAuth(['salesman'])
+    const actionDb = await getRequestDb()
+    await actionDb.query('delete from profiles where id = $1', [id])
+    redirect('/admin/customers')
+  }
+
+  const businessName = customer.business_name ?? customer.contact_name ?? 'this customer'
+
   return (
-    <div className="mx-auto max-w-lg space-y-6 pt-2">
+    <div className="mx-auto max-w-lg space-y-6 pb-28 pt-2 md:pb-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Edit details</h1>
         <Link
@@ -154,8 +165,14 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
           </div>
         </section>
 
-        <Button type="submit">Save</Button>
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
+          <div className="mx-auto flex max-w-lg items-center">
+            <Button type="submit">Save changes</Button>
+          </div>
+        </div>
       </form>
+
+      <DangerZoneDeleteCustomer businessName={businessName} action={deleteCustomer} />
     </div>
   )
 }

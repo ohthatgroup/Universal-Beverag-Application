@@ -3,12 +3,6 @@
 import Link from 'next/link'
 import { UserCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 
 interface PortalTopBarProps {
@@ -26,18 +20,11 @@ export function PortalTopBar({ token, customerName }: PortalTopBarProps) {
         Universal Beverages
       </Link>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Account">
-            <UserCircle className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem asChild>
-            <Link href={`${base}/account`}>Account</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button asChild variant="ghost" size="icon" aria-label="Account">
+        <Link href={`${base}/account`}>
+          <UserCircle className="h-5 w-5" />
+        </Link>
+      </Button>
       </div>
     </header>
   )
