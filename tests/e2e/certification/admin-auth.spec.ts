@@ -4,7 +4,7 @@ import { credentials, loginWithPassword } from '../helpers/auth'
 test.describe('ST-9 admin auth certification', () => {
   test('login page renders', async ({ page }) => {
     await page.goto('/auth/login')
-    await expect(page.getByText('Admin Sign In')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Universal Beverages' })).toBeVisible()
   })
 
   test('unauthenticated user is redirected to login for admin routes', async ({ page }) => {
