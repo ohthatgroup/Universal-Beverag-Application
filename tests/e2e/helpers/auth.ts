@@ -8,10 +8,14 @@ function requireEnv(name: string): string {
   return value
 }
 
+function resolveSalesmanEmail(): string {
+  return process.env.CI_SALESMAN_EMAIL || process.env.CI_INBOX_EMAIL || 'inbox@ohthatgrp.com'
+}
+
 export function credentials(name: 'salesman' | 'customerA' | 'customerB') {
   if (name === 'salesman') {
     return {
-      email: requireEnv('CI_SALESMAN_EMAIL'),
+      email: resolveSalesmanEmail(),
       password: requireEnv('CI_SALESMAN_PASSWORD'),
     }
   }

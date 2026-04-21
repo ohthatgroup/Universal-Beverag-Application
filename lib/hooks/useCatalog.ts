@@ -8,8 +8,8 @@ export type CatalogTab = 'pallets' | 'all'
 export type GroupBy = 'brand' | 'size'
 
 export interface FilterState {
-  brandId: string | null
-  sizeFilter: string | null
+  brandIds: string[]
+  sizeFilters: string[]
   searchQuery: string
   groupBy: GroupBy
 }
@@ -30,8 +30,8 @@ export function useCatalog({
   defaultGroupBy = 'brand',
 }: UseCatalogOptions) {
   const [filters, setFilters] = useState<FilterState>({
-    brandId: null,
-    sizeFilter: null,
+    brandIds: [],
+    sizeFilters: [],
     searchQuery: '',
     groupBy: defaultGroupBy,
   })
@@ -44,10 +44,13 @@ export function useCatalog({
 
   // Step 2: Apply search + dropdowns
   const filtered = useMemo<CatalogProduct[]>(() => {
+    const brandSet = new Set(filters.brandIds)
+    const sizeSet = new Set(filters.sizeFilters)
     return tabFiltered.filter((product) => {
-      if (filters.brandId && product.brand_id !== filters.brandId) return false
+      if (brandSet.size > 0 && !brandSet.has(product.brand_id ?? '')) return false
 
-      if (filters.sizeFilter && getProductSizeLabel(product) !== filters.sizeFilter) return false
+      const sizeLabel = getProductSizeLabel(product)
+      if (sizeSet.size > 0 && !(sizeLabel && sizeSet.has(sizeLabel))) return false
 
       if (
         filters.searchQuery &&
@@ -59,9 +62,9 @@ export function useCatalog({
 
       return true
     })
-  }, [tabFiltered, filters.brandId, filters.sizeFilter, filters.searchQuery])
+  }, [tabFiltered, filters.brandIds, filters.sizeFilters, filters.searchQuery])
 
-  const isFilterActive = Boolean(filters.brandId || filters.sizeFilter)
+  const isFilterActive = filters.brandIds.length > 0 || filters.sizeFilters.length > 0
   const newItems = useMemo(() => filtered.filter((product) => product.is_new), [filtered])
   const productsForGroupedView = useMemo(
     () => (isFilterActive ? filtered : filtered.filter((product) => !product.is_new)),

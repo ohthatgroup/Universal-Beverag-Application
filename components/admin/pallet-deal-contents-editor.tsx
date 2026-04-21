@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { QuantitySelector } from '@/components/catalog/quantity-selector'
 
 type PalletType = 'single' | 'mixed'
 
@@ -110,35 +109,29 @@ export function PalletDealContentsEditor({
     }
   }
 
-  const flushPersist = (productId: string) => {
-    const pending = timersRef.current.get(productId)
-    if (pending) {
-      clearTimeout(pending)
-      timersRef.current.delete(productId)
-    }
-    void persistQuantity(productId, quantities[productId] ?? 0)
-  }
-
-  const toggleSingle = (rowId: string) => {
+  const changeSingle = (rowId: string, rawNext: number) => {
+    const next = Math.max(0, Math.min(1, Math.floor(rawNext)))
     const current = quantities[rowId] ?? 0
-    const currentlySelectedOtherIds = Object.entries(quantities)
-      .filter(([id, quantity]) => id !== rowId && quantity > 0)
-      .map(([id]) => id)
+    if (next === current) return
 
-    if (current > 0) {
+    if (next === 0) {
       setQuantities((prev) => ({ ...prev, [rowId]: 0 }))
       void persistQuantity(rowId, 0)
       return
     }
 
+    const currentlySelectedOtherIds = Object.entries(quantities)
+      .filter(([id, quantity]) => id !== rowId && quantity > 0)
+      .map(([id]) => id)
+
     setQuantities((prev) => {
-      const next = { ...prev, [rowId]: 1 }
-      for (const [id, quantity] of Object.entries(next)) {
+      const nextState = { ...prev, [rowId]: 1 }
+      for (const [id, quantity] of Object.entries(nextState)) {
         if (id !== rowId && quantity > 0) {
-          next[id] = 0
+          nextState[id] = 0
         }
       }
-      return next
+      return nextState
     })
 
     void persistUpdates([
@@ -147,11 +140,10 @@ export function PalletDealContentsEditor({
     ])
   }
 
-  const updateMixed = (rowId: string, rawValue: string) => {
-    const parsed = Number(rawValue)
-    const nextQuantity = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0
-    setQuantities((prev) => ({ ...prev, [rowId]: nextQuantity }))
-    schedulePersist(rowId, nextQuantity)
+  const changeMixed = (rowId: string, nextValue: number) => {
+    const clamped = Math.max(0, Math.floor(nextValue))
+    setQuantities((prev) => ({ ...prev, [rowId]: clamped }))
+    schedulePersist(rowId, clamped)
   }
 
   return (
@@ -173,25 +165,12 @@ export function PalletDealContentsEditor({
                 </div>
                 <div className="text-xs text-muted-foreground">{row.packLabel}</div>
               </div>
-              {palletType === 'single' ? (
-                <Button
-                  size="sm"
-                  variant={hasQuantity ? 'default' : 'outline'}
-                  onClick={() => toggleSingle(row.id)}
-                  disabled={isSaving}
-                >
-                  {hasQuantity ? 'Selected' : 'Select'}
-                </Button>
-              ) : (
-                <Input
-                  className="h-8 w-20 text-right text-xs"
-                  type="number"
-                  min="0"
-                  value={String(quantity)}
-                  onChange={(event) => updateMixed(row.id, event.target.value)}
-                  onBlur={() => flushPersist(row.id)}
-                />
-              )}
+              <QuantitySelector
+                quantity={quantity}
+                onChange={(next) =>
+                  palletType === 'single' ? changeSingle(row.id, next) : changeMixed(row.id, next)
+                }
+              />
               {isSaving ? <span className="text-xs text-muted-foreground">Saving...</span> : null}
             </div>
           )

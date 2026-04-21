@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "capture:layer1": "node scripts/capture-layer1-interactions.js",
     "prebuild": "node scripts/clean-next-types.cjs",
     "build": "next build",
     "start": "next start",

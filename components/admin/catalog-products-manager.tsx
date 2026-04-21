@@ -26,6 +26,37 @@ import { Label } from '@/components/ui/label'
 import { moveSelectedRows } from '@/lib/reorder'
 import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency, PACK_UOM_OPTIONS } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+
+type ProductLifecycle = 'discontinued' | 'active'
+
+function getLifecycle(row: { isDiscontinued: boolean }): ProductLifecycle {
+  return row.isDiscontinued ? 'discontinued' : 'active'
+}
+
+const PRODUCT_DOT_CLASSES: Record<ProductLifecycle, string> = {
+  discontinued: 'bg-red-500',
+  active: 'bg-green-500',
+}
+
+const PRODUCT_DOT_LABELS: Record<ProductLifecycle, string> = {
+  discontinued: 'Discontinued',
+  active: 'Active',
+}
+
+function ProductStatusDot({ lifecycle, className }: { lifecycle: ProductLifecycle; className?: string }) {
+  const label = PRODUCT_DOT_LABELS[lifecycle]
+  return (
+    <span
+      role="img"
+      aria-label={`Status: ${label}`}
+      title={label}
+      className={cn('inline-block h-2 w-2 shrink-0 rounded-full', PRODUCT_DOT_CLASSES[lifecycle], className)}
+    />
+  )
+}
+
+const NEW_ROW_TINT = 'bg-blue-50/70'
 
 export interface CatalogBrandOption {
   id: string
@@ -419,48 +450,60 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
         <>
           {/* Mobile list */}
           <div className="space-y-0 md:hidden">
-            {rows.map((row, index) => (
-              <div
-                key={row.id}
-                className="flex items-start gap-2 border-b py-3 last:border-0"
-              >
-                {editMode && (
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4"
-                    checked={selectedIds.has(row.id)}
-                    onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                    onClick={(event) => event.stopPropagation()}
-                    aria-label={`Select ${row.title}`}
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={(event) => onRowClick(event, row.id)}
-                  onKeyDown={(event) => onRowKeyDown(event, row.id)}
-                  className="min-w-0 flex-1 text-left"
+            {rows.map((row, index) => {
+              const lifecycle = getLifecycle(row)
+              return (
+                <div
+                  key={row.id}
+                  className={cn(
+                    'flex items-start gap-2 border-b px-2 py-3 last:border-0',
+                    row.isNew && NEW_ROW_TINT
+                  )}
                 >
-                  <div className="truncate text-sm font-medium">{row.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {row.brandName ?? 'No brand'} - {row.packLabel ?? 'N/A'}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatCurrency(row.price)} - {row.isDiscontinued ? 'Discontinued' : row.isNew ? 'New' : 'Active'}
-                  </div>
-                </button>
-                {editMode && !searchIsActive && (
-                  <ReorderArrows
-                    disabled={busy}
-                    isFirst={index === 0}
-                    isLast={index === rows.length - 1}
-                    onUp={() => moveRowBy(row.id, 'up')}
-                    onTop={() => moveRowBy(row.id, 'top')}
-                    onDown={() => moveRowBy(row.id, 'down')}
-                    onBottom={() => moveRowBy(row.id, 'bottom')}
-                  />
-                )}
-              </div>
-            ))}
+                  {editMode && (
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={selectedIds.has(row.id)}
+                      onChange={(event) => toggleSelected(row.id, event.target.checked)}
+                      onClick={(event) => event.stopPropagation()}
+                      aria-label={`Select ${row.title}`}
+                    />
+                  )}
+                  <ProductStatusDot lifecycle={lifecycle} className="mt-1.5" />
+                  <button
+                    type="button"
+                    onClick={(event) => onRowClick(event, row.id)}
+                    onKeyDown={(event) => onRowKeyDown(event, row.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div
+                      className={cn(
+                        'truncate text-sm font-medium',
+                        lifecycle === 'discontinued' && 'text-muted-foreground'
+                      )}
+                    >
+                      {row.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.brandName ?? 'No brand'} - {row.packLabel ?? 'N/A'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{formatCurrency(row.price)}</div>
+                  </button>
+                  {editMode && !searchIsActive && (
+                    <ReorderArrows
+                      disabled={busy}
+                      isFirst={index === 0}
+                      isLast={index === rows.length - 1}
+                      onUp={() => moveRowBy(row.id, 'up')}
+                      onTop={() => moveRowBy(row.id, 'top')}
+                      onDown={() => moveRowBy(row.id, 'down')}
+                      onBottom={() => moveRowBy(row.id, 'bottom')}
+                    />
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* Desktop table — no drag; arrows only in edit mode */}
@@ -479,58 +522,70 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                       />
                     </th>
                   )}
+                  <th className="w-6 px-2 py-3" aria-label="Status" />
                   <th className="px-4 py-3 text-left font-medium">Flavor / Details</th>
                   <th className="px-4 py-3 text-left font-medium">Brand</th>
                   <th className="px-4 py-3 text-left font-medium">Pack</th>
                   <th className="px-4 py-3 text-right font-medium">Price</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
                   {editMode && <th className="w-36 px-2 py-3 text-left font-medium">Order</th>}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
-                  <tr
-                    key={row.id}
-                    className={`cursor-pointer border-b last:border-0 hover:bg-muted/30 ${selectedIds.has(row.id) ? 'bg-muted/30' : ''}`}
-                    onClick={(event) => onRowClick(event, row.id)}
-                    onKeyDown={(event) => onRowKeyDown(event, row.id)}
-                    tabIndex={0}
-                    role="button"
-                  >
-                    {editMode && (
-                      <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(row.id)}
-                          onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                          aria-label={`Select ${row.title}`}
-                        />
+                {rows.map((row, index) => {
+                  const lifecycle = getLifecycle(row)
+                  return (
+                    <tr
+                      key={row.id}
+                      className={cn(
+                        'cursor-pointer border-b last:border-0 hover:bg-muted/30',
+                        row.isNew && NEW_ROW_TINT,
+                        selectedIds.has(row.id) && 'bg-muted/30'
+                      )}
+                      onClick={(event) => onRowClick(event, row.id)}
+                      onKeyDown={(event) => onRowKeyDown(event, row.id)}
+                      tabIndex={0}
+                      role="button"
+                    >
+                      {editMode && (
+                        <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(row.id)}
+                            onChange={(event) => toggleSelected(row.id, event.target.checked)}
+                            aria-label={`Select ${row.title}`}
+                          />
+                        </td>
+                      )}
+                      <td className="px-2 py-3">
+                        <ProductStatusDot lifecycle={lifecycle} />
                       </td>
-                    )}
-                    <td className="px-4 py-3 font-medium">{row.title}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.brandName ?? '-'}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.packLabel ?? '-'}</td>
-                    <td className="px-4 py-3 text-right">{formatCurrency(row.price)}</td>
-                    <td className="px-4 py-3">
-                      {row.isDiscontinued && <span className="text-xs text-muted-foreground line-through">Discontinued</span>}
-                      {!row.isDiscontinued && row.isNew && <span className="text-xs text-primary">New</span>}
-                      {!row.isDiscontinued && !row.isNew && <span className="text-xs text-muted-foreground">Active</span>}
-                    </td>
-                    {editMode && (
-                      <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
-                        <ReorderArrows
-                          disabled={busy || searchIsActive}
-                          isFirst={index === 0}
-                          isLast={index === rows.length - 1}
-                          onUp={() => moveRowBy(row.id, 'up')}
-                          onTop={() => moveRowBy(row.id, 'top')}
-                          onDown={() => moveRowBy(row.id, 'down')}
-                          onBottom={() => moveRowBy(row.id, 'bottom')}
-                        />
+                      <td
+                        className={cn(
+                          'px-4 py-3 font-medium',
+                          lifecycle === 'discontinued' && 'text-muted-foreground'
+                        )}
+                      >
+                        {row.title}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="px-4 py-3 text-muted-foreground">{row.brandName ?? '-'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{row.packLabel ?? '-'}</td>
+                      <td className="px-4 py-3 text-right">{formatCurrency(row.price)}</td>
+                      {editMode && (
+                        <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
+                          <ReorderArrows
+                            disabled={busy || searchIsActive}
+                            isFirst={index === 0}
+                            isLast={index === rows.length - 1}
+                            onUp={() => moveRowBy(row.id, 'up')}
+                            onTop={() => moveRowBy(row.id, 'top')}
+                            onDown={() => moveRowBy(row.id, 'down')}
+                            onBottom={() => moveRowBy(row.id, 'bottom')}
+                          />
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

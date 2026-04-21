@@ -1,11 +1,9 @@
 import { addDays, todayISODate } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { Money } from '@/components/ui/money'
-import { StatusChip } from '@/components/ui/status-chip'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { StatusDot } from '@/components/ui/status-dot'
 import { Separator } from '@/components/ui/separator'
+import { ReportDatePresets } from '@/components/admin/report-date-presets'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 import type { OrderStatus } from '@/lib/types'
@@ -87,21 +85,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     <div className="space-y-8">
       <PageHeader title="Reports" description="Revenue and order trends for the selected date range." />
 
-      <form className="grid gap-4 rounded-lg border p-4 md:grid-cols-[1fr_1fr_auto]">
-        <div className="space-y-2">
-          <Label htmlFor="from">From</Label>
-          <Input id="from" name="from" type="date" defaultValue={from} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="to">To</Label>
-          <Input id="to" name="to" type="date" defaultValue={to} />
-        </div>
-        <div className="flex items-end">
-          <Button type="submit" className="w-full md:w-auto">
-            Run Report
-          </Button>
-        </div>
-      </form>
+      <ReportDatePresets from={from} to={to} />
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border p-4">
@@ -125,9 +109,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           <div className="space-y-3">
             {orderRows.map((order) => (
               <div key={order.id} className="flex items-center justify-between gap-4 rounded-md border p-3">
-                <div>
+                <div className="flex items-center gap-3">
+                  <StatusDot status={order.status as OrderStatus} />
                   <div className="font-medium">{order.delivery_date}</div>
-                  <StatusChip status={order.status as OrderStatus} className="mt-1" />
                 </div>
                 <div className="text-right">
                   <Money value={Number(order.total ?? 0)} />

@@ -8,16 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency, formatDeliveryDate, todayISODate } from '@/lib/utils'
+import { StatusDot } from '@/components/ui/status-dot'
+import { StatusFilterChip } from '@/components/ui/status-filter-chip'
 import type { OrderStatus } from '@/lib/types'
 
 interface Customer {
@@ -56,49 +51,6 @@ function normalizeStatus(value: string | null): OrderStatus | 'all' {
     return value
   }
   return 'all'
-}
-
-const STATUS_VARIANT_CLASSES: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground border border-border',
-  submitted: 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
-  delivered: 'bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800',
-}
-
-function StatusPill({ status, orderId }: { status: OrderStatus; orderId: string }) {
-  const router = useRouter()
-  const [isOpen, setIsOpen] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-
-  const handleChange = async (newStatus: string) => {
-    setIsSaving(true)
-    try {
-      await fetch(`/api/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      })
-      router.refresh()
-    } finally {
-      setIsSaving(false)
-      setIsOpen(false)
-    }
-  }
-
-  return (
-    <Select open={isOpen} onOpenChange={setIsOpen} value={status} onValueChange={handleChange}>
-      <SelectTrigger
-        className={`h-7 w-auto min-w-0 gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border-0 focus:ring-0 focus:ring-offset-0 ${STATUS_VARIANT_CLASSES[status]} ${isSaving ? 'opacity-60' : ''}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent onClick={(e) => e.stopPropagation()}>
-        <SelectItem value="draft">Draft</SelectItem>
-        <SelectItem value="submitted">Submitted</SelectItem>
-        <SelectItem value="delivered">Delivered</SelectItem>
-      </SelectContent>
-    </Select>
-  )
 }
 
 function DeepLinkButton({ orderId, customerToken }: { orderId: string; customerToken: string | null }) {
@@ -211,9 +163,10 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
     left < right ? 1 : left > right ? -1 : 0
   )
 
-  const statusTabs: Array<{ label: string; value: 'all' | OrderStatus }> = [
-    { label: 'Needs review', value: 'submitted' },
+  const statusTabs: Array<{ label: string; value: OrderStatus }> = [
     { label: 'Drafts', value: 'draft' },
+    { label: 'Needs review', value: 'submitted' },
+    { label: 'Delivered', value: 'delivered' },
   ]
 
   function buildQuery(overrides: Record<string, string | undefined>) {
@@ -391,20 +344,20 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
         </div>
       </div>
 
-      {/* Status filter chips — two verbs only */}
+      {/* Status filter chips — click active chip to clear */}
       <div className="flex flex-wrap gap-2">
-        {statusTabs.map((tab) => (
-          <Button
-            key={tab.value}
-            asChild
-            size="sm"
-            variant={selectedStatus === tab.value ? 'default' : 'outline'}
-          >
-            <Link href={buildQuery({ status: tab.value !== 'all' ? tab.value : undefined })}>
-              {tab.label}
-            </Link>
-          </Button>
-        ))}
+        {statusTabs.map((tab) => {
+          const isActive = selectedStatus === tab.value
+          return (
+            <StatusFilterChip
+              key={tab.value}
+              status={tab.value}
+              label={tab.label}
+              active={isActive}
+              href={buildQuery({ status: isActive ? undefined : tab.value })}
+            />
+          )
+        })}
       </div>
 
       {selectedOrderCount > 0 && (
@@ -459,64 +412,73 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
         <p className="text-sm text-muted-foreground">No orders found.</p>
       ) : (
         <div className="space-y-6">
-          {dateGroups.map(([deliveryDate, dateOrders]) => (
-            <section key={deliveryDate} className="space-y-2">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {formatDeliveryDate(deliveryDate)}
-              </h3>
-
-              {/* Mobile cards — minimal: row is a tap target, status is a read-only pill */}
-              <ul className="divide-y rounded-xl border bg-card md:hidden">
-                {dateOrders.map((order) => {
-                  const status = asOrderStatus(order.status)
-                  return (
-                    <li key={order.id}>
-                      <Link
-                        href={orderDetailHref(order.id)}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">
-                            {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
-                          </div>
-                        </div>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_VARIANT_CLASSES[status]}`}
+          {/* Mobile cards — grouped by date */}
+          <div className="space-y-6 md:hidden">
+            {dateGroups.map(([deliveryDate, dateOrders]) => (
+              <section key={deliveryDate} className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  {formatDeliveryDate(deliveryDate)}
+                </h3>
+                <ul className="divide-y rounded-xl border bg-card">
+                  {dateOrders.map((order) => {
+                    const status = asOrderStatus(order.status)
+                    return (
+                      <li key={order.id}>
+                        <Link
+                          href={orderDetailHref(order.id)}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
                         >
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </span>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
+                          <StatusDot status={status} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">
+                              {(order.customer_id ? customerById.get(order.customer_id) : null) ?? 'Unknown customer'}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {order.item_count ?? 0} items · {formatCurrency(order.total ?? 0)}
+                            </div>
+                          </div>
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
 
-              {/* Desktop table */}
-              <div className="hidden md:block rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="w-10 px-2 py-3 text-left">
-                        <input
-                          type="checkbox"
-                          checked={allVisibleSelected}
-                          onChange={(event) => toggleSelectAllVisible(event.target.checked)}
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium">Customer</th>
-                      <th className="px-4 py-3 text-right font-medium">Items</th>
-                      <th className="px-4 py-3 text-right font-medium">Total</th>
-                      <th className="px-4 py-3 text-left font-medium">Status</th>
-                      <th className="px-4 py-3 text-right font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dateOrders.map((order) => {
-                      const checked = selectedOrderIds.has(order.id)
-                      return (
+          {/* Desktop table — single header, date separators between groups */}
+          <div className="hidden md:block rounded-lg border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="w-8 px-2 py-3 text-left" aria-label="Status" />
+                  <th className="w-10 px-2 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={(event) => toggleSelectAllVisible(event.target.checked)}
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium">Customer</th>
+                  <th className="px-4 py-3 text-right font-medium">Items</th>
+                  <th className="px-4 py-3 text-right font-medium">Total</th>
+                  <th className="px-4 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              {dateGroups.map(([deliveryDate, dateOrders]) => (
+                <tbody key={deliveryDate}>
+                  <tr className="border-b bg-muted/20">
+                    <td
+                      colSpan={6}
+                      className="px-4 py-2 text-xs font-medium text-muted-foreground"
+                    >
+                      {formatDeliveryDate(deliveryDate)}
+                    </td>
+                  </tr>
+                  {dateOrders.map((order) => {
+                    const checked = selectedOrderIds.has(order.id)
+                    const status = asOrderStatus(order.status)
+                    return (
                       <tr
                         key={order.id}
                         className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer ${checked ? 'bg-muted/30' : ''}`}
@@ -525,6 +487,9 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                           router.push(orderDetailHref(order.id))
                         }}
                       >
+                        <td className="px-2 py-3">
+                          <StatusDot status={status} />
+                        </td>
                         <td className="px-2 py-3">
                           <input
                             type="checkbox"
@@ -540,12 +505,9 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                         <td className="px-4 py-3 text-right text-muted-foreground">{order.item_count ?? 0}</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(order.total ?? 0)}</td>
                         <td className="px-4 py-3">
-                          <StatusPill status={asOrderStatus(order.status)} orderId={order.id} />
-                        </td>
-                        <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0" title="Download CSV">
-                              <a href={`/api/orders/${order.id}/csv`}>
+                              <a href={`/api/orders/${order.id}/csv`} onClick={(e) => e.stopPropagation()}>
                                 <Download className="h-3.5 w-3.5" />
                               </a>
                             </Button>
@@ -556,12 +518,12 @@ export function OrdersSection({ orders, customers, basePath }: OrdersSectionProp
                           </div>
                         </td>
                       </tr>
-                    )})}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          ))}
+                    )
+                  })}
+                </tbody>
+              ))}
+            </table>
+          </div>
         </div>
       )}
 

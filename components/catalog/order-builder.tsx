@@ -17,8 +17,8 @@ import {
 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { BrandChips, SizeChips } from '@/components/catalog/filter-chips'
-import { BrowseRow } from '@/components/catalog/browse-row'
+import { BrandChips, GroupByChips, SizeChips } from '@/components/catalog/filter-chips'
+import { BrowseListGrouped } from '@/components/catalog/browse-list-grouped'
 import { CartSummaryBar } from '@/components/catalog/cart-summary-bar'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { ReviewOrderSheet, type ReviewItem } from '@/components/catalog/review-order-sheet'
@@ -118,11 +118,23 @@ export function OrderBuilder({
 
   const usualProductIds = useMemo(() => new Set(usuals.map((u) => u.productId)), [usuals])
 
-  const browseList = useMemo(() => {
-    const all = grouped.flatMap((group) => group.products)
-    if (isFilterActive) return all
-    return all.filter((product) => !usualProductIds.has(product.id))
+  const browseGroups = useMemo(() => {
+    if (isFilterActive) return grouped
+    return grouped
+      .map((group) => ({
+        ...group,
+        products: group.products.filter((product) => !usualProductIds.has(product.id)),
+      }))
+      .filter((group) => group.products.length > 0)
   }, [grouped, isFilterActive, usualProductIds])
+
+  const browseList = useMemo(
+    () => browseGroups.flatMap((group) => group.products),
+    [browseGroups]
+  )
+
+  const hasSearchQuery = filters.searchQuery.trim().length > 0
+  const renderFlat = isFilterActive || hasSearchQuery
 
   const reviewItems = useMemo<ReviewItem[]>(() => {
     return Object.entries(quantities)
@@ -364,34 +376,48 @@ export function OrderBuilder({
               </div>
 
               <div className="space-y-2">
+                <GroupByChips
+                  groupBy={filters.groupBy}
+                  onChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
+                />
                 <SizeChips
                   sizes={availableSizes}
-                  selectedSize={filters.sizeFilter}
-                  onSelect={(sizeFilter) => setFilters((prev) => ({ ...prev, sizeFilter }))}
+                  selectedSizes={filters.sizeFilters}
+                  onToggle={(size) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      sizeFilters: prev.sizeFilters.includes(size)
+                        ? prev.sizeFilters.filter((s) => s !== size)
+                        : [...prev.sizeFilters, size],
+                    }))
+                  }
+                  onClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
                 />
                 <BrandChips
                   brands={availableBrands}
-                  selectedBrandId={filters.brandId}
-                  onSelect={(brandId) => setFilters((prev) => ({ ...prev, brandId }))}
+                  selectedBrandIds={filters.brandIds}
+                  onToggle={(brandId) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      brandIds: prev.brandIds.includes(brandId)
+                        ? prev.brandIds.filter((b) => b !== brandId)
+                        : [...prev.brandIds, brandId],
+                    }))
+                  }
+                  onClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
                 />
               </div>
 
-              {browseList.length > 0 ? (
-                <div className="divide-y rounded-md border">
-                  {browseList.map((product) => (
-                    <BrowseRow
-                      key={product.id}
-                      product={product}
-                      quantity={quantities[`product:${product.id}`] ?? 0}
-                      onChange={(next) => setProductQuantity(product, next)}
-                      showPrices={showPrices}
-                      hasPalletDeal={(productToPalletDealIds[product.id] ?? []).length > 0}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No products match your filters.</p>
-              )}
+              <BrowseListGrouped
+                groups={browseGroups}
+                groupBy={filters.groupBy}
+                flat={renderFlat}
+                flatProducts={browseList}
+                quantityFor={(product) => quantities[`product:${product.id}`] ?? 0}
+                onChange={(product, next) => setProductQuantity(product, next)}
+                showPrices={showPrices}
+                productToPalletDealIds={productToPalletDealIds}
+              />
             </section>
           )}
         </div>

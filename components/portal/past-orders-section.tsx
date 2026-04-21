@@ -15,7 +15,7 @@ export function PastOrdersSection({ token, orders, showPrices }: PastOrdersSecti
 
   return (
     <details open={defaultOpen} className="group space-y-2">
-      <summary className="flex cursor-pointer list-none items-center justify-between py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between py-1 text-sm font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
         <span>Past orders ({orders.length})</span>
         <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
       </summary>

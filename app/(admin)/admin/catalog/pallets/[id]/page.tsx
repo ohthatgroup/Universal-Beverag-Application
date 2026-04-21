@@ -164,7 +164,7 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
 
       <div className="grid gap-6 xl:grid-cols-2">
         <form action={updatePallet} className="min-w-0 space-y-4 rounded-lg border p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Settings</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">Deal settings</h2>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
@@ -192,18 +192,18 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
             </div>
           </div>
 
-          <ImageUploadField name="image_url" label="Image" folder="pallets" defaultValue={palletDeal.image_url} />
+          <ImageUploadField name="image_url" label="Image" folder="pallets" defaultValue={palletDeal.image_url} compact />
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="is_active" defaultChecked={palletDeal.is_active ?? true} className="h-4 w-4" />
+            <input type="checkbox" name="is_active" defaultChecked={palletDeal.is_active ?? true} className="h-4 w-4 accent-primary" />
             Active
           </label>
 
           <Button type="submit">Save Deal</Button>
         </form>
 
-        <div className="min-w-0 space-y-4 overflow-hidden rounded-lg border p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Deal Contents</h2>
+        <div className="min-w-0 space-y-4 rounded-lg border p-4">
+          <h2 className="text-sm font-medium text-muted-foreground">Deal contents</h2>
           <div className="space-y-2">
             <LiveQueryInput
               placeholder="Search deal items..."

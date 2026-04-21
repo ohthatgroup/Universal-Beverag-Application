@@ -6,7 +6,8 @@ import { Separator } from '@/components/ui/separator'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import { formatDeliveryDate } from '@/lib/utils'
 import { Money } from '@/components/ui/money'
-import { StatusChip } from '@/components/ui/status-chip'
+import { StatusDot } from '@/components/ui/status-dot'
+import { getStatusLabel } from '@/lib/utils'
 
 interface CustomerReadonlyLineItem {
   id: string
@@ -47,7 +48,10 @@ export function CustomerOrderReadonly({ token, order, items, showPrices }: Custo
           </Button>
           <div>
             <h1 className="text-lg font-semibold">{formatDeliveryDate(order.delivery_date)}</h1>
-            <StatusChip status={order.status} className="mt-0.5" />
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <StatusDot status={order.status} />
+              {getStatusLabel(order.status)}
+            </div>
           </div>
         </div>
 

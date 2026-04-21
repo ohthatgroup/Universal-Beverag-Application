@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Eye, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,6 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { BrandLogoSlot } from '@/components/admin/brand-logo-slot'
+import { cn } from '@/lib/utils'
 
 export interface BrandTableRow {
   id: string
@@ -59,6 +61,8 @@ function normalizeBrandApiRow(row: BrandApiRow): BrandTableRow {
 export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerProps) {
   const [rows, setRows] = useState<BrandRowState[]>(brands.map(toRowState))
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  const [rowStatus, setRowStatus] = useState<Record<string, 'saved' | 'error'>>({})
+  const [editingNameId, setEditingNameId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editMode, setEditMode] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -67,6 +71,7 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
   const [error, setError] = useState<string | null>(null)
   const [createName, setCreateName] = useState('')
   const [createLogoUrl, setCreateLogoUrl] = useState<string | null>(null)
+  const savedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const searchIsActive = searchQuery.trim().length > 0
 
@@ -87,16 +92,40 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
     )
   }
 
+  const flashSaved = (id: string) => {
+    setRowStatus((prev) => ({ ...prev, [id]: 'saved' }))
+    const existing = savedTimersRef.current.get(id)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      setRowStatus((prev) => {
+        if (prev[id] !== 'saved') return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      savedTimersRef.current.delete(id)
+    }, 1200)
+    savedTimersRef.current.set(id, timer)
+  }
+
   const saveRow = async (row: BrandRowState) => {
     if (savingIds.has(row.id)) return
 
     const name = row.draftName.trim()
     if (!name) {
-      setError('Brand name is required')
+      setRowStatus((prev) => ({ ...prev, [row.id]: 'error' }))
       return
     }
 
+    if (!isRowDirty({ ...row, draftName: name })) return
+
     setError(null)
+    setRowStatus((prev) => {
+      if (prev[row.id] !== 'error') return prev
+      const next = { ...prev }
+      delete next[row.id]
+      return next
+    })
     setSavingIds((prev) => new Set(prev).add(row.id))
     try {
       const response = await fetch(`/api/admin/brands/${row.id}`, {
@@ -122,8 +151,10 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
         draftName: saved.name,
         draftLogoUrl: saved.logoUrl,
       })
+      flashSaved(row.id)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to save brand')
+      setRowStatus((prev) => ({ ...prev, [row.id]: 'error' }))
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev)
@@ -307,58 +338,77 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
       ) : (
         <ul className="divide-y rounded-lg border bg-card">
           {rows.map((row) => {
-            const dirty = isRowDirty(row)
-            const fileUrl = row.draftLogoUrl ?? row.logoUrl
             const saving = savingIds.has(row.id)
+            const status = rowStatus[row.id]
+            const isEditing = editingNameId === row.id
 
             return (
               <li key={row.id} className="flex items-center gap-3 px-3 py-3">
-                {/* Image upload — always on the left, icon-only affordance */}
-                <ImageUpload
-                  value={row.draftLogoUrl}
-                  onChange={(value) => updateRow(row.id, { draftLogoUrl: value })}
-                  folder="brands"
-                  compact
-                  iconOnly
+                <BrandLogoSlot
+                  name={row.draftName || row.name}
+                  logoUrl={row.draftLogoUrl}
+                  editable={!editMode}
+                  onChange={(value) => {
+                    updateRow(row.id, { draftLogoUrl: value })
+                    void saveRow({ ...row, draftLogoUrl: value })
+                  }}
                 />
 
-                {/* Name input — center, wraps if needed */}
                 <div className="min-w-0 flex-1">
-                  <Input
-                    value={row.draftName}
-                    onChange={(event) => updateRow(row.id, { draftName: event.target.value })}
-                    className="h-9"
-                    aria-label="Brand name"
-                  />
+                  {isEditing ? (
+                    <Input
+                      autoFocus
+                      value={row.draftName}
+                      onChange={(event) => updateRow(row.id, { draftName: event.target.value })}
+                      onBlur={() => {
+                        setEditingNameId(null)
+                        void saveRow(row)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          ;(event.target as HTMLInputElement).blur()
+                        } else if (event.key === 'Escape') {
+                          updateRow(row.id, { draftName: row.name })
+                          setEditingNameId(null)
+                        }
+                      }}
+                      className="h-9"
+                      aria-label="Brand name"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => (editMode ? undefined : setEditingNameId(row.id))}
+                      className={cn(
+                        'block w-full truncate text-left text-sm font-medium',
+                        !editMode && 'hover:underline decoration-dotted underline-offset-4'
+                      )}
+                      disabled={editMode}
+                    >
+                      {row.draftName || row.name}
+                    </button>
+                  )}
                 </div>
 
-                {/* Icon actions: view file (eye) — delete only via bulk */}
-                {fileUrl && !editMode && (
-                  <a
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="View file"
-                    title="View file"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </a>
-                )}
+                <div className="flex min-w-[60px] items-center justify-end gap-1.5 text-xs">
+                  {saving && <span className="text-muted-foreground">Saving…</span>}
+                  {!saving && status === 'saved' && (
+                    <span className="inline-flex items-center gap-1 text-green-600">
+                      <Check className="h-3 w-3" /> Saved
+                    </span>
+                  )}
+                  {!saving && status === 'error' && (
+                    <button
+                      type="button"
+                      onClick={() => void saveRow(row)}
+                      className="inline-flex items-center gap-1 text-destructive hover:underline"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Retry
+                    </button>
+                  )}
+                </div>
 
-                {dirty && !editMode && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => saveRow(row)}
-                    disabled={saving}
-                    className="shrink-0"
-                  >
-                    {saving ? 'Saving...' : 'Save'}
-                  </Button>
-                )}
-
-                {/* Checkmark — right — only in edit mode, replaces row controls */}
                 {editMode && (
                   <input
                     type="checkbox"

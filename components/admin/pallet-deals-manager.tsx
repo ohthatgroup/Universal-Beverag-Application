@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AdminFab } from '@/components/admin/admin-fab'
 import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency } from '@/lib/utils'
 
@@ -27,7 +28,6 @@ export interface PalletDealRow {
 interface PalletDealsManagerProps {
   deals: PalletDealRow[]
   searchQuery: string
-  createAction: () => void | Promise<void>
 }
 
 interface ReorderArrowsProps {
@@ -99,12 +99,13 @@ function ReorderArrows({ onTop, onUp, onDown, onBottom, isFirst, isLast, disable
   )
 }
 
-export function PalletDealsManager({ deals, searchQuery, createAction }: PalletDealsManagerProps) {
+export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerProps) {
   const router = useRouter()
   const [rows, setRows] = useState<PalletDealRow[]>(deals)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editMode, setEditMode] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const searchIsActive = searchQuery.trim().length > 0
@@ -213,6 +214,37 @@ export function PalletDealsManager({ deals, searchQuery, createAction }: PalletD
     }
   }
 
+  const createDeal = async () => {
+    if (creating) return
+
+    setCreating(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/admin/pallet-deals', {
+        method: 'POST',
+      })
+      const payload = (await response.json().catch(() => null)) as
+        | { data?: { palletDealId?: string }; error?: { message?: string } }
+        | null
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Failed to create pallet deal')
+      }
+
+      const palletDealId = payload?.data?.palletDealId
+      if (!palletDealId) {
+        throw new Error('Pallet deal was created without an id')
+      }
+
+      router.push(`/admin/catalog/pallets/${palletDealId}`)
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Failed to create pallet deal')
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const onRowClick = (event: MouseEvent<HTMLElement>, id: string) => {
     if (editMode) return
     if (isInteractiveRowTarget(event.target)) return
@@ -229,7 +261,7 @@ export function PalletDealsManager({ deals, searchQuery, createAction }: PalletD
 
   return (
     <div className="space-y-4">
-      {/* Toolbar: pen toggles edit mode; plus creates a new pallet via server action */}
+      {/* Toolbar: pen toggles edit mode */}
       <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
@@ -247,17 +279,14 @@ export function PalletDealsManager({ deals, searchQuery, createAction }: PalletD
         >
           {editMode ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
         </Button>
-        <form action={createAction}>
-          <Button
-            type="submit"
-            size="icon"
-            aria-label="New pallet deal"
-            title="New pallet deal"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </form>
       </div>
+
+      <AdminFab
+        icon={<Plus className="h-6 w-6" />}
+        label="New pallet deal"
+        onClick={() => void createDeal()}
+        disabled={creating}
+      />
 
       {editMode && selectedCount > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">

@@ -1,7 +1,6 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { BrandsTableManager, type BrandTableRow } from '@/components/admin/brands-table-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
+import { PageHeader } from '@/components/ui/page-header'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
@@ -39,19 +38,10 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          href="/admin"
-          className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Admin
-        </Link>
-        <h1 className="text-2xl font-semibold">Brands</h1>
-        <p className="text-sm text-muted-foreground">
-          {brandRows.length} brand{brandRows.length === 1 ? '' : 's'}
-        </p>
-      </div>
+      <PageHeader
+        title="Brands"
+        description={`${brandRows.length} brand${brandRows.length === 1 ? '' : 's'}`}
+      />
 
       <LiveQueryInput
         placeholder="Search brands..."

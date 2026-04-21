@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { CustomersSearchIndex, type CustomerIndexRow } from '@/components/admin/customers-search-index'
 import { NewCustomerDialog } from '@/components/admin/new-customer-dialog'
@@ -15,6 +17,7 @@ export default async function CustomersPage() {
     contact_name: string | null
     email: string | null
     phone: string | null
+    access_token: string | null
     last_order_date: string | null
     last_order_status: string | null
   }>(
@@ -24,6 +27,7 @@ export default async function CustomersPage() {
         p.contact_name,
         p.email,
         p.phone,
+        p.access_token,
         max(o.delivery_date)::text as last_order_date,
         (select status from orders
            where customer_id = p.id
@@ -32,7 +36,7 @@ export default async function CustomersPage() {
       from profiles p
       left join orders o on o.customer_id = p.id
       where p.role = 'customer'
-      group by p.id, p.business_name, p.contact_name, p.email, p.phone
+      group by p.id, p.business_name, p.contact_name, p.email, p.phone, p.access_token
       order by p.business_name asc nulls last, p.contact_name asc nulls last, p.id asc`
   )
 
@@ -41,6 +45,7 @@ export default async function CustomersPage() {
     businessName: c.business_name ?? c.contact_name ?? 'Unnamed customer',
     email: c.email,
     phone: c.phone,
+    accessToken: c.access_token,
     lastOrderDate: c.last_order_date,
     lastOrderStatus: c.last_order_status,
   }))
@@ -69,6 +74,17 @@ export default async function CustomersPage() {
 
   return (
     <>
+      <div className="mx-auto w-full max-w-xl pt-2">
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Admin
+        </Link>
+        <h1 className="mt-1 text-2xl font-semibold">Customers</h1>
+        <p className="text-sm text-muted-foreground">{rows.length} customers</p>
+      </div>
       <CustomersSearchIndex rows={rows} recentIds={recentIds} />
       <NewCustomerDialog action={createCustomer} variant="fab" />
     </>

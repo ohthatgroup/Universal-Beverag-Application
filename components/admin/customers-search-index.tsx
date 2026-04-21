@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Search, X } from 'lucide-react'
+import { StatusDot } from '@/components/ui/status-dot'
+import type { OrderStatus } from '@/lib/types'
 
 function formatShortDate(iso: string) {
   const d = new Date(iso)
@@ -10,9 +12,21 @@ function formatShortDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function statusLabel(status: string | null) {
-  if (!status || status === 'draft') return null
+function toStatus(value: string | null): OrderStatus | null {
+  if (value === 'draft' || value === 'submitted' || value === 'delivered') return value
+  return null
+}
+
+function statusLabel(status: OrderStatus | null): string | null {
+  if (!status) return null
   return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+function formatOrderMeta(date: string | null, status: OrderStatus | null): string | null {
+  if (!date) return null
+  const datePart = formatShortDate(date)
+  const label = statusLabel(status)
+  return label ? `${datePart} · ${label}` : datePart
 }
 
 export interface CustomerIndexRow {
@@ -93,18 +107,19 @@ export function CustomersSearchIndex({ rows, recentIds = [] }: CustomersSearchIn
             </div>
             <ul className="mt-1">
               {recents.map((r) => {
-                const label = statusLabel(r.lastOrderStatus)
+                const status = toStatus(r.lastOrderStatus)
+                const meta = formatOrderMeta(r.lastOrderDate, status)
                 return (
                   <li key={r.id}>
                     <Link
                       href={`/admin/customers/${r.id}`}
-                      className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/60"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/60"
                     >
+                      {status ? <StatusDot status={status} /> : <span className="h-2 w-2 shrink-0" aria-hidden />}
                       <span className="font-medium">{r.businessName}</span>
-                      {r.lastOrderDate && (
-                        <span className="text-xs text-muted-foreground">
-                          {formatShortDate(r.lastOrderDate)}
-                          {label ? ` · ${label}` : ''}
+                      {meta && (
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          {meta}
                         </span>
                       )}
                     </Link>
@@ -157,18 +172,22 @@ export function CustomersSearchIndex({ rows, recentIds = [] }: CustomersSearchIn
               </li>
             )}
             {results.map((r) => {
-              const label = statusLabel(r.lastOrderStatus)
+              const status = toStatus(r.lastOrderStatus)
+              const meta = formatOrderMeta(r.lastOrderDate, status)
               return (
                 <li key={r.id}>
                   <Link
                     href={`/admin/customers/${r.id}`}
-                    className="flex flex-col gap-0.5 px-3 py-3 hover:bg-muted/60"
+                    className="flex items-start gap-3 px-3 py-3 hover:bg-muted/60"
                   >
-                    <span className="font-medium">{r.businessName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {r.email ?? r.phone ?? '—'}
-                      {r.lastOrderDate && ` · ${formatShortDate(r.lastOrderDate)}${label ? ` · ${label}` : ''}`}
-                    </span>
+                    {status ? <StatusDot status={status} className="mt-1.5" /> : <span className="mt-1.5 h-2 w-2 shrink-0" aria-hidden />}
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-medium">{r.businessName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {r.email ?? r.phone ?? '—'}
+                        {meta && ` · ${meta}`}
+                      </span>
+                    </div>
                   </Link>
                 </li>
               )
