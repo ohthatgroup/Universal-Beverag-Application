@@ -9,7 +9,7 @@ import type { Order } from '@/lib/types'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Money } from '@/components/ui/money'
-import { StatusChip } from '@/components/ui/status-chip'
+import { StatusDot } from '@/components/ui/status-dot'
 import {
   Dialog,
   DialogContent,
@@ -155,15 +155,15 @@ export function OrdersList({ token, orders, variant, showPrices, emptyMessage }:
 
   const renderCard = (order: Order) => (
     <div key={order.id} className="rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex items-start gap-3">
+        <StatusDot status={order.status} className="mt-1.5" />
+        <div className="min-w-0 flex-1">
           <div className="font-medium">{formatDeliveryDate(order.delivery_date)}</div>
           <div className="text-xs text-muted-foreground">
             {order.item_count} items
             {showPrices && <span> · <Money value={order.total} /></span>}
           </div>
         </div>
-        <StatusChip status={order.status} />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
