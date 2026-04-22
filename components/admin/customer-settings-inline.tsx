@@ -12,6 +12,7 @@ interface CustomerSettingsInlineProps {
   initialShowPrices: boolean
   initialCustomPricing: boolean
   initialDefaultGroup: GroupOption
+  layout?: 'stack' | 'row'
 }
 
 type FieldKey = 'showPrices' | 'customPricing' | 'defaultGroup'
@@ -22,6 +23,7 @@ export function CustomerSettingsInline({
   initialShowPrices,
   initialCustomPricing,
   initialDefaultGroup,
+  layout = 'stack',
 }: CustomerSettingsInlineProps) {
   const [showPrices, setShowPrices] = useState(initialShowPrices)
   const [customPricing, setCustomPricing] = useState(initialCustomPricing)
@@ -69,6 +71,41 @@ export function CustomerSettingsInline({
     save('defaultGroup', { defaultGroup: next }, () => setDefaultGroup(prev))
   }
 
+  if (layout === 'row') {
+    return (
+      <div className="grid grid-cols-1 divide-y rounded-xl border bg-card text-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <SettingCell
+          label="Show prices"
+          state={state.showPrices}
+          control={<Switch checked={showPrices} onCheckedChange={toggleShowPrices} aria-label="Show prices" />}
+          onRetry={() => toggleShowPrices(showPrices)}
+        />
+        <SettingCell
+          label="Custom"
+          state={state.customPricing}
+          control={<Switch checked={customPricing} onCheckedChange={toggleCustomPricing} aria-label="Custom pricing" />}
+          onRetry={() => toggleCustomPricing(customPricing)}
+        />
+        <SettingCell
+          label="Group"
+          state={state.defaultGroup}
+          control={
+            <select
+              value={defaultGroup}
+              onChange={(e) => changeGroup(e.target.value as GroupOption)}
+              className="h-8 rounded-md border bg-background px-2 text-sm"
+              aria-label="Default grouping"
+            >
+              <option value="brand">Brand</option>
+              <option value="size">Size</option>
+            </select>
+          }
+          onRetry={() => changeGroup(defaultGroup)}
+        />
+      </div>
+    )
+  }
+
   return (
     <ul className="divide-y rounded-xl border bg-card text-sm">
       <SettingRow
@@ -100,6 +137,55 @@ export function CustomerSettingsInline({
         onRetry={() => changeGroup(defaultGroup)}
       />
     </ul>
+  )
+}
+
+function SettingCell({
+  label,
+  state,
+  control,
+  onRetry,
+}: {
+  label: string
+  state: FieldState
+  control: React.ReactNode
+  onRetry: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span
+          className={cn(
+            'text-[10px] transition-opacity',
+            state === 'saved' && 'text-green-600 opacity-100',
+            state === 'saving' && 'text-muted-foreground opacity-100',
+            (state === 'idle' || state === 'error') && 'opacity-0',
+          )}
+          aria-live="polite"
+        >
+          {state === 'saving' && 'Saving…'}
+          {state === 'saved' && (
+            <span className="inline-flex items-center gap-1">
+              <Check className="h-3 w-3" /> Saved
+            </span>
+          )}
+          {state !== 'saving' && state !== 'saved' && '·'}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        {state === 'error' && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+          >
+            <RotateCcw className="h-3 w-3" /> Retry
+          </button>
+        )}
+        {control}
+      </div>
+    </div>
   )
 }
 

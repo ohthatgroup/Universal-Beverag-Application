@@ -1,8 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useTransition, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check, ChevronDown, Copy, Mail, MessageSquare, MoreVertical, Plus, RefreshCcw, Share2 } from 'lucide-react'
+import Link from 'next/link'
+import { Check, Copy, Mail, MessageSquare, MoreVertical, Pencil, Plus, RefreshCcw, Share2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -109,25 +109,54 @@ export function CustomerActionsProvider({
 }
 
 export function CustomerOverflowMenu() {
-  const router = useRouter()
-  const { customerId } = useCtx()
+  const { regenerateToken, deleteCustomer } = useCtx()
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="More actions" className="-mr-2">
-          <MoreVertical className="h-5 w-5" />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="More actions"
+          className="h-9 w-9"
+        >
+          <MoreVertical className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => router.push(`/admin/customers/${customerId}/edit`)}>
-          Edit details
+        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void regenerateToken() }}>
+          <RefreshCcw className="mr-2 h-3.5 w-3.5" />
+          Regenerate portal token
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push(`/admin/customers/${customerId}/products`)}>
-          Visibility &amp; pricing
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={(e) => { e.preventDefault(); deleteCustomer() }}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="mr-2 h-3.5 w-3.5" />
+          Delete customer
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+export function CustomerEditButton() {
+  const { customerId } = useCtx()
+  return (
+    <Button
+      asChild
+      type="button"
+      variant="outline"
+      size="icon"
+      aria-label="Edit customer details"
+      className="h-9 w-9"
+    >
+      <Link href={`/admin/customers/${customerId}/edit`}>
+        <Pencil className="h-4 w-4" />
+      </Link>
+    </Button>
   )
 }
 
@@ -158,10 +187,15 @@ export function CustomerSharePortalMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" disabled={disabled}>
-          <Share2 className="mr-1.5 h-3.5 w-3.5" />
-          Share portal
-          <ChevronDown className="ml-1 h-3.5 w-3.5" />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          disabled={disabled}
+          aria-label="Share portal link"
+          className="h-9 w-9"
+        >
+          <Share2 className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">

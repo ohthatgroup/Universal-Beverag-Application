@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { ChevronRight, Mail, MapPin, Phone } from 'lucide-react'
 import {
   CustomerActionsProvider,
+  CustomerEditButton,
   CustomerOverflowMenu,
   CustomerSharePortalMenu,
   CustomerStartOrderButton,
@@ -15,6 +16,7 @@ import {
   todayISODate,
 } from '@/lib/utils'
 import { StatusDot } from '@/components/ui/status-dot'
+import { StatCard } from '@/components/ui/stat-card'
 import { CustomerSettingsInline } from '@/components/admin/customer-settings-inline'
 import type { OrderStatus } from '@/lib/types'
 
@@ -24,7 +26,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const db = await getRequestDb()
   const today = todayISODate()
 
-  const [{ rows: customers }, { rows: orderHistory }, { rows: draftRows }] = await Promise.all([
+  const [
+    { rows: customers },
+    { rows: orderHistory },
+    { rows: draftRows },
+    { rows: statsRows },
+  ] = await Promise.all([
     db.query<{
       id: string
       business_name: string | null
@@ -67,6 +74,17 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
        limit 1`,
       [id, today]
     ),
+    db.query<{
+      count: number
+      spend: string | number | null
+      last_date: string | null
+    }>(
+      `select count(*) filter (where status != 'draft')::int as count,
+              coalesce(sum(total) filter (where status != 'draft'), 0) as spend,
+              max(delivery_date) filter (where status != 'draft')::text as last_date
+       from orders where customer_id = $1`,
+      [id]
+    ),
   ])
 
   const customer = customers[0] ?? null
@@ -75,6 +93,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const customerName = customer.business_name || customer.contact_name || 'Customer'
   const orders = orderHistory ?? []
   const todayDraftId = draftRows[0]?.id ?? null
+
+  const statRow = statsRows[0]
+  const lifetimeOrders = statRow?.count ?? 0
+  const lifetimeSpend = Number(statRow?.spend ?? 0)
+  const lastOrderDate = statRow?.last_date ?? null
+  const avgOrder = lifetimeOrders > 0 ? lifetimeSpend / lifetimeOrders : null
 
   async function startOrder() {
     'use server'
@@ -118,7 +142,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       deleteCustomerAction={deleteCustomer}
     >
       <div className="mx-auto max-w-lg space-y-6 pt-2">
-        {/* Header row: name + inline overflow */}
+        {/* Header row: name + visible secondary action icons */}
         <div>
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-2xl font-semibold leading-tight tracking-tight">
@@ -126,6 +150,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             </h1>
             <div className="flex shrink-0 items-center gap-2">
               <CustomerSharePortalMenu />
+              <CustomerEditButton />
               <CustomerOverflowMenu />
             </div>
           </div>
@@ -135,63 +160,85 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           )}
         </div>
 
-        {/* Structured contact card */}
-        {(customer.phone || customer.email || customer.address) && (
-          <ul className="divide-y rounded-xl border bg-card text-sm">
-            {customer.phone && (
-              <li>
-                <a
-                  href={`tel:${customer.phone}`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
-                >
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{customer.phone}</span>
-                </a>
-              </li>
-            )}
-            {customer.email && (
-              <li>
-                <a
-                  href={`mailto:${customer.email}`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
-                >
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span className="truncate">{customer.email}</span>
-                </a>
-              </li>
-            )}
-            {customer.address && (
-              <li className="flex items-start gap-3 px-4 py-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <span>
-                  {customer.address}
-                  {(customer.city || customer.state || customer.zip) && (
-                    <>
-                      <br />
-                      {[customer.city, customer.state].filter(Boolean).join(', ')}
-                      {customer.zip ? ` ${customer.zip}` : ''}
-                    </>
-                  )}
-                </span>
-              </li>
-            )}
-          </ul>
-        )}
+        {/* Customer details + primary action */}
+        <section className="space-y-3">
+          {(customer.phone || customer.email || customer.address) && (
+            <ul className="divide-y rounded-xl border bg-card text-sm">
+              {customer.phone && (
+                <li>
+                  <a
+                    href={`tel:${customer.phone}`}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
+                  >
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{customer.phone}</span>
+                  </a>
+                </li>
+              )}
+              {customer.email && (
+                <li>
+                  <a
+                    href={`mailto:${customer.email}`}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
+                  >
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="truncate">{customer.email}</span>
+                  </a>
+                </li>
+              )}
+              {customer.address && (
+                <li className="flex items-start gap-3 px-4 py-3">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span>
+                    {customer.address}
+                    {(customer.city || customer.state || customer.zip) && (
+                      <>
+                        <br />
+                        {[customer.city, customer.state].filter(Boolean).join(', ')}
+                        {customer.zip ? ` ${customer.zip}` : ''}
+                      </>
+                    )}
+                  </span>
+                </li>
+              )}
+            </ul>
+          )}
 
-        <CustomerStartOrderButton />
+          <CustomerStartOrderButton />
+        </section>
 
-      {/* Customer settings — inline autosave */}
-      <section className="space-y-2">
-        <h2 className="px-1 text-xs font-medium text-muted-foreground">
-          Customer settings
-        </h2>
-        <CustomerSettingsInline
-          customerId={customer.id}
-          initialShowPrices={customer.show_prices ?? true}
-          initialCustomPricing={customer.custom_pricing ?? false}
-          initialDefaultGroup={customer.default_group === 'size' ? 'size' : 'brand'}
-        />
-      </section>
+        {/* Stats grid */}
+        <section className="space-y-2">
+          <h2 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Stats
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Lifetime orders" value={lifetimeOrders} />
+            <StatCard label="Lifetime spend" value={formatCurrency(lifetimeSpend)} />
+            <StatCard
+              label="Last order"
+              value={lastOrderDate ? formatDeliveryDate(lastOrderDate) : '—'}
+            />
+            <StatCard
+              label="Average order"
+              value={avgOrder !== null ? formatCurrency(avgOrder) : '—'}
+            />
+          </div>
+        </section>
+
+        {/* Customer settings — inline autosave (row layout) */}
+        <section className="space-y-2">
+          <h2 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Customer settings
+          </h2>
+          <CustomerSettingsInline
+            customerId={customer.id}
+            initialShowPrices={customer.show_prices ?? true}
+            initialCustomPricing={customer.custom_pricing ?? false}
+            initialDefaultGroup={customer.default_group === 'size' ? 'size' : 'brand'}
+            layout="row"
+          />
+        </section>
 
       {/* Recent orders ledger */}
       <section className="space-y-2">
