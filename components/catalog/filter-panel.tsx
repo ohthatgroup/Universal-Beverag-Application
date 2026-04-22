@@ -134,7 +134,7 @@ export function FilterReveal(props: FilterPanelProps & { state: UseFilterPanelSt
   } = props
 
   const body = (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <GroupByChips groupBy={groupBy} onChange={onGroupByChange} />
       <SizeChips
         sizes={sizes}
@@ -167,13 +167,14 @@ export function FilterReveal(props: FilterPanelProps & { state: UseFilterPanelSt
       {/* Desktop slide-down */}
       <div
         className={cn(
-          'hidden sm:grid overflow-hidden transition-all duration-200 ease-out',
-          state.desktopOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+          'hidden overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out sm:block',
+          state.desktopOpen
+            ? 'max-h-[60vh] opacity-100'
+            : 'pointer-events-none max-h-0 opacity-0',
         )}
+        aria-hidden={!state.desktopOpen}
       >
-        <div className="min-h-0">
-          <div className="rounded-xl border bg-card p-4">{body}</div>
-        </div>
+        <div className="max-h-[60vh] overflow-y-auto pb-1 pt-1">{body}</div>
       </div>
     </>
   )

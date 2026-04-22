@@ -15,11 +15,11 @@ interface FacetRowProps {
 
 function FacetRow({ label, children }: FacetRowProps) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="mt-1.5 w-12 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="space-y-2 rounded-xl border bg-card p-4">
+      <span className="block text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <div className="flex flex-1 flex-wrap gap-1.5">{children}</div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   )
 }

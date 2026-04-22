@@ -58,8 +58,8 @@ export function ReviewOrderSheet({
             'inset-x-0 bottom-0 max-h-[85vh] rounded-t-xl border-t',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
-            // Desktop: centered card
-            'sm:inset-auto sm:left-[50%] sm:top-[50%] sm:max-h-[80vh] sm:w-full sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border',
+            // Desktop: centered card — 65% viewport height, auto-scrolls body
+            'sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-[65vh] sm:max-h-[65vh] sm:w-full sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border',
             'sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]',
             'sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]',
             'sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95'
@@ -143,12 +143,7 @@ export function ReviewOrderSheet({
                 </span>
               </div>
             )}
-            <div className="flex items-center justify-end gap-2">
-              <DialogClose asChild>
-                <Button type="button" variant="outline" size="lg">
-                  Edit order
-                </Button>
-              </DialogClose>
+            <div className="flex justify-end">
               <Button
                 type="button"
                 variant="accent"
