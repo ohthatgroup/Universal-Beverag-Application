@@ -31,6 +31,7 @@ vi.mock('@/lib/server/neon-auth-users', () => ({
 
 describe('invite setup', () => {
   beforeEach(() => {
+    vi.useRealTimers()
     process.env.NEON_AUTH_COOKIE_SECRET = 'x'.repeat(32)
     query.mockReset()
     signUpEmail.mockReset()
@@ -133,6 +134,54 @@ describe('invite setup', () => {
       email: 'pending@example.com',
       authUserId: 'auth-created',
     })
+  })
+
+  it('retries Neon auth lookup after signup before failing invite setup', async () => {
+    vi.useFakeTimers()
+
+    const { buildStaffInviteToken, completeStaffInviteSetup } = await import('@/lib/server/staff-invites')
+    const token = buildStaffInviteToken('pending-invite-delayed')
+
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'pending-invite-delayed',
+            profile_id: 'profile-4',
+            email: 'delayed@example.com',
+            status: 'pending',
+            token_hash: createHash('sha256').update(token).digest('hex'),
+            revoked_at: null,
+            accepted_at: null,
+            disabled_at: null,
+            contact_name: 'Delayed User',
+            business_name: null,
+            auth_user_id: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    lookupNeonAuthUserId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('auth-delayed')
+    signUpEmail.mockResolvedValueOnce({ error: null })
+    signInEmail.mockResolvedValueOnce({ error: null })
+
+    const resultPromise = completeStaffInviteSetup({
+      token,
+      password: 'Password123',
+    })
+
+    await vi.runAllTimersAsync()
+
+    await expect(resultPromise).resolves.toEqual({
+      email: 'delayed@example.com',
+      authUserId: 'auth-delayed',
+    })
+    expect(lookupNeonAuthUserId).toHaveBeenCalledTimes(3)
   })
 
   it('returns invite_account_exists for a legacy pending invite that already has an auth user', async () => {

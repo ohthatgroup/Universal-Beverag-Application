@@ -352,6 +352,19 @@ function isExistingUserError(error: { message?: string } | null | undefined) {
   return message.includes('already exists') || message.includes('already registered')
 }
 
+async function waitForInviteAuthUserId(email: string) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const authUserId = await lookupNeonAuthUserId(email)
+    if (authUserId) {
+      return authUserId
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)))
+  }
+
+  return null
+}
+
 function toInviteSetupRouteError(validation: Awaited<ReturnType<typeof validateStaffInviteToken>>) {
   if (validation.status === 'accepted') {
     return new RouteError(
@@ -410,7 +423,7 @@ async function establishInviteAuthSession(invite: PendingStaffInvite, password: 
     }
   }
 
-  const authUserId = invite.auth_user_id ?? (await lookupNeonAuthUserId(invite.email))
+  const authUserId = existingAuthUserId ?? invite.auth_user_id ?? (await waitForInviteAuthUserId(invite.email))
 
   if (!authUserId) {
     throw new RouteError(
