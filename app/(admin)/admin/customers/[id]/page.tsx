@@ -162,47 +162,45 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
         {/* Customer details + primary action */}
         <section className="space-y-3">
-          {(customer.phone || customer.email || customer.address) && (
-            <ul className="divide-y rounded-xl border bg-card text-sm">
-              {customer.phone && (
-                <li>
-                  <a
-                    href={`tel:${customer.phone}`}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
-                  >
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{customer.phone}</span>
-                  </a>
-                </li>
+          <ul className="divide-y rounded-xl border bg-card text-sm">
+            <li className="flex items-center gap-3 px-4 py-3">
+              <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+              {customer.phone ? (
+                <a href={`tel:${customer.phone}`} className="hover:underline">
+                  {customer.phone}
+                </a>
+              ) : (
+                <span className="text-muted-foreground">No phone</span>
               )}
-              {customer.email && (
-                <li>
-                  <a
-                    href={`mailto:${customer.email}`}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
-                  >
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span className="truncate">{customer.email}</span>
-                  </a>
-                </li>
+            </li>
+            <li className="flex items-center gap-3 px-4 py-3">
+              <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+              {customer.email ? (
+                <a href={`mailto:${customer.email}`} className="truncate hover:underline">
+                  {customer.email}
+                </a>
+              ) : (
+                <span className="text-muted-foreground">No email</span>
               )}
-              {customer.address && (
-                <li className="flex items-start gap-3 px-4 py-3">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span>
-                    {customer.address}
-                    {(customer.city || customer.state || customer.zip) && (
-                      <>
-                        <br />
-                        {[customer.city, customer.state].filter(Boolean).join(', ')}
-                        {customer.zip ? ` ${customer.zip}` : ''}
-                      </>
-                    )}
-                  </span>
-                </li>
+            </li>
+            <li className="flex items-start gap-3 px-4 py-3">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              {customer.address ? (
+                <span>
+                  {customer.address}
+                  {(customer.city || customer.state || customer.zip) && (
+                    <>
+                      <br />
+                      {[customer.city, customer.state].filter(Boolean).join(', ')}
+                      {customer.zip ? ` ${customer.zip}` : ''}
+                    </>
+                  )}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">No address</span>
               )}
-            </ul>
-          )}
+            </li>
+          </ul>
 
           <CustomerStartOrderButton />
         </section>

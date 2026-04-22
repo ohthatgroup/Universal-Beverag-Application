@@ -4,6 +4,12 @@ import { useState, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Download, Package2, Upload, Users } from 'lucide-react'
+import {
+  BULK_DEFINITIONS,
+  getBulkColumnsHelp,
+  type BulkDefinition,
+  type BulkKind,
+} from '@/lib/admin/bulk-transfer'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -17,9 +23,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { buildCsv } from '@/lib/utils'
-
-type ImportKind = 'customers' | 'products'
 
 interface ImportOutcome {
   createdCount: number
@@ -28,98 +31,62 @@ interface ImportOutcome {
   errors?: Array<{ lineNumber: number; message: string }>
 }
 
-const IMPORT_CONFIG: Record<
-  ImportKind,
-  {
-    title: string
-    description: string
-    apiPath: string
-    filename: string
-    headers: string[]
-    sampleRows: Array<Record<string, string | number | boolean | null>>
-    columnsHelp: string
-    hint: string
-    reviewHref: string
-    reviewLabel: string
-    icon: typeof Users
-  }
-> = {
-  customers: {
-    title: 'Bulk upload customers',
-    description: 'Create customer profiles and portal access links from a CSV or TSV file.',
-    apiPath: '/api/admin/customers/import',
-    filename: 'customer-import-template.csv',
-    headers: ['businessName', 'email', 'contactName', 'phone', 'address', 'city', 'state', 'zip'],
-    sampleRows: [
-      {
-        businessName: 'Corner Deli',
-        email: 'owner@cornerdeli.com',
-        contactName: 'Maya Ortiz',
-        phone: '555-0101',
-        address: '123 Main St',
-        city: 'Brooklyn',
-        state: 'NY',
-        zip: '11201',
-      },
-    ],
-    columnsHelp: 'Required: businessName, email. Optional: contactName, phone, address, city, state, zip.',
-    hint: 'Each imported customer gets a portal profile and access link automatically.',
-    reviewHref: '/admin/customers',
-    reviewLabel: 'Review customers',
-    icon: Users,
-  },
-  products: {
-    title: 'Bulk upload products',
-    description: 'Add catalog products in one pass. Missing brands are created automatically.',
-    apiPath: '/api/admin/products/import',
-    filename: 'product-import-template.csv',
-    headers: ['title', 'brandName', 'price', 'packDetails', 'packCount', 'sizeValue', 'sizeUom', 'imageUrl', 'isNew'],
-    sampleRows: [
-      {
-        title: 'Lemon Lime Soda',
-        brandName: 'Universal Beverages',
-        price: 24.5,
-        packDetails: '24/12 OZ',
-        packCount: 24,
-        sizeValue: 12,
-        sizeUom: 'OZ',
-        imageUrl: '',
-        isNew: false,
-      },
-    ],
-    columnsHelp:
-      'Required: title, price. Optional: brandName, packDetails, imageUrl, isNew. Structured pack fields require packCount + sizeValue + sizeUom together.',
-    hint: 'Supported size units: OZ, ML, LITER, LITERS, GALLON, GALLONS, CT, ROLL, ROLLS.',
-    reviewHref: '/admin/catalog',
-    reviewLabel: 'Review catalog',
-    icon: Package2,
-  },
+const BULK_ICONS: Record<BulkKind, typeof Users> = {
+  customers: Users,
+  products: Package2,
 }
 
-function downloadTemplate(kind: ImportKind) {
-  const config = IMPORT_CONFIG[kind]
-  const csv = buildCsv(config.sampleRows, config.headers)
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
+function extractFilename(disposition: string | null, fallback: string) {
+  if (!disposition) return fallback
+
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+
+  const asciiMatch = disposition.match(/filename="?([^";]+)"?/i)
+  return asciiMatch?.[1] ?? fallback
+}
+
+async function downloadCsv(url: string, fallbackFilename: string) {
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'same-origin',
+  })
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null
+    throw new Error(payload?.error?.message ?? 'Download failed')
+  }
+
+  const blob = await response.blob()
+  const blobUrl = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = config.filename
+  anchor.href = blobUrl
+  anchor.download = extractFilename(
+    response.headers.get('content-disposition'),
+    fallbackFilename
+  )
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  URL.revokeObjectURL(url)
+  URL.revokeObjectURL(blobUrl)
 }
 
 export function BulkUploadPanel() {
   const router = useRouter()
-  const [activeKind, setActiveKind] = useState<ImportKind | null>(null)
+  const [activeKind, setActiveKind] = useState<BulkKind | null>(null)
   const [rawText, setRawText] = useState('')
   const [loadedFileName, setLoadedFileName] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null)
 
-  const activeConfig = activeKind ? IMPORT_CONFIG[activeKind] : null
+  const activeDefinition = activeKind ? BULK_DEFINITIONS[activeKind] : null
 
   const resetDialog = () => {
     setRawText('')
@@ -154,7 +121,7 @@ export function BulkUploadPanel() {
   }
 
   const handleImport = async () => {
-    if (!activeConfig || !rawText.trim()) {
+    if (!activeKind || !activeDefinition || !rawText.trim()) {
       setSubmitError('Paste CSV/TSV data or choose a file first.')
       return
     }
@@ -164,7 +131,7 @@ export function BulkUploadPanel() {
     setOutcome(null)
 
     try {
-      const response = await fetch(activeConfig.apiPath, {
+      const response = await fetch(`/api/admin/${activeKind}/import`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -191,20 +158,50 @@ export function BulkUploadPanel() {
     }
   }
 
+  const handleDownload = async (kind: BulkKind, mode: 'template' | 'export') => {
+    const definition = BULK_DEFINITIONS[kind]
+    const key = `${kind}:${mode}`
+    setDownloadError(null)
+    setDownloadingKey(key)
+
+    try {
+      await downloadCsv(
+        mode === 'template'
+          ? `/api/admin/${kind}/export?mode=template`
+          : `/api/admin/${kind}/export`,
+        mode === 'template'
+          ? definition.templateFilename
+          : `${definition.exportFilenamePrefix}.csv`
+      )
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : 'Download failed')
+    } finally {
+      setDownloadingKey(null)
+    }
+  }
+
   return (
     <>
       <div className="space-y-3">
         <div>
-          <h2 className="text-lg font-semibold">Bulk Upload</h2>
+          <h2 className="text-lg font-semibold">Bulk Tools</h2>
           <p className="text-sm text-muted-foreground">
-            Upload CSV or TSV files directly from the admin landing page.
+            Export live data, download form-matched templates, or import CSV and TSV rows directly
+            from the admin landing page.
           </p>
         </div>
 
+        {downloadError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {downloadError}
+          </div>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2">
-          {(Object.entries(IMPORT_CONFIG) as Array<[ImportKind, (typeof IMPORT_CONFIG)[ImportKind]]>).map(
-            ([kind, config]) => {
-              const Icon = config.icon
+          {(Object.entries(BULK_DEFINITIONS) as Array<[BulkKind, BulkDefinition]>).map(
+            ([kind, definition]) => {
+              const Icon = BULK_ICONS[kind]
+              const fieldKeys = definition.fields.map((field) => field.key).join(', ')
 
               return (
                 <Card key={kind}>
@@ -213,20 +210,39 @@ export function BulkUploadPanel() {
                       <span className="rounded-md bg-muted p-2 text-muted-foreground">
                         <Icon className="h-4 w-4" />
                       </span>
-                      <CardTitle className="text-base">{config.title}</CardTitle>
+                      <CardTitle className="text-base">{definition.title}</CardTitle>
                     </div>
-                    <CardDescription>{config.description}</CardDescription>
+                    <CardDescription>{definition.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <p className="text-xs text-muted-foreground">{config.columnsHelp}</p>
+                    <p className="text-xs text-muted-foreground">{getBulkColumnsHelp(kind)}</p>
+                    <p className="rounded-md border bg-muted/30 px-2 py-2 font-mono text-[11px] text-muted-foreground">
+                      {fieldKeys}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       <Button type="button" size="sm" onClick={() => setActiveKind(kind)}>
                         <Upload className="mr-1.5 h-4 w-4" />
                         Upload
                       </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => downloadTemplate(kind)}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleDownload(kind, 'template')}
+                        disabled={downloadingKey !== null}
+                      >
                         <Download className="mr-1.5 h-4 w-4" />
-                        Template
+                        {downloadingKey === `${kind}:template` ? 'Downloading...' : 'Template'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleDownload(kind, 'export')}
+                        disabled={downloadingKey !== null}
+                      >
+                        <Download className="mr-1.5 h-4 w-4" />
+                        {downloadingKey === `${kind}:export` ? 'Downloading...' : 'Export'}
                       </Button>
                     </div>
                   </CardContent>
@@ -240,13 +256,11 @@ export function BulkUploadPanel() {
       <Dialog open={activeKind !== null} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{activeConfig?.title}</DialogTitle>
-            <DialogDescription>
-              {activeConfig?.hint}
-            </DialogDescription>
+            <DialogTitle>{activeDefinition?.title}</DialogTitle>
+            <DialogDescription>{activeDefinition?.hint}</DialogDescription>
           </DialogHeader>
 
-          {activeConfig && (
+          {activeKind && activeDefinition && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="bulk-upload-file">CSV or TSV file</Label>
@@ -267,10 +281,22 @@ export function BulkUploadPanel() {
                   id="bulk-upload-text"
                   value={rawText}
                   onChange={(event) => setRawText(event.target.value)}
-                  placeholder={activeConfig.headers.join(',')}
+                  placeholder={activeDefinition.fields.map((field) => field.key).join(',')}
                   className="min-h-[220px] font-mono text-xs"
                 />
-                <p className="text-xs text-muted-foreground">{activeConfig.columnsHelp}</p>
+                <p className="text-xs text-muted-foreground">{getBulkColumnsHelp(activeKind)}</p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {activeDefinition.fields.map((field) => (
+                  <div key={field.key} className="rounded-md border bg-muted/20 px-3 py-2 text-xs">
+                    <div className="font-mono font-medium">
+                      {field.key}
+                      {field.requiredOnImport ? ' *' : ''}
+                    </div>
+                    <div className="mt-1 text-muted-foreground">{field.description}</div>
+                  </div>
+                ))}
               </div>
 
               {submitError && (
@@ -283,11 +309,14 @@ export function BulkUploadPanel() {
                 <div className="space-y-2 rounded-md border bg-muted/30 px-3 py-3 text-sm">
                   <p className="font-medium">
                     Imported {outcome.createdCount} row{outcome.createdCount === 1 ? '' : 's'}.
-                    {outcome.failedCount > 0 ? ` ${outcome.failedCount} row${outcome.failedCount === 1 ? '' : 's'} failed.` : ''}
+                    {outcome.failedCount > 0
+                      ? ` ${outcome.failedCount} row${outcome.failedCount === 1 ? '' : 's'} failed.`
+                      : ''}
                   </p>
                   {typeof outcome.createdBrandCount === 'number' && outcome.createdBrandCount > 0 && (
                     <p className="text-muted-foreground">
-                      Created {outcome.createdBrandCount} new brand{outcome.createdBrandCount === 1 ? '' : 's'}.
+                      Created {outcome.createdBrandCount} new brand
+                      {outcome.createdBrandCount === 1 ? '' : 's'}.
                     </p>
                   )}
                   {outcome.errors && outcome.errors.length > 0 && (
@@ -300,10 +329,10 @@ export function BulkUploadPanel() {
                     </ul>
                   )}
                   <Link
-                    href={activeConfig.reviewHref}
+                    href={activeDefinition.reviewHref}
                     className="inline-flex text-sm text-primary underline-offset-4 hover:underline"
                   >
-                    {activeConfig.reviewLabel}
+                    {activeDefinition.reviewLabel}
                   </Link>
                 </div>
               )}
@@ -321,7 +350,7 @@ export function BulkUploadPanel() {
             </Button>
             {activeKind && (
               <Button type="button" onClick={handleImport} disabled={submitting}>
-                {submitting ? 'Importing...' : `Import ${IMPORT_CONFIG[activeKind].title.replace('Bulk upload ', '')}`}
+                {submitting ? 'Importing...' : `Import ${activeKind}`}
               </Button>
             )}
           </DialogFooter>

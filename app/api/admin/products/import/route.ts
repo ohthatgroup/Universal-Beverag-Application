@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getBulkField, readBulkColumn, normalizeBulkColumnKey } from '@/lib/admin/bulk-transfer'
 import { parseDelimitedData } from '@/lib/delimited'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
@@ -11,20 +12,6 @@ const importSchema = z.object({
 
 const MAX_IMPORT_ROWS = 500
 const MAX_RETURNED_ERRORS = 25
-
-function normalizeColumnKey(value: string) {
-  return value.replace(/[\s_-]+/g, '').toLowerCase()
-}
-
-function readColumn(row: Record<string, string>, aliases: string[]) {
-  const aliasSet = new Set(aliases.map(normalizeColumnKey))
-  for (const [key, value] of Object.entries(row)) {
-    if (aliasSet.has(normalizeColumnKey(key))) {
-      return value.trim()
-    }
-  }
-  return ''
-}
 
 function toNullable(value: string) {
   const trimmed = value.trim()
@@ -46,12 +33,37 @@ function parseOptionalPositiveNumber(value: string, fieldName: string) {
   return parsePositiveNumber(trimmed, fieldName)
 }
 
+function parseOptionalPositiveInteger(value: string, fieldName: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const parsed = parsePositiveNumber(trimmed, fieldName)
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${fieldName} must be a whole number`)
+  }
+  return parsed
+}
+
 function parseBooleanFlag(value: string) {
   const normalized = value.trim().toLowerCase()
   if (!normalized) return false
   if (['1', 'true', 'yes', 'y'].includes(normalized)) return true
   if (['0', 'false', 'no', 'n'].includes(normalized)) return false
   throw new Error('isNew must be one of: true, false, yes, no, 1, 0')
+}
+
+function parseBooleanFlagForField(value: string, fieldKey: string) {
+  try {
+    return parseBooleanFlag(value)
+  } catch {
+    throw new Error(`${fieldKey} must be one of: true, false, yes, no, 1, 0`)
+  }
+}
+
+function parseTags(value: string) {
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
 }
 
 export async function POST(request: Request) {
@@ -81,7 +93,7 @@ export async function POST(request: Request) {
     )
 
     const brandIdByName = new Map(
-      brandRows.map((brand) => [normalizeColumnKey(brand.name), brand.id])
+      brandRows.map((brand) => [normalizeBulkColumnKey(brand.name), brand.id])
     )
     let nextSortOrder = Number(sortRows[0]?.next_sort_order ?? 0)
     let createdCount = 0
@@ -91,30 +103,38 @@ export async function POST(request: Request) {
 
     for (const record of parsed.records) {
       try {
-        const title = readColumn(record.values, ['title', 'product', 'productName', 'name'])
+        const title = readBulkColumn(record.values, getBulkField('products', 'title'))
         if (!title) {
           throw new Error('title is required')
         }
 
         const price = parsePositiveNumber(
-          readColumn(record.values, ['price', 'unitPrice', 'unit_price']),
+          readBulkColumn(record.values, getBulkField('products', 'price')),
           'price'
         )
-        const brandName = toNullable(readColumn(record.values, ['brand', 'brandName', 'brand_name']))
+        const brandName = toNullable(readBulkColumn(record.values, getBulkField('products', 'brand_name')))
         const packDetails = toNullable(
-          readColumn(record.values, ['packDetails', 'pack_details', 'pack', 'packLabel'])
+          readBulkColumn(record.values, getBulkField('products', 'pack_details'))
         )
-        const packCount = parseOptionalPositiveNumber(
-          readColumn(record.values, ['packCount', 'pack_count', 'caseCount']),
+        const packCount = parseOptionalPositiveInteger(
+          readBulkColumn(record.values, getBulkField('products', 'pack_count')),
           'packCount'
         )
         const sizeValue = parseOptionalPositiveNumber(
-          readColumn(record.values, ['sizeValue', 'size_value', 'size']),
+          readBulkColumn(record.values, getBulkField('products', 'size_value')),
           'sizeValue'
         )
-        const sizeUomRaw = toNullable(readColumn(record.values, ['sizeUom', 'size_uom', 'uom', 'unit']))
-        const imageUrl = toNullable(readColumn(record.values, ['imageUrl', 'image_url', 'image']))
-        const isNew = parseBooleanFlag(readColumn(record.values, ['isNew', 'is_new', 'new']))
+        const sizeUomRaw = toNullable(readBulkColumn(record.values, getBulkField('products', 'size_uom')))
+        const imageUrl = toNullable(readBulkColumn(record.values, getBulkField('products', 'image_url')))
+        const tags = parseTags(readBulkColumn(record.values, getBulkField('products', 'tags')))
+        const isNew = parseBooleanFlagForField(
+          readBulkColumn(record.values, getBulkField('products', 'is_new')),
+          'is_new'
+        )
+        const isDiscontinued = parseBooleanFlagForField(
+          readBulkColumn(record.values, getBulkField('products', 'is_discontinued')),
+          'is_discontinued'
+        )
 
         const hasStructuredInput = packCount !== null || sizeValue !== null || sizeUomRaw !== null
         if (hasStructuredInput && (packCount === null || sizeValue === null || sizeUomRaw === null)) {
@@ -128,7 +148,7 @@ export async function POST(request: Request) {
 
         let brandId: string | null = null
         if (brandName) {
-          const normalizedBrandName = normalizeColumnKey(brandName)
+          const normalizedBrandName = normalizeBulkColumnKey(brandName)
           brandId = brandIdByName.get(normalizedBrandName) ?? null
 
           if (!brandId) {
@@ -154,9 +174,9 @@ export async function POST(request: Request) {
 
         await db.query(
           `insert into products (
-             brand_id, customer_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, is_new, is_discontinued, sort_order
+             brand_id, customer_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, tags, is_new, is_discontinued, sort_order
            ) values (
-             $1, null, $2, $3, $4, $5, $6, $7, $8, $9, false, $10
+             $1, null, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
            )`,
           [
             brandId,
@@ -167,7 +187,9 @@ export async function POST(request: Request) {
             sizeUom,
             price,
             imageUrl,
+            tags.length > 0 ? tags : null,
             isNew,
+            isDiscontinued,
             nextSortOrder,
           ]
         )

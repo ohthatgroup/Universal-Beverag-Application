@@ -81,13 +81,13 @@ export function CustomerSettingsInline({
           onRetry={() => toggleShowPrices(showPrices)}
         />
         <SettingCell
-          label="Custom"
+          label="Custom pricing"
           state={state.customPricing}
           control={<Switch checked={customPricing} onCheckedChange={toggleCustomPricing} aria-label="Custom pricing" />}
           onRetry={() => toggleCustomPricing(customPricing)}
         />
         <SettingCell
-          label="Group"
+          label="Grouping"
           state={state.defaultGroup}
           control={
             <select
@@ -152,29 +152,24 @@ function SettingCell({
   onRetry: () => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3">
-      <div className="flex min-w-0 flex-col">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+    <div className="flex flex-col items-center gap-2 px-4 py-3 text-center">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </span>
         <span
           className={cn(
-            'text-[10px] transition-opacity',
-            state === 'saved' && 'text-green-600 opacity-100',
-            state === 'saving' && 'text-muted-foreground opacity-100',
-            (state === 'idle' || state === 'error') && 'opacity-0',
+            'inline-flex h-3 w-3 items-center justify-center transition-opacity',
+            state === 'saved' ? 'text-green-600 opacity-100' : 'opacity-0',
           )}
           aria-live="polite"
+          aria-label={state === 'saved' ? 'Saved' : undefined}
         >
-          {state === 'saving' && 'Saving…'}
-          {state === 'saved' && (
-            <span className="inline-flex items-center gap-1">
-              <Check className="h-3 w-3" /> Saved
-            </span>
-          )}
-          {state !== 'saving' && state !== 'saved' && '·'}
+          {state === 'saved' && <Check className="h-3 w-3" />}
         </span>
       </div>
-      <div className="flex items-center gap-2">
-        {state === 'error' && (
+      <div className="flex h-8 items-center justify-center">
+        {state === 'error' ? (
           <button
             type="button"
             onClick={onRetry}
@@ -182,8 +177,9 @@ function SettingCell({
           >
             <RotateCcw className="h-3 w-3" /> Retry
           </button>
+        ) : (
+          control
         )}
-        {control}
       </div>
     </div>
   )
