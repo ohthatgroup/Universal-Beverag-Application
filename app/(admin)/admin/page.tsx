@@ -1,14 +1,13 @@
 import Link from 'next/link'
 import { ChevronRight, LogOut } from 'lucide-react'
 import { redirect } from 'next/navigation'
+import { getAuth } from '@/lib/auth/server'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
-import { createClient } from '@/lib/supabase/server'
 
 async function signOut() {
   'use server'
-  const supabase = await createClient()
-  await supabase.auth.signOut()
+  await getAuth().signOut()
   redirect('/auth/login')
 }
 
