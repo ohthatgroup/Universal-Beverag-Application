@@ -132,10 +132,24 @@ export function FilterTriggerAnchored(
   } = props
 
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  // Track viewport so the portaled mobile Sheet only activates on <sm. The
+  // Sheet's full-screen overlay would otherwise block all interaction on
+  // desktop because `sm:hidden` on content doesn't suppress the portaled
+  // overlay's click capture.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(min-width: 640px)')
+    const update = () => setIsDesktop(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [])
 
   // Close desktop drawer on outside click or Escape.
   useEffect(() => {
-    if (!state.open) return
+    if (!state.open || !isDesktop) return
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node | null
       if (target && wrapperRef.current && !wrapperRef.current.contains(target)) {
@@ -151,7 +165,7 @@ export function FilterTriggerAnchored(
       document.removeEventListener('mousedown', onPointerDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [state])
+  }, [state, isDesktop])
 
   const body = (
     <div className="space-y-4">
@@ -189,18 +203,21 @@ export function FilterTriggerAnchored(
         <div className="max-h-[60vh] overflow-y-auto p-4">{body}</div>
       </div>
 
-      {/* Mobile sheet overlay */}
-      <Sheet open={state.open} onOpenChange={state.setOpen}>
-        <SheetContent
-          side="right"
-          className="w-full max-w-sm overflow-y-auto p-4 sm:hidden"
-        >
-          <SheetHeader className="mb-4">
-            <SheetTitle>Filters</SheetTitle>
-          </SheetHeader>
-          {body}
-        </SheetContent>
-      </Sheet>
+      {/* Mobile sheet overlay — only rendered on <sm to avoid the Radix
+          portal's full-screen overlay swallowing clicks on desktop. */}
+      {!isDesktop && (
+        <Sheet open={state.open} onOpenChange={state.setOpen}>
+          <SheetContent
+            side="right"
+            className="w-full max-w-sm overflow-y-auto p-4"
+          >
+            <SheetHeader className="mb-4">
+              <SheetTitle>Filters</SheetTitle>
+            </SheetHeader>
+            {body}
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   )
 }

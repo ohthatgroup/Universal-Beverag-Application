@@ -143,6 +143,10 @@ export default async function AdminOrderDetailPage({
     price: Number(product.price ?? 0),
   }))
   const previouslyOrderedIds = priorOrdered.map((row) => row.product_id)
+  const currentQuantities: Record<string, number> = {}
+  for (const item of orderItems) {
+    if (item.product_id) currentQuantities[item.product_id] = item.quantity
+  }
 
   const customerName = customer?.business_name || customer?.contact_name || 'Unknown customer'
 
@@ -235,6 +239,7 @@ export default async function AdminOrderDetailPage({
             triggerLabel="Add"
             products={pickerProducts}
             previouslyOrderedIds={previouslyOrderedIds}
+            currentQuantities={currentQuantities}
             defaultGroupBy={customer?.default_group === 'size' ? 'size' : 'brand'}
           />
         ) : null

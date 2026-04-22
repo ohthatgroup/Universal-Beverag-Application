@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Search, Sparkles } from 'lucide-react'
 import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
 import { useCatalog } from '@/lib/hooks/useCatalog'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import type { CatalogProduct, GroupByOption, PalletDeal } from '@/lib/types'
 import type { Usual } from '@/lib/server/portal-usuals'
 import {
+  cn,
   formatCurrency,
   formatDeliveryDate,
   getProductDisplayName,
@@ -73,8 +74,8 @@ export function OrderBuilder({
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
-  const [palletsExpanded, setPalletsExpanded] = useState(false)
   const [palletDetailId, setPalletDetailId] = useState<string | null>(null)
+  const [palletsExpanded, setPalletsExpanded] = useState(true)
 
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {}
@@ -266,58 +267,78 @@ export function OrderBuilder({
       </header>
 
       {palletDeals.length > 0 && (
-        <div className="border-y py-2 text-sm">
+        <section className="space-y-2">
           <button
             type="button"
             onClick={() => setPalletsExpanded((p) => !p)}
-            className="flex w-full items-center justify-between text-left text-muted-foreground hover:text-foreground"
+            aria-expanded={palletsExpanded}
+            className="flex w-full items-center justify-between gap-2 px-1"
           >
-            <span>
-              {palletDeals.length} pallet {palletDeals.length === 1 ? 'deal' : 'deals'} available
+            <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-accent" />
+              Deals
+              <span className="ml-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-accent">
+                {palletDeals.length}
+              </span>
             </span>
-            <span className="text-xs">{palletsExpanded ? 'Hide' : 'View'}</span>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              {palletsExpanded ? 'Hide' : 'Show'}
+              <ChevronDown
+                className={cn(
+                  'h-3.5 w-3.5 transition-transform',
+                  palletsExpanded && 'rotate-180',
+                )}
+              />
+            </span>
           </button>
-          {palletsExpanded && (
-            <div className="mt-3 divide-y rounded-md border">
-              {palletDeals.map((deal) => {
-                const qty = quantities[`pallet:${deal.id}`] ?? 0
-                const isSingle = deal.pallet_type === 'single'
-                return (
-                  <div key={deal.id} className="flex items-center gap-3 px-3 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => setPalletDetailId(deal.id)}
-                        className="text-sm font-medium text-primary underline underline-offset-4 hover:no-underline"
-                      >
-                        {deal.title}
-                      </button>
-                      <div className="text-xs text-muted-foreground">
-                        {deal.savings_text}
-                        {showPrices && <> · {formatCurrency(deal.price)}</>}
+          <div
+            className={cn(
+              'grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out',
+              palletsExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+            )}
+            aria-hidden={!palletsExpanded}
+          >
+            <div className="min-h-0">
+              <ul className="divide-y rounded-xl border bg-card">
+                {palletDeals.map((deal) => {
+                  const qty = quantities[`pallet:${deal.id}`] ?? 0
+                  return (
+                    <li key={deal.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setPalletDetailId(deal.id)}
+                          className="text-sm font-medium text-primary underline underline-offset-4 hover:no-underline"
+                        >
+                          {deal.title}
+                        </button>
+                        <div className="text-xs text-muted-foreground">
+                          {deal.savings_text}
+                          {showPrices && <> · {formatCurrency(deal.price)}</>}
+                        </div>
                       </div>
-                    </div>
-                    {isSingle ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={qty > 0 ? 'default' : 'outline'}
-                        onClick={() => setPalletQuantity(deal, qty > 0 ? 0 : 1)}
-                      >
-                        {qty > 0 ? 'Added' : 'Add'}
-                      </Button>
-                    ) : (
-                      <QuantitySelector
-                        quantity={qty}
-                        onChange={(next) => setPalletQuantity(deal, next)}
-                      />
-                    )}
-                  </div>
-                )
-              })}
+                      {qty === 0 ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setPalletQuantity(deal, 1)}
+                        >
+                          Add
+                        </Button>
+                      ) : (
+                        <QuantitySelector
+                          quantity={qty}
+                          onChange={(next) => setPalletQuantity(deal, next)}
+                        />
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
             </div>
-          )}
-        </div>
+          </div>
+        </section>
       )}
 
       <div className="pt-4">

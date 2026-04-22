@@ -13,7 +13,6 @@ import {
   MoreVertical,
   Plus,
   Share2,
-  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -341,14 +340,6 @@ function AdminOrderLine({ item }: { item: AdminOrderEditorItem }) {
         )}
       </div>
 
-      <button
-        type="button"
-        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-        aria-label="Remove line"
-        title="Remove this line (TODO: wire to DELETE endpoint)"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
     </div>
   )
 }

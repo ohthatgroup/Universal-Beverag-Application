@@ -47,7 +47,9 @@
       "Bash(npm test *)",
       "mcp__Claude_Preview__preview_start",
       "Bash(export DATABASE_URL='postgresql://neondb_owner:npg_a8Xp0yZdNOVS@ep-proud-violet-ammybwuo.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require')",
-      "Bash(curl -sf http://localhost:3000/portal/7bac9d11b8a3dc5205ac2508eab9b87d -o /dev/null)"
+      "Bash(curl -sf http://localhost:3000/portal/7bac9d11b8a3dc5205ac2508eab9b87d -o /dev/null)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(taskkill //F //IM node.exe)"
     ]
   }
 }

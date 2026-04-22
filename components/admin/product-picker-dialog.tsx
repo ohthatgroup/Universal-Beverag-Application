@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import {
   FilterTriggerAnchored,
   useFilterPanelState,
 } from '@/components/catalog/filter-panel'
+import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import type { Brand } from '@/lib/types'
 import { cn, formatCurrency } from '@/lib/utils'
 
@@ -31,6 +32,12 @@ interface ProductPickerDialogProps {
   triggerLabel: string
   products: PickerProduct[]
   previouslyOrderedIds?: string[]
+  /**
+   * Current quantity in the order keyed by product id. When > 0 the picker
+   * row swaps its "Add" button for a QuantitySelector so the salesman can
+   * adjust without leaving the dialog.
+   */
+  currentQuantities?: Record<string, number>
   triggerVariant?: 'default' | 'outline' | 'ghost'
   triggerSize?: 'sm' | 'default'
   defaultGroupBy?: 'brand' | 'size'
@@ -43,6 +50,7 @@ export function ProductPickerDialog({
   triggerLabel,
   products,
   previouslyOrderedIds = [],
+  currentQuantities = {},
   triggerVariant = 'default',
   triggerSize = 'sm',
   defaultGroupBy = 'brand',
@@ -56,6 +64,31 @@ export function ProductPickerDialog({
   const [groupBy, setGroupBy] = useState<'brand' | 'size'>(defaultGroupBy)
   const [isAddingId, setIsAddingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Optimistic override for quantities mutated inside the dialog so the UI
+  // swaps Add → QuantitySelector immediately instead of waiting for the
+  // server refresh to propagate new props.
+  const [pendingQuantities, setPendingQuantities] = useState<Record<string, number>>({})
+
+  const quantityFor = (productId: string): number =>
+    pendingQuantities[productId] ?? currentQuantities[productId] ?? 0
+
+  // Reconcile optimistic overlay with fresh server props — drop entries that
+  // the server has caught up on so the picker reflects authoritative state.
+  useEffect(() => {
+    setPendingQuantities((prev) => {
+      let changed = false
+      const next: Record<string, number> = {}
+      for (const [productId, qty] of Object.entries(prev)) {
+        const serverQty = currentQuantities[productId] ?? 0
+        if (serverQty === qty) {
+          changed = true
+          continue
+        }
+        next[productId] = qty
+      }
+      return changed ? next : prev
+    })
+  }, [currentQuantities])
 
   const previouslyOrderedSet = useMemo(
     () => new Set(previouslyOrderedIds),
@@ -122,6 +155,7 @@ export function ProductPickerDialog({
     setIsAddingId(product.id)
     setError(null)
 
+    const nextQty = quantityFor(product.id) + 1
     const body =
       mode === 'order'
         ? { productId: product.id, quantity: 1, unitPrice: product.price }
@@ -141,7 +175,57 @@ export function ProductPickerDialog({
       return
     }
 
+    if (mode === 'order') {
+      setPendingQuantities((prev) => ({ ...prev, [product.id]: nextQty }))
+    }
+
     // Keep the dialog open so the salesman can add more items inline.
+    router.refresh()
+  }
+
+  const setQuantity = async (product: PickerProduct, next: number) => {
+    if (mode !== 'order') return
+    const current = quantityFor(product.id)
+    if (next === current) return
+    setError(null)
+
+    if (next === 0) {
+      // Removal path — delete the line entirely.
+      setPendingQuantities((prev) => ({ ...prev, [product.id]: 0 }))
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id }),
+      })
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
+        setError(payload?.error?.message ?? 'Unable to remove product')
+        return
+      }
+      router.refresh()
+      return
+    }
+
+    const delta = next - current
+    if (delta <= 0) {
+      // Partial decrements aren't supported by the API — clamp to current.
+      setPendingQuantities((prev) => ({ ...prev, [product.id]: current }))
+      return
+    }
+
+    setPendingQuantities((prev) => ({ ...prev, [product.id]: next }))
+    const response = await fetch(endpoint, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId: product.id, quantity: delta, unitPrice: product.price }),
+    })
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
+      setError(payload?.error?.message ?? 'Unable to update quantity')
+      return
+    }
+
     router.refresh()
   }
 
@@ -218,7 +302,13 @@ export function ProductPickerDialog({
             {filtered.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">No products found.</p>
             ) : renderFlat ? (
-              filtered.map((product) => renderPickerRow(product, isAddingId, addProduct))
+              filtered.map((product) =>
+                renderPickerRow(product, isAddingId, addProduct, {
+                  mode,
+                  quantity: quantityFor(product.id),
+                  onQuantityChange: setQuantity,
+                }),
+              )
             ) : (
               <div className="divide-y">
                 {grouped.map((section) => (
@@ -227,7 +317,13 @@ export function ProductPickerDialog({
                       {groupBy === 'brand' ? 'Brand' : 'Size'}: {section.label}
                     </div>
                     <div className="divide-y">
-                      {section.items.map((product) => renderPickerRow(product, isAddingId, addProduct))}
+                      {section.items.map((product) =>
+                        renderPickerRow(product, isAddingId, addProduct, {
+                          mode,
+                          quantity: quantityFor(product.id),
+                          onQuantityChange: setQuantity,
+                        }),
+                      )}
                     </div>
                   </section>
                 ))}
@@ -250,7 +346,14 @@ function renderPickerRow(
   product: PickerProduct,
   isAddingId: string | null,
   addProduct: (product: PickerProduct) => void,
+  opts: {
+    mode: DialogMode
+    quantity: number
+    onQuantityChange: (product: PickerProduct, next: number) => void
+  },
 ) {
+  const { mode, quantity, onQuantityChange } = opts
+  const showQuantitySelector = mode === 'order' && quantity > 0
   return (
     <div key={product.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
       <div className="min-w-0 flex-1">
@@ -261,15 +364,22 @@ function renderPickerRow(
       </div>
       <div className="flex items-center justify-between gap-2 sm:justify-end sm:gap-3">
         <div className="text-sm text-muted-foreground">{formatCurrency(product.price)}</div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="shrink-0"
-          disabled={isAddingId === product.id}
-          onClick={() => addProduct(product)}
-        >
-          {isAddingId === product.id ? 'Adding...' : 'Add'}
-        </Button>
+        {showQuantitySelector ? (
+          <QuantitySelector
+            quantity={quantity}
+            onChange={(next) => onQuantityChange(product, next)}
+          />
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+            disabled={isAddingId === product.id}
+            onClick={() => addProduct(product)}
+          >
+            {isAddingId === product.id ? 'Adding...' : 'Add'}
+          </Button>
+        )}
       </div>
     </div>
   )
