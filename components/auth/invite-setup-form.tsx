@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useEffect, useState } from 'react'
-import { getAuthClient } from '@/lib/auth/client'
-import { toSafeInviteSetupErrorMessage, toSafeLoginErrorMessage } from '@/lib/auth/safe-messages'
+import { FormEvent, useState } from 'react'
+import { toSafeInviteSetupErrorMessage } from '@/lib/auth/safe-messages'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,20 +21,10 @@ export function InviteSetupForm({ token, email, contactName }: InviteSetupFormPr
   const [confirmPassword, setConfirmPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [authClient, setAuthClient] = useState<ReturnType<typeof getAuthClient> | null>(null)
-
-  useEffect(() => {
-    setAuthClient(getAuthClient())
-  }, [])
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setMessage(null)
-
-    if (!authClient) {
-      setMessage('Authentication is still loading. Please try again.')
-      return
-    }
 
     if (password.length < 8) {
       setMessage('Password must be at least 8 characters.')
@@ -70,20 +59,7 @@ export function InviteSetupForm({ token, email, contactName }: InviteSetupFormPr
       return
     }
 
-    const inviteEmail = payload?.data?.email ?? email
-    const { error } = await authClient.signInWithPassword({
-      email: inviteEmail,
-      password,
-    })
-
     setIsLoading(false)
-
-    if (error) {
-      setMessage(
-        `${toSafeLoginErrorMessage(error)} Your password was created successfully. Use the normal admin sign-in screen if automatic sign-in does not finish.`
-      )
-      return
-    }
 
     router.push('/auth/post-login')
     router.refresh()
@@ -138,7 +114,7 @@ export function InviteSetupForm({ token, email, contactName }: InviteSetupFormPr
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={!authClient || isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? 'Setting up...' : 'Create Password'}
           </Button>
         </form>

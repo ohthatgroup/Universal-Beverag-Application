@@ -9,7 +9,7 @@ const paramsSchema = z.object({
 
 const updateBrandSchema = z.object({
   name: z.string().trim().min(1).optional(),
-  logoUrl: z.string().url().nullable().optional(),
+  logoUrl: z.string().trim().min(1).nullable().optional(),
 })
 
 export async function PATCH(
@@ -30,6 +30,9 @@ export async function PATCH(
     const current = existing.rows[0]
     if (!current) throw new Error('Brand not found')
 
+    const nextName = payload.name ?? current.name
+    const nextLogo = 'logoUrl' in payload ? payload.logoUrl ?? null : current.logo_url
+
     const { rows } = await db.query<{
       id: string
       name: string
@@ -41,7 +44,7 @@ export async function PATCH(
            logo_url = $3
        where id = $1
        returning id, name, logo_url, sort_order`,
-      [id, payload.name ?? current.name, payload.logoUrl ?? current.logo_url]
+      [id, nextName, nextLogo]
     )
     const updated = rows[0]
     if (!updated) throw new Error('Brand not found')

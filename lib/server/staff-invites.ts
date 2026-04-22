@@ -384,14 +384,14 @@ function toInviteSetupRouteError(validation: Awaited<ReturnType<typeof validateS
   )
 }
 
-async function createOrUpdateInviteAuthUser(invite: PendingStaffInvite, password: string) {
+async function establishInviteAuthSession(invite: PendingStaffInvite, password: string) {
   const auth = getAuth()
   const displayName = invite.contact_name?.trim() || invite.business_name?.trim() || invite.email
-  let authUserId = invite.auth_user_id ?? (await lookupNeonAuthUserId(invite.email))
-  let createdUser = false
+  const existingAuthUserId = invite.auth_user_id ?? (await lookupNeonAuthUserId(invite.email))
+  let signUpMatchedExistingUser = false
 
-  if (!authUserId) {
-    const { data, error } = await auth.admin.createUser({
+  if (!existingAuthUserId) {
+    const { error } = await auth.signUp.email({
       email: invite.email,
       password,
       name: displayName,
@@ -406,12 +406,11 @@ async function createOrUpdateInviteAuthUser(invite: PendingStaffInvite, password
         )
       }
 
-      authUserId = await lookupNeonAuthUserId(invite.email)
-    } else {
-      authUserId = data?.user?.id ?? null
-      createdUser = true
+      signUpMatchedExistingUser = true
     }
   }
+
+  const authUserId = invite.auth_user_id ?? (await lookupNeonAuthUserId(invite.email))
 
   if (!authUserId) {
     throw new RouteError(
@@ -421,19 +420,25 @@ async function createOrUpdateInviteAuthUser(invite: PendingStaffInvite, password
     )
   }
 
-  if (!createdUser) {
-    const { error } = await auth.admin.setUserPassword({
-      userId: authUserId,
-      newPassword: password,
-    })
+  const { error: signInError } = await auth.signIn.email({
+    email: invite.email,
+    password,
+  })
 
-    if (error) {
+  if (signInError) {
+    if (existingAuthUserId || signUpMatchedExistingUser) {
       throw new RouteError(
-        502,
-        'invite_setup_failed',
-        'Unable to finish invite setup right now.'
+        409,
+        'invite_account_exists',
+        'This admin account already exists. Sign in from the normal admin login screen or reset your password if needed.'
       )
     }
+
+    throw new RouteError(
+      502,
+      'invite_setup_failed',
+      'Unable to finish invite setup right now.'
+    )
   }
 
   return authUserId
@@ -452,7 +457,7 @@ export async function completeStaffInviteSetup(input: { token: string; password:
     ...invitePasswordSetupRateLimit,
   })
 
-  const authUserId = await createOrUpdateInviteAuthUser(invite, input.password)
+  const authUserId = await establishInviteAuthSession(invite, input.password)
 
   const db = await getRequestDb()
   await db.query(

@@ -114,7 +114,7 @@ export default async function PalletDetailPage({ params, searchParams }: PalletD
 
   async function updatePallet(formData: FormData) {
     'use server'
-
+    await requirePageAuth(['salesman'])
     const actionDb = await getRequestDb()
     const price = Number((formData.get('price') as string) || 0)
 

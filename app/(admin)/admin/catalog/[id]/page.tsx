@@ -68,7 +68,7 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ id
 
   async function updateProduct(formData: FormData) {
     'use server'
-
+    await requirePageAuth(['salesman'])
     const actionDb = await getRequestDb()
     const price = Number((formData.get('price') as string) || 0)
     const packDetailsInput = (formData.get('pack_details') as string).trim()

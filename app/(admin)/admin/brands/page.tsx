@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { BrandsTableManager, type BrandTableRow } from '@/components/admin/brands-table-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { PageHeader } from '@/components/ui/page-header'
@@ -41,6 +43,15 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
       <PageHeader
         title="Brands"
         description={`${brandRows.length} brand${brandRows.length === 1 ? '' : 's'}`}
+        breadcrumb={
+          <Link
+            href="/admin/dashboard"
+            className="inline-flex items-center gap-1.5 hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Dashboard
+          </Link>
+        }
       />
 
       <LiveQueryInput

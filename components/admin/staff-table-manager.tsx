@@ -1,10 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Mail, RotateCcw, ShieldOff } from 'lucide-react'
+import { Loader2, Mail, MoreVertical, RotateCcw, ShieldOff, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { CopyUrlButton } from '@/components/admin/copy-url-button'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +58,7 @@ function StatusDot({ status }: { status: StaffListRow['status'] }) {
 type ConfirmState =
   | { type: 'revoke'; row: StaffListRow }
   | { type: 'disable'; row: StaffListRow }
+  | { type: 'delete'; row: StaffListRow }
   | null
 
 export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps) {
@@ -60,6 +67,14 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<ConfirmState>(null)
+  const [flash, setFlash] = useState<{ id: string; message: string } | null>(null)
+
+  function showFlash(id: string, message: string) {
+    setFlash({ id, message })
+    setTimeout(() => {
+      setFlash((prev) => (prev && prev.id === id ? null : prev))
+    }, 1200)
+  }
 
   useEffect(() => {
     setRows(initialRows)
@@ -85,6 +100,7 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
     setError(null)
     try {
       await postAction(`/api/admin/staff/${row.id}/invite`)
+      showFlash(row.id, row.status === 'invited' ? 'Invite resent' : 'Invite sent')
       router.refresh()
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Failed to send invite')
@@ -98,6 +114,7 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
     setError(null)
     try {
       await postAction(`/api/admin/staff/${row.id}/revoke`)
+      showFlash(row.id, 'Invite revoked')
       router.refresh()
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Failed to revoke invite')
@@ -111,9 +128,30 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
     setError(null)
     try {
       await postAction(`/api/admin/staff/${row.id}/disable`, { disabled: !row.disabled })
+      showFlash(row.id, row.disabled ? 'Access restored' : 'Access disabled')
       router.refresh()
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Failed to update staff access')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function deleteStaff(row: StaffListRow) {
+    setBusyId(row.id)
+    setError(null)
+    try {
+      const response = await fetch(`/api/admin/staff/${row.id}`, { method: 'DELETE' })
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Failed to delete staff record')
+      }
+      setRows((prev) => prev.filter((r) => r.id !== row.id))
+      router.refresh()
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'Failed to delete staff record')
     } finally {
       setBusyId(null)
     }
@@ -130,6 +168,8 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
       <ul className="divide-y rounded-lg border bg-card">
         {rows.map((row) => {
           const inviteTitle = row.status === 'invited' ? 'Resend invite' : 'Send invite'
+          const isBusy = busyId === row.id
+          const rowFlash = flash?.id === row.id ? flash.message : null
           return (
             <li key={row.id} className="flex items-center gap-3 px-3 py-3">
               <StatusDot status={row.status} />
@@ -138,8 +178,16 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
                 <div className="truncate text-xs text-muted-foreground">{row.email ?? 'No email'}</div>
               </div>
 
+              {rowFlash ? (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {rowFlash}
+                </span>
+              ) : null}
+
               <div className="flex shrink-0 items-center gap-1">
-                {row.inviteUrl ? <CopyUrlButton url={row.inviteUrl} iconOnly /> : null}
+                {row.inviteUrl && row.status === 'invited' ? (
+                  <CopyUrlButton url={row.inviteUrl} iconOnly />
+                ) : null}
 
                 {!row.disabled ? (
                   <>
@@ -147,19 +195,19 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
                       type="button"
                       size="icon"
                       variant="ghost"
-                      disabled={busyId === row.id}
+                      disabled={isBusy}
                       onClick={() => sendInvite(row)}
                       aria-label={inviteTitle}
                       title={inviteTitle}
                     >
-                      <Mail className="h-4 w-4" />
+                      {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                     </Button>
                     {row.status === 'invited' ? (
                       <Button
                         type="button"
                         size="icon"
                         variant="ghost"
-                        disabled={busyId === row.id}
+                        disabled={isBusy}
                         onClick={() => setConfirm({ type: 'revoke', row })}
                         aria-label="Revoke invite"
                         title="Revoke invite"
@@ -171,18 +219,49 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
                   </>
                 ) : null}
 
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  disabled={busyId === row.id}
-                  onClick={() => (row.disabled ? toggleDisabled(row) : setConfirm({ type: 'disable', row }))}
-                  aria-label={row.disabled ? 'Enable access' : 'Disable access'}
-                  title={row.disabled ? 'Enable access' : 'Disable access'}
-                  className={row.disabled ? '' : 'text-destructive hover:text-destructive'}
-                >
-                  <ShieldOff className="h-4 w-4" />
-                </Button>
+                {row.status !== 'invited' ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    disabled={isBusy}
+                    onClick={() => (row.disabled ? toggleDisabled(row) : setConfirm({ type: 'disable', row }))}
+                    aria-label={row.disabled ? 'Enable access' : 'Disable access'}
+                    title={row.disabled ? 'Enable access' : 'Disable access'}
+                    className={row.disabled ? '' : 'text-destructive hover:text-destructive'}
+                  >
+                    {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldOff className="h-4 w-4" />}
+                  </Button>
+                ) : null}
+
+                {row.disabled ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        disabled={isBusy}
+                        aria-label="More actions"
+                        title="More actions"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          setConfirm({ type: 'delete', row })
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        Delete staff record
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
               </div>
             </li>
           )
@@ -198,14 +277,20 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm?.type === 'revoke' ? 'Revoke invite?' : 'Disable access?'}
+              {confirm?.type === 'revoke'
+                ? 'Revoke invite?'
+                : confirm?.type === 'delete'
+                  ? 'Delete staff record?'
+                  : 'Disable access?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm?.type === 'revoke'
                 ? `The invite link for ${confirm.row.displayName} will stop working.`
-                : confirm?.type === 'disable'
-                  ? `${confirm.row.displayName} will lose access to the admin portal.`
-                  : null}
+                : confirm?.type === 'delete'
+                  ? `Delete staff record for ${confirm.row.displayName}? This cannot be undone.`
+                  : confirm?.type === 'disable'
+                    ? `${confirm.row.displayName} will lose access to the admin portal.`
+                    : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -217,10 +302,15 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
                 const { type, row } = confirm
                 setConfirm(null)
                 if (type === 'revoke') void revokeInvite(row)
+                else if (type === 'delete') void deleteStaff(row)
                 else void toggleDisabled(row)
               }}
             >
-              {confirm?.type === 'revoke' ? 'Revoke invite' : 'Disable access'}
+              {confirm?.type === 'revoke'
+                ? 'Revoke invite'
+                : confirm?.type === 'delete'
+                  ? 'Delete staff record'
+                  : 'Disable access'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

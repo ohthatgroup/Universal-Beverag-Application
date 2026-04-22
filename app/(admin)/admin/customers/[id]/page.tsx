@@ -4,6 +4,7 @@ import { ChevronRight, Mail, MapPin, Phone } from 'lucide-react'
 import {
   CustomerActionsProvider,
   CustomerOverflowMenu,
+  CustomerSharePortalMenu,
   CustomerStartOrderButton,
 } from '@/components/admin/customer-home-actions'
 import { getRequestDb } from '@/lib/server/db'
@@ -123,7 +124,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             <h1 className="text-2xl font-semibold leading-tight tracking-tight">
               {customerName}
             </h1>
-            <CustomerOverflowMenu />
+            <div className="flex shrink-0 items-center gap-2">
+              <CustomerSharePortalMenu />
+              <CustomerOverflowMenu />
+            </div>
           </div>
 
           {customer.contact_name && customer.contact_name !== customerName && (

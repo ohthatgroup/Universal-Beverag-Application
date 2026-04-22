@@ -93,6 +93,14 @@ export function AdminOrderEditor({
   const router = useRouter()
   const [shareCopied, setShareCopied] = useState(false)
 
+  const absoluteShareLink = (() => {
+    if (!shareLink) return null
+    if (/^https?:\/\//i.test(shareLink)) return shareLink
+    if (typeof window === 'undefined') return shareLink
+    const normalized = shareLink.startsWith('/') ? shareLink : `/${shareLink}`
+    return `${window.location.origin}${normalized}`
+  })()
+
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
@@ -102,9 +110,9 @@ export function AdminOrderEditor({
   }
 
   const copyShareLink = async () => {
-    if (!shareLink) return
+    if (!absoluteShareLink) return
     try {
-      await navigator.clipboard.writeText(shareLink)
+      await navigator.clipboard.writeText(absoluteShareLink)
       setShareCopied(true)
       setTimeout(() => setShareCopied(false), 1500)
     } catch {
@@ -113,15 +121,15 @@ export function AdminOrderEditor({
   }
 
   const shareViaSms = () => {
-    if (!shareLink) return
-    const body = encodeURIComponent(`Review your order: ${shareLink}`)
+    if (!absoluteShareLink) return
+    const body = encodeURIComponent(`Review your order: ${absoluteShareLink}`)
     window.location.href = `sms:?&body=${body}`
   }
 
   const shareViaEmail = () => {
-    if (!shareLink) return
+    if (!absoluteShareLink) return
     const subject = encodeURIComponent(`Your order — ${formatDeliveryDate(deliveryDate)}`)
-    const body = encodeURIComponent(`Review your order here: ${shareLink}`)
+    const body = encodeURIComponent(`Review your order here: ${absoluteShareLink}`)
     window.location.href = `mailto:${customerEmail ?? ''}?subject=${subject}&body=${body}`
   }
 

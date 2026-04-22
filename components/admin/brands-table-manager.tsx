@@ -37,11 +37,6 @@ interface BrandsTableManagerProps {
   searchQuery: string
 }
 
-function isRowDirty(row: BrandRowState) {
-  const normalizedDraftName = row.draftName.trim()
-  return normalizedDraftName !== row.name || (row.draftLogoUrl ?? null) !== (row.logoUrl ?? null)
-}
-
 function toRowState(row: BrandTableRow): BrandRowState {
   return {
     ...row,
@@ -108,60 +103,67 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
     savedTimersRef.current.set(id, timer)
   }
 
-  const saveRow = async (row: BrandRowState) => {
-    if (savingIds.has(row.id)) return
-
-    const name = row.draftName.trim()
-    if (!name) {
-      setRowStatus((prev) => ({ ...prev, [row.id]: 'error' }))
-      return
-    }
-
-    if (!isRowDirty({ ...row, draftName: name })) return
-
+  const patchBrand = async (
+    id: string,
+    body: Record<string, unknown>,
+    errorLabel: string
+  ): Promise<BrandTableRow | null> => {
+    if (savingIds.has(id)) return null
     setError(null)
     setRowStatus((prev) => {
-      if (prev[row.id] !== 'error') return prev
+      if (prev[id] !== 'error') return prev
       const next = { ...prev }
-      delete next[row.id]
+      delete next[id]
       return next
     })
-    setSavingIds((prev) => new Set(prev).add(row.id))
+    setSavingIds((prev) => new Set(prev).add(id))
     try {
-      const response = await fetch(`/api/admin/brands/${row.id}`, {
+      const response = await fetch(`/api/admin/brands/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          logoUrl: row.draftLogoUrl,
-        }),
+        body: JSON.stringify(body),
       })
       const payload = (await response.json().catch(() => null)) as
         | { data?: BrandApiRow; error?: { message?: string } }
         | null
-
       if (!response.ok || !payload?.data) {
-        throw new Error(payload?.error?.message ?? 'Failed to save brand')
+        throw new Error(payload?.error?.message ?? errorLabel)
       }
-
       const saved = normalizeBrandApiRow(payload.data)
-      updateRow(row.id, {
+      updateRow(id, {
         name: saved.name,
         logoUrl: saved.logoUrl,
         draftName: saved.name,
         draftLogoUrl: saved.logoUrl,
       })
-      flashSaved(row.id)
+      flashSaved(id)
+      return saved
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save brand')
-      setRowStatus((prev) => ({ ...prev, [row.id]: 'error' }))
+      setError(saveError instanceof Error ? saveError.message : errorLabel)
+      setRowStatus((prev) => ({ ...prev, [id]: 'error' }))
+      return null
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev)
-        next.delete(row.id)
+        next.delete(id)
         return next
       })
     }
+  }
+
+  const saveName = async (row: BrandRowState) => {
+    const name = row.draftName.trim()
+    if (!name) {
+      setRowStatus((prev) => ({ ...prev, [row.id]: 'error' }))
+      return
+    }
+    if (name === row.name) return
+    await patchBrand(row.id, { name }, 'Failed to save brand name')
+  }
+
+  const saveLogo = async (row: BrandRowState, nextLogoUrl: string | null) => {
+    if ((nextLogoUrl ?? null) === (row.logoUrl ?? null)) return
+    await patchBrand(row.id, { logoUrl: nextLogoUrl }, 'Failed to save brand logo')
   }
 
   const toggleSelected = (id: string, checked: boolean) => {
@@ -350,7 +352,7 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
                   editable={!editMode}
                   onChange={(value) => {
                     updateRow(row.id, { draftLogoUrl: value })
-                    void saveRow({ ...row, draftLogoUrl: value })
+                    void saveLogo(row, value)
                   }}
                 />
 
@@ -362,7 +364,7 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
                       onChange={(event) => updateRow(row.id, { draftName: event.target.value })}
                       onBlur={() => {
                         setEditingNameId(null)
-                        void saveRow(row)
+                        void saveName(row)
                       }}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
@@ -401,7 +403,13 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
                   {!saving && status === 'error' && (
                     <button
                       type="button"
-                      onClick={() => void saveRow(row)}
+                      onClick={() => {
+                        if (row.draftName.trim() !== row.name) {
+                          void saveName(row)
+                        } else if ((row.draftLogoUrl ?? null) !== (row.logoUrl ?? null)) {
+                          void saveLogo(row, row.draftLogoUrl)
+                        }
+                      }}
                       className="inline-flex items-center gap-1 text-destructive hover:underline"
                     >
                       <RotateCcw className="h-3 w-3" /> Retry

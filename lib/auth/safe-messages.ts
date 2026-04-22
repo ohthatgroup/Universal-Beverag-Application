@@ -111,6 +111,10 @@ export function toSafeInviteSetupErrorMessage(error: unknown): string {
     return 'This admin account is currently disabled. Contact another salesman if you need access restored.'
   }
 
+  if (code === 'invite_account_exists') {
+    return 'This admin account already exists. Sign in from the normal admin login screen or reset your password if needed.'
+  }
+
   if (includesAny(code, ['invite_invalid']) || includesAny(message, ['invalid', 'expired'])) {
     return 'This admin invite link is invalid or has expired. Ask for a new invite and try again.'
   }
