@@ -13,9 +13,6 @@ import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { formatCurrency } from '@/lib/utils'
 import type { PalletDeal } from '@/lib/types'
 
-// TODO(engineer): extend PalletDeal loader with `items: PalletDealItem[]`
-// (product_title, brand_name, pack_label, image_url, quantity). See
-// docs/st-9-engineer-followups.md §"Data needs for the new pallet detail popup".
 export interface PalletDetailItem {
   product_id: string
   product_title: string
@@ -29,7 +26,13 @@ interface PalletDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   deal: PalletDeal | null
-  items?: PalletDetailItem[]
+  /**
+   * Breakdown of products in this pallet. Callers must always provide
+   * this — pass an empty array for genuinely empty pallets. Making this
+   * required prevents the "not yet available" placeholder from leaking
+   * into production when a caller forgets to wire the data through.
+   */
+  items: PalletDetailItem[]
   showPrices: boolean
   quantity?: number
   onChange?: (next: number) => void
@@ -82,7 +85,7 @@ export function PalletDetailDialog({
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Included in this pallet
             </div>
-            {items && items.length > 0 ? (
+            {items.length > 0 ? (
               <ul className="divide-y rounded-md border">
                 {items.map((item) => (
                   <li
@@ -122,7 +125,7 @@ export function PalletDetailDialog({
               </ul>
             ) : (
               <div className="rounded-md border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-                Item breakdown not yet available.
+                No items have been added to this pallet yet.
               </div>
             )}
           </div>

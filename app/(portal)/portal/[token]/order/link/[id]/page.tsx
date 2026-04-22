@@ -176,10 +176,32 @@ export default async function PortalOrderLinkPage({
 
   const palletDealIds = palletDealsResult.rows.map((deal) => deal.id)
   const palletItemsResult = palletDealIds.length
-    ? await db.query<{ pallet_deal_id: string; product_id: string }>(
-        `select pallet_deal_id, product_id
-         from pallet_deal_items
-         where pallet_deal_id = any($1::uuid[])`,
+    ? await db.query<{
+        pallet_deal_id: string
+        product_id: string
+        quantity: number
+        product_title: string
+        brand_name: string | null
+        pack_details: string | null
+        pack_count: number | null
+        size_value: number | null
+        size_uom: string | null
+        image_url: string | null
+      }>(
+        `select pdi.pallet_deal_id,
+                pdi.product_id,
+                pdi.quantity,
+                p.title as product_title,
+                b.name as brand_name,
+                p.pack_details,
+                p.pack_count,
+                p.size_value,
+                p.size_uom,
+                p.image_url
+         from pallet_deal_items pdi
+         join products p on p.id = pdi.product_id
+         left join brands b on b.id = p.brand_id
+         where pdi.pallet_deal_id = any($1::uuid[])`,
         [palletDealIds]
       )
     : { rows: [] }
@@ -187,6 +209,17 @@ export default async function PortalOrderLinkPage({
   const brandById = new Map(brandsResult.rows.map((brand) => [brand.id, brand]))
   const customerProductById = new Map(customerProductsResult.rows.map((entry) => [entry.product_id, entry]))
   const productToPalletDealIds: Record<string, string[]> = {}
+  const palletItemsByDealId: Record<
+    string,
+    Array<{
+      product_id: string
+      product_title: string
+      brand_name: string | null
+      pack_label: string | null
+      image_url: string | null
+      quantity: number
+    }>
+  > = {}
 
   for (const row of palletItemsResult.rows) {
     const current = productToPalletDealIds[row.product_id] ?? []
@@ -194,6 +227,22 @@ export default async function PortalOrderLinkPage({
       current.push(row.pallet_deal_id)
       productToPalletDealIds[row.product_id] = current
     }
+
+    const dealItems = palletItemsByDealId[row.pallet_deal_id] ?? []
+    dealItems.push({
+      product_id: row.product_id,
+      product_title: row.product_title,
+      brand_name: row.brand_name,
+      pack_label: getProductPackLabel({
+        pack_details: row.pack_details,
+        pack_count: row.pack_count,
+        size_value: row.size_value,
+        size_uom: row.size_uom,
+      }),
+      image_url: row.image_url,
+      quantity: row.quantity,
+    })
+    palletItemsByDealId[row.pallet_deal_id] = dealItems
   }
 
   const catalogProducts: CatalogProduct[] = productsResult.rows
@@ -216,6 +265,7 @@ export default async function PortalOrderLinkPage({
       deliveryDate={order.delivery_date}
       products={catalogProducts}
       palletDeals={palletDealsResult.rows}
+      palletItemsByDealId={palletItemsByDealId}
       showPrices={profile.show_prices}
       defaultGroupBy={profile.default_group}
       initialItems={orderItemsResult.rows}

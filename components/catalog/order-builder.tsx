@@ -18,15 +18,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  FilterReveal,
-  FilterTrigger,
+  FilterTriggerAnchored,
   useFilterPanelState,
 } from '@/components/catalog/filter-panel'
 import { BrowseListGrouped } from '@/components/catalog/browse-list-grouped'
 import { CartSummaryBar } from '@/components/catalog/cart-summary-bar'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { ReviewOrderSheet, type ReviewItem } from '@/components/catalog/review-order-sheet'
-import { PalletDetailDialog } from '@/components/catalog/pallet-detail-dialog'
+import { PalletDetailDialog, type PalletDetailItem } from '@/components/catalog/pallet-detail-dialog'
 
 interface OrderBuilderProps {
   token: string
@@ -34,6 +33,8 @@ interface OrderBuilderProps {
   deliveryDate: string
   products: CatalogProduct[]
   palletDeals: PalletDeal[]
+  /** Lookup of pallet breakdown items keyed by pallet_deal_id. */
+  palletItemsByDealId?: Record<string, PalletDetailItem[]>
   showPrices: boolean
   defaultGroupBy: GroupByOption
   initialItems: Array<{
@@ -57,6 +58,7 @@ export function OrderBuilder({
   deliveryDate,
   products,
   palletDeals,
+  palletItemsByDealId,
   showPrices,
   defaultGroupBy,
   initialItems,
@@ -371,35 +373,34 @@ export function OrderBuilder({
                     }
                   />
                 </div>
-                <FilterTrigger state={filterPanelState} />
+                <FilterTriggerAnchored
+                  state={filterPanelState}
+                  groupBy={filters.groupBy}
+                  onGroupByChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
+                  sizes={availableSizes}
+                  selectedSizes={filters.sizeFilters}
+                  onSizeToggle={(size) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      sizeFilters: prev.sizeFilters.includes(size)
+                        ? prev.sizeFilters.filter((s) => s !== size)
+                        : [...prev.sizeFilters, size],
+                    }))
+                  }
+                  onSizeClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
+                  brands={availableBrands}
+                  selectedBrandIds={filters.brandIds}
+                  onBrandToggle={(brandId) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      brandIds: prev.brandIds.includes(brandId)
+                        ? prev.brandIds.filter((b) => b !== brandId)
+                        : [...prev.brandIds, brandId],
+                    }))
+                  }
+                  onBrandClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
+                />
               </div>
-              <FilterReveal
-                state={filterPanelState}
-                groupBy={filters.groupBy}
-                onGroupByChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
-                sizes={availableSizes}
-                selectedSizes={filters.sizeFilters}
-                onSizeToggle={(size) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    sizeFilters: prev.sizeFilters.includes(size)
-                      ? prev.sizeFilters.filter((s) => s !== size)
-                      : [...prev.sizeFilters, size],
-                  }))
-                }
-                onSizeClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
-                brands={availableBrands}
-                selectedBrandIds={filters.brandIds}
-                onBrandToggle={(brandId) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    brandIds: prev.brandIds.includes(brandId)
-                      ? prev.brandIds.filter((b) => b !== brandId)
-                      : [...prev.brandIds, brandId],
-                  }))
-                }
-                onBrandClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
-              />
 
               <BrowseListGrouped
                 groups={browseGroups}
@@ -444,6 +445,7 @@ export function OrderBuilder({
           if (!next) setPalletDetailId(null)
         }}
         deal={palletDetailId ? palletById.get(palletDetailId) ?? null : null}
+        items={palletDetailId ? palletItemsByDealId?.[palletDetailId] ?? [] : []}
         showPrices={showPrices}
       />
 
