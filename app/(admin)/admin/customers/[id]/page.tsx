@@ -3,7 +3,6 @@ import { notFound, redirect } from 'next/navigation'
 import { ChevronRight, Mail, MapPin, Phone } from 'lucide-react'
 import {
   CustomerActionsProvider,
-  CustomerEditButton,
   CustomerOverflowMenu,
   CustomerSharePortalMenu,
   CustomerStartOrderButton,
@@ -141,7 +140,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       startOrderAction={startOrder}
       deleteCustomerAction={deleteCustomer}
     >
-      <div className="mx-auto max-w-lg space-y-6 pt-2">
+      <div className="mx-auto max-w-lg space-y-6 pb-28 pt-2 md:pb-6">
         {/* Header row: name + visible secondary action icons */}
         <div>
           <div className="flex items-start justify-between gap-3">
@@ -150,7 +149,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             </h1>
             <div className="flex shrink-0 items-center gap-2">
               <CustomerSharePortalMenu />
-              <CustomerEditButton />
               <CustomerOverflowMenu />
             </div>
           </div>
@@ -160,7 +158,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           )}
         </div>
 
-        {/* Customer details + primary action */}
+        {/* Customer details */}
         <section className="space-y-3">
           <ul className="divide-y rounded-xl border bg-card text-sm">
             <li className="flex items-center gap-3 px-4 py-3">
@@ -201,8 +199,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               )}
             </li>
           </ul>
-
-          <CustomerStartOrderButton />
         </section>
 
         {/* Stats grid */}
@@ -224,10 +220,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </div>
         </section>
 
-        {/* Customer settings — inline autosave (row layout) */}
+        {/* Edit settings — inline autosave (row layout) */}
         <section className="space-y-2">
           <h2 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Customer settings
+            Edit settings
           </h2>
           <CustomerSettingsInline
             customerId={customer.id}
@@ -266,6 +262,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </ul>
         </section>
       </div>
+      <CustomerStartOrderButton />
     </CustomerActionsProvider>
   )
 }

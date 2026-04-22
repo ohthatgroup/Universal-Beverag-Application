@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { ChevronRight, LogOut } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { BulkUploadPanel } from '@/components/admin/bulk-upload-panel'
+import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
 import { getAuth } from '@/lib/auth/server'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
@@ -35,43 +37,64 @@ export default async function AdminDrawerPage() {
     { href: '/admin/reports', label: 'Reports' },
   ]
 
+  const accountLabel =
+    context.profile.email ?? context.profile.contact_name ?? 'Signed in'
+
   return (
-    <div className="mx-auto max-w-lg space-y-6 pt-2">
-      <h1 className="text-2xl font-semibold">Admin</h1>
+    <div className="mx-auto max-w-lg space-y-8 pb-10 pt-2">
+      <PageHeader
+        title="Settings"
+        description="Jump to a resource, move data in bulk, or manage your account."
+      />
 
-      <ul className="divide-y rounded-xl border bg-card">
-        {items.map((item) => (
-          <li key={item.href}>
-            <Link
-              href={item.href}
-              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40"
-            >
-              <span className="text-sm font-medium">{item.label}</span>
-              <span className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-                {item.value && <span className="tabular-nums">{item.value}</span>}
-                <ChevronRight className="h-4 w-4" />
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <section className="space-y-2">
+        <h2 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Manage
+        </h2>
+        <ul className="divide-y rounded-xl border bg-card">
+          {items.map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40"
+              >
+                <span className="text-sm font-medium">{item.label}</span>
+                <span className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+                  {item.value && <span className="tabular-nums">{item.value}</span>}
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-      <BulkUploadPanel />
+      <section className="space-y-2">
+        <h2 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Bulk data
+        </h2>
+        <BulkUploadPanel />
+      </section>
 
-      <div className="divide-y rounded-xl border bg-card">
-        <div className="px-4 py-3 text-sm text-muted-foreground">
-          {context.profile.email ?? context.profile.contact_name ?? 'Signed in'}
+      <section className="space-y-2">
+        <h2 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Account
+        </h2>
+        <div className="rounded-xl border bg-card">
+          <div className="px-4 py-3">
+            <div className="text-xs text-muted-foreground">Signed in as</div>
+            <div className="text-sm font-medium">{accountLabel}</div>
+          </div>
+          <div className="flex justify-end border-t px-4 py-3">
+            <form action={signOut}>
+              <Button type="submit" variant="outline" size="sm" className="text-destructive">
+                <LogOut className="mr-1.5 h-4 w-4" />
+                Sign out
+              </Button>
+            </form>
+          </div>
         </div>
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-destructive hover:bg-muted/40"
-          >
-            <span>Sign out</span>
-            <LogOut className="h-4 w-4" />
-          </button>
-        </form>
-      </div>
+      </section>
     </div>
   )
 }

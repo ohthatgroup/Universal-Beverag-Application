@@ -1,8 +1,9 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, Copy, Mail, MessageSquare, MoreVertical, Pencil, Plus, RefreshCcw, Share2, Trash2 } from 'lucide-react'
+import { Check, Copy, Mail, MessageSquare, MoreVertical, Package2, Pencil, Plus, RefreshCcw, Share2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,6 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { AdminFab } from '@/components/admin/admin-fab'
+import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 
 interface Ctx {
@@ -84,7 +87,6 @@ export function CustomerActionsProvider({
 
   const startOrder = () => startTransition(async () => { await startOrderAction() })
   const deleteCustomer = () => {
-    if (!window.confirm('Delete this customer? This cannot be undone.')) return
     startTransition(async () => { await deleteCustomerAction() })
   }
 
@@ -109,36 +111,61 @@ export function CustomerActionsProvider({
 }
 
 export function CustomerOverflowMenu() {
-  const { regenerateToken, deleteCustomer } = useCtx()
+  const router = useRouter()
+  const { customerId, regenerateToken, deleteCustomer, isPending } = useCtx()
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label="More actions"
-          className="h-9 w-9"
-        >
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void regenerateToken() }}>
-          <RefreshCcw className="mr-2 h-3.5 w-3.5" />
-          Regenerate portal token
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={(e) => { e.preventDefault(); deleteCustomer() }}
-          className="text-destructive focus:text-destructive"
-        >
-          <Trash2 className="mr-2 h-3.5 w-3.5" />
-          Delete customer
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="More actions"
+            className="h-9 w-9"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => router.push(`/admin/customers/${customerId}/edit`)}>
+            <Pencil className="mr-2 h-3.5 w-3.5" />
+            Edit profile
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push(`/admin/customers/${customerId}/products`)}>
+            <Package2 className="mr-2 h-3.5 w-3.5" />
+            Products &amp; visibility
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void regenerateToken() }}>
+            <RefreshCcw className="mr-2 h-3.5 w-3.5" />
+            Regenerate portal token
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={(e) => { e.preventDefault(); setConfirmOpen(true) }}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            Delete customer
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DestructiveConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete customer?"
+        description="This permanently removes the customer and all associated data. This cannot be undone."
+        confirmLabel="Delete customer"
+        pendingLabel="Deleting…"
+        pending={isPending}
+        onConfirm={() => {
+          setConfirmOpen(false)
+          deleteCustomer()
+        }}
+      />
+    </>
   )
 }
 
@@ -163,15 +190,12 @@ export function CustomerEditButton() {
 export function CustomerStartOrderButton() {
   const { startOrder, isPending, hasDraftToday } = useCtx()
   return (
-    <Button
-      type="button"
+    <AdminFab
+      icon={<Plus className="h-6 w-6" />}
+      label={hasDraftToday ? 'Continue draft order' : 'Start order'}
       onClick={startOrder}
       disabled={isPending}
-      className="gap-2"
-    >
-      <Plus className="h-4 w-4" />
-      {hasDraftToday ? 'Continue draft' : 'Start order'}
-    </Button>
+    />
   )
 }
 
@@ -190,12 +214,12 @@ export function CustomerSharePortalMenu() {
         <Button
           type="button"
           variant="outline"
-          size="icon"
+          size="sm"
           disabled={disabled}
-          aria-label="Share portal link"
-          className="h-9 w-9"
+          className="h-9"
         >
-          <Share2 className="h-4 w-4" />
+          <Share2 className="mr-1.5 h-4 w-4" />
+          Share portal
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">

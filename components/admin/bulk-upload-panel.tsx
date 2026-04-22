@@ -11,7 +11,6 @@ import {
   type BulkKind,
 } from '@/lib/admin/bulk-transfer'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -182,75 +181,65 @@ export function BulkUploadPanel() {
 
   return (
     <>
-      <div className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold">Bulk Tools</h2>
-          <p className="text-sm text-muted-foreground">
-            Export live data, download form-matched templates, or import CSV and TSV rows directly
-            from the admin landing page.
-          </p>
-        </div>
-
+      <div className="space-y-2">
         {downloadError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {downloadError}
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <ul className="divide-y rounded-xl border bg-card">
           {(Object.entries(BULK_DEFINITIONS) as Array<[BulkKind, BulkDefinition]>).map(
             ([kind, definition]) => {
               const Icon = BULK_ICONS[kind]
-              const fieldKeys = definition.fields.map((field) => field.key).join(', ')
 
               return (
-                <Card key={kind}>
-                  <CardHeader className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-md bg-muted p-2 text-muted-foreground">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <CardTitle className="text-base">{definition.title}</CardTitle>
+                <li
+                  key={kind}
+                  className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium">{definition.title}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {definition.description}
+                      </div>
                     </div>
-                    <CardDescription>{definition.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-xs text-muted-foreground">{getBulkColumnsHelp(kind)}</p>
-                    <p className="rounded-md border bg-muted/30 px-2 py-2 font-mono text-[11px] text-muted-foreground">
-                      {fieldKeys}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" onClick={() => setActiveKind(kind)}>
-                        <Upload className="mr-1.5 h-4 w-4" />
-                        Upload
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleDownload(kind, 'template')}
-                        disabled={downloadingKey !== null}
-                      >
-                        <Download className="mr-1.5 h-4 w-4" />
-                        {downloadingKey === `${kind}:template` ? 'Downloading...' : 'Template'}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleDownload(kind, 'export')}
-                        disabled={downloadingKey !== null}
-                      >
-                        <Download className="mr-1.5 h-4 w-4" />
-                        {downloadingKey === `${kind}:export` ? 'Downloading...' : 'Export'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <div className="flex flex-wrap gap-2 sm:justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleDownload(kind, 'export')}
+                      disabled={downloadingKey !== null}
+                    >
+                      <Download className="mr-1.5 h-4 w-4" />
+                      {downloadingKey === `${kind}:export` ? 'Downloading…' : 'Export'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleDownload(kind, 'template')}
+                      disabled={downloadingKey !== null}
+                    >
+                      <Download className="mr-1.5 h-4 w-4" />
+                      {downloadingKey === `${kind}:template` ? 'Downloading…' : 'Template'}
+                    </Button>
+                    <Button type="button" size="sm" onClick={() => setActiveKind(kind)}>
+                      <Upload className="mr-1.5 h-4 w-4" />
+                      Import
+                    </Button>
+                  </div>
+                </li>
               )
             }
           )}
-        </div>
+        </ul>
       </div>
 
       <Dialog open={activeKind !== null} onOpenChange={handleOpenChange}>
