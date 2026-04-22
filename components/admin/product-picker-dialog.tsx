@@ -6,7 +6,11 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { BrandChips, GroupByChips, SizeChips } from '@/components/catalog/filter-chips'
+import {
+  FilterReveal,
+  FilterTrigger,
+  useFilterPanelState,
+} from '@/components/catalog/filter-panel'
 import type { Brand } from '@/lib/types'
 import { cn, formatCurrency } from '@/lib/utils'
 
@@ -77,6 +81,8 @@ export function ProductPickerDialog({
     }
     return Array.from(unique).sort((left, right) => left.localeCompare(right))
   }, [products])
+
+  const filterPanelState = useFilterPanelState(sizes, brandLabels)
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -157,39 +163,40 @@ export function ProductPickerDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-col space-y-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search products..."
-              className="pl-9"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search products..."
+                className="pl-9"
+              />
+            </div>
+            <FilterTrigger state={filterPanelState} />
           </div>
 
-          <div className="space-y-2">
-            <GroupByChips groupBy={groupBy} onChange={setGroupBy} />
-            <SizeChips
-              sizes={availableSizes}
-              selectedSizes={sizes}
-              onToggle={(s) =>
-                setSizes((prev) =>
-                  prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-                )
-              }
-              onClear={() => setSizes([])}
-            />
-            <BrandChips
-              brands={availableBrands}
-              selectedBrandIds={brandLabels}
-              onToggle={(id) =>
-                setBrandLabels((prev) =>
-                  prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-                )
-              }
-              onClear={() => setBrandLabels([])}
-            />
-          </div>
+          <FilterReveal
+            state={filterPanelState}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
+            sizes={availableSizes}
+            selectedSizes={sizes}
+            onSizeToggle={(s) =>
+              setSizes((prev) =>
+                prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+              )
+            }
+            onSizeClear={() => setSizes([])}
+            brands={availableBrands}
+            selectedBrandIds={brandLabels}
+            onBrandToggle={(id) =>
+              setBrandLabels((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+              )
+            }
+            onBrandClear={() => setBrandLabels([])}
+          />
 
           {previouslyOrderedIds.length > 0 && (
             <label className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">

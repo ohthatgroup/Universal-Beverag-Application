@@ -1,7 +1,5 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import type { Brand } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -31,7 +29,6 @@ interface BrandChipsProps {
   selectedBrandIds: string[]
   onToggle: (brandId: string) => void
   onClear?: () => void
-  collapseAfter?: number
 }
 
 export function BrandChips({
@@ -39,27 +36,14 @@ export function BrandChips({
   selectedBrandIds,
   onToggle,
   onClear,
-  collapseAfter = 8,
 }: BrandChipsProps) {
-  const [expanded, setExpanded] = useState(false)
   if (brands.length === 0) return null
 
   const selectedSet = new Set(selectedBrandIds)
-  const needsCollapse = brands.length > collapseAfter
-  const anySelectedHidden =
-    needsCollapse &&
-    !expanded &&
-    brands.some((b, i) => i >= collapseAfter && selectedSet.has(b.id))
-
-  const visible = needsCollapse && !expanded && !anySelectedHidden
-    ? brands.slice(0, collapseAfter)
-    : brands
-
-  const hiddenCount = brands.length - collapseAfter
 
   return (
     <FacetRow label="Brand">
-      {visible.map((brand) => {
+      {brands.map((brand) => {
         const active = selectedSet.has(brand.id)
         return (
           <button
@@ -72,16 +56,6 @@ export function BrandChips({
           </button>
         )
       })}
-      {needsCollapse && !expanded && (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className={cn(chipBase, chipIdle, 'gap-1')}
-        >
-          +{hiddenCount} more
-          <ChevronDown className="h-3 w-3" />
-        </button>
-      )}
       {selectedBrandIds.length > 0 && onClear && (
         <button
           type="button"
@@ -100,7 +74,6 @@ interface SizeChipsProps {
   selectedSizes: string[]
   onToggle: (size: string) => void
   onClear?: () => void
-  collapseAfter?: number
 }
 
 export function SizeChips({
@@ -108,27 +81,14 @@ export function SizeChips({
   selectedSizes,
   onToggle,
   onClear,
-  collapseAfter = 10,
 }: SizeChipsProps) {
-  const [expanded, setExpanded] = useState(false)
   if (sizes.length === 0) return null
 
   const selectedSet = new Set(selectedSizes)
-  const needsCollapse = sizes.length > collapseAfter
-  const anySelectedHidden =
-    needsCollapse &&
-    !expanded &&
-    sizes.some((s, i) => i >= collapseAfter && selectedSet.has(s))
-
-  const visible = needsCollapse && !expanded && !anySelectedHidden
-    ? sizes.slice(0, collapseAfter)
-    : sizes
-
-  const hiddenCount = sizes.length - collapseAfter
 
   return (
     <FacetRow label="Size">
-      {visible.map((size) => {
+      {sizes.map((size) => {
         const active = selectedSet.has(size)
         return (
           <button
@@ -141,16 +101,6 @@ export function SizeChips({
           </button>
         )
       })}
-      {needsCollapse && !expanded && (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className={cn(chipBase, chipIdle, 'gap-1')}
-        >
-          +{hiddenCount} more
-          <ChevronDown className="h-3 w-3" />
-        </button>
-      )}
       {selectedSizes.length > 0 && onClear && (
         <button
           type="button"

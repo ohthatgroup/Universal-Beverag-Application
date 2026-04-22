@@ -17,7 +17,11 @@ import {
 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { BrandChips, GroupByChips, SizeChips } from '@/components/catalog/filter-chips'
+import {
+  FilterReveal,
+  FilterTrigger,
+  useFilterPanelState,
+} from '@/components/catalog/filter-panel'
 import { BrowseListGrouped } from '@/components/catalog/browse-list-grouped'
 import { CartSummaryBar } from '@/components/catalog/cart-summary-bar'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
@@ -84,6 +88,8 @@ export function OrderBuilder({
       products,
       defaultGroupBy: defaultGroupBy === 'size' ? 'size' : 'brand',
     })
+
+  const filterPanelState = useFilterPanelState(filters.sizeFilters, filters.brandIds)
 
   const { save, flush } = useAutoSavePortal({
     orderId,
@@ -363,50 +369,47 @@ export function OrderBuilder({
                 </span>
               </div>
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  className="pl-9"
-                  value={filters.searchQuery}
-                  onChange={(event) =>
-                    setFilters((prev) => ({ ...prev, searchQuery: event.target.value }))
-                  }
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products..."
+                    className="pl-9"
+                    value={filters.searchQuery}
+                    onChange={(event) =>
+                      setFilters((prev) => ({ ...prev, searchQuery: event.target.value }))
+                    }
+                  />
+                </div>
+                <FilterTrigger state={filterPanelState} />
               </div>
-
-              <div className="space-y-2">
-                <GroupByChips
-                  groupBy={filters.groupBy}
-                  onChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
-                />
-                <SizeChips
-                  sizes={availableSizes}
-                  selectedSizes={filters.sizeFilters}
-                  onToggle={(size) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      sizeFilters: prev.sizeFilters.includes(size)
-                        ? prev.sizeFilters.filter((s) => s !== size)
-                        : [...prev.sizeFilters, size],
-                    }))
-                  }
-                  onClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
-                />
-                <BrandChips
-                  brands={availableBrands}
-                  selectedBrandIds={filters.brandIds}
-                  onToggle={(brandId) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      brandIds: prev.brandIds.includes(brandId)
-                        ? prev.brandIds.filter((b) => b !== brandId)
-                        : [...prev.brandIds, brandId],
-                    }))
-                  }
-                  onClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
-                />
-              </div>
+              <FilterReveal
+                state={filterPanelState}
+                groupBy={filters.groupBy}
+                onGroupByChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
+                sizes={availableSizes}
+                selectedSizes={filters.sizeFilters}
+                onSizeToggle={(size) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    sizeFilters: prev.sizeFilters.includes(size)
+                      ? prev.sizeFilters.filter((s) => s !== size)
+                      : [...prev.sizeFilters, size],
+                  }))
+                }
+                onSizeClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
+                brands={availableBrands}
+                selectedBrandIds={filters.brandIds}
+                onBrandToggle={(brandId) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    brandIds: prev.brandIds.includes(brandId)
+                      ? prev.brandIds.filter((b) => b !== brandId)
+                      : [...prev.brandIds, brandId],
+                  }))
+                }
+                onBrandClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
+              />
 
               <BrowseListGrouped
                 groups={browseGroups}
