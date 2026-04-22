@@ -35,7 +35,9 @@ export function PalletCard({ palletDeal, quantity, onChange, showPrices }: Palle
           <div className="text-sm font-semibold text-accent">{palletDeal.savings_text}</div>
         )}
         <div>
-          <div className="font-medium">{palletDeal.title}</div>
+          <div className="font-medium text-primary underline underline-offset-4 hover:no-underline">
+            {palletDeal.title}
+          </div>
           {palletDeal.description && (
             <div className="text-xs text-muted-foreground">{palletDeal.description}</div>
           )}

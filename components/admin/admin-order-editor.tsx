@@ -291,8 +291,6 @@ function AdminOrderLine({ item }: { item: AdminOrderEditorItem }) {
     setEditingPrice(false)
   }
 
-  const lineTotal = unitPrice * quantity
-
   return (
     <div className="flex items-center gap-3 px-3 py-3">
       <div className="min-w-0 flex-1">
@@ -341,10 +339,6 @@ function AdminOrderLine({ item }: { item: AdminOrderEditorItem }) {
             {formatCurrency(unitPrice)}
           </button>
         )}
-      </div>
-
-      <div className="w-24 shrink-0 text-right text-sm font-medium tabular-nums">
-        {formatCurrency(lineTotal)}
       </div>
 
       <button

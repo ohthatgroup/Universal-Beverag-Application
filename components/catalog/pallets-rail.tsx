@@ -67,7 +67,9 @@ export function PalletsRail({ deals, quantities, onChange, showPrices }: Pallets
               {deal.savings_text && (
                 <div className="text-sm font-semibold text-accent">{deal.savings_text}</div>
               )}
-              <div className="text-sm font-medium leading-snug">{deal.title}</div>
+              <div className="text-sm font-medium leading-snug text-primary underline underline-offset-4 hover:no-underline">
+                {deal.title}
+              </div>
               {showPrices && (
                 <div className="text-xs text-muted-foreground">{formatCurrency(deal.price)}</div>
               )}
