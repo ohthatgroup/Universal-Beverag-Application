@@ -53,3 +53,25 @@ export async function getCustomerToken(businessName: string): Promise<string> {
   })
 }
 
+/**
+ * Look up a customer profile by business name and return its id.
+ */
+export async function getCustomerIdByName(businessName: string): Promise<string> {
+  return withDb(async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      `select id
+       from profiles
+       where role = 'customer'
+         and business_name = $1
+       limit 1`,
+      [businessName]
+    )
+
+    const id = rows[0]?.id
+    if (!id) {
+      throw new Error(`Unable to find customer id for "${businessName}"`)
+    }
+
+    return id
+  })
+}
