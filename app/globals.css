@@ -50,6 +50,16 @@
     --status-delivered-bg: 142 50% 94%;
     --status-cancelled: 0 72% 45%;
     --status-cancelled-bg: 0 80% 96%;
+    --status-active: 142 55% 38%;
+    --status-active-bg: 142 50% 94%;
+    --status-inactive: 214 10% 55%;
+    --status-inactive-bg: 214 15% 94%;
+    --status-discontinued: 0 72% 45%;
+    --status-discontinued-bg: 0 80% 96%;
+    --status-invited: 38 92% 45%;
+    --status-invited-bg: 38 90% 94%;
+    --status-disabled: 214 10% 55%;
+    --status-disabled-bg: 214 15% 94%;
 
     /* Lines */
     --border: 214 15% 88%;
@@ -99,6 +109,16 @@
     --status-delivered-bg: 142 30% 16%;
     --status-cancelled: 0 72% 60%;
     --status-cancelled-bg: 0 40% 18%;
+    --status-active: 142 55% 55%;
+    --status-active-bg: 142 30% 16%;
+    --status-inactive: 214 10% 65%;
+    --status-inactive-bg: 214 20% 18%;
+    --status-discontinued: 0 72% 60%;
+    --status-discontinued-bg: 0 40% 18%;
+    --status-invited: 38 92% 60%;
+    --status-invited-bg: 38 40% 18%;
+    --status-disabled: 214 10% 65%;
+    --status-disabled-bg: 214 20% 18%;
 
     --border: 214 20% 20%;
     --input: 214 20% 20%;

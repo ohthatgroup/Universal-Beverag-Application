@@ -1,7 +1,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { STATUS_DOT_CLASSES } from '@/components/ui/status-dot'
+import { OrderStatusDot } from '@/components/ui/status-dot'
 import type { OrderStatus } from '@/lib/types'
 
 export interface StatusFilterChipProps {
@@ -26,10 +26,7 @@ export function StatusFilterChip({ status, label, href, active, className }: Sta
         className
       )}
     >
-      <span
-        aria-hidden
-        className={cn('inline-block h-2 w-2 shrink-0 rounded-full', STATUS_DOT_CLASSES[status])}
-      />
+      <OrderStatusDot status={status} aria-hidden />
       {label}
     </Link>
   )

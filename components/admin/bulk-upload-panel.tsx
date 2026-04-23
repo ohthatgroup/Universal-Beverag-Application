@@ -196,7 +196,7 @@ export function BulkUploadPanel() {
               return (
                 <li
                   key={kind}
-                  className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 px-4 py-3 md:grid md:grid-cols-[1fr_auto] md:items-center md:gap-4"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
@@ -204,12 +204,12 @@ export function BulkUploadPanel() {
                     </span>
                     <div className="min-w-0">
                       <div className="text-sm font-medium">{definition.title}</div>
-                      <div className="truncate text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         {definition.description}
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 sm:justify-end">
+                  <div className="flex flex-wrap gap-2 md:flex-nowrap md:justify-end">
                     <Button
                       type="button"
                       size="sm"

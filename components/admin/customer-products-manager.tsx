@@ -124,6 +124,7 @@ export function CustomerProductsManager({
   const [drafts, setDrafts] = useState<Record<string, ProductDraftState>>(() => buildInitialDrafts(groups, overrides))
   const [savingToggleIds, setSavingToggleIds] = useState<Set<string>>(new Set())
   const [priceRowState, setPriceRowState] = useState<Record<string, 'saving' | 'saved' | 'error'>>({})
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [isCreatingCustomProduct, setIsCreatingCustomProduct] = useState(false)
   const [createForm, setCreateForm] = useState<CreateCustomProductFormState>(DEFAULT_CREATE_FORM)
@@ -275,6 +276,44 @@ export function CustomerProductsManager({
             savedCustomPrice: parsed.value,
             draftCustomPrice: parsed.value === null ? '' : String(parsed.value),
           },
+        }
+      })
+      setPriceRowState((s) => ({ ...s, [productId]: 'saved' }))
+      setTimeout(() => {
+        setPriceRowState((s) => {
+          if (s[productId] !== 'saved') return s
+          const next = { ...s }
+          delete next[productId]
+          return next
+        })
+      }, 1200)
+    } catch {
+      setPriceRowState((s) => ({ ...s, [productId]: 'error' }))
+    }
+  }
+
+  const resetCustomPrice = async (productId: string) => {
+    if (!customPricing) return
+    const draft = drafts[productId]
+    setEditingPriceId(null)
+    if (!draft || draft.savedCustomPrice === null) {
+      updateDraft(productId, { draftCustomPrice: '' })
+      return
+    }
+    setPriceRowState((s) => ({ ...s, [productId]: 'saving' }))
+    try {
+      const response = await fetch(`/api/customers/${customerId}/products`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: [{ productId, customPrice: null }] }),
+      })
+      if (!response.ok) throw new Error('save failed')
+      setDrafts((prev) => {
+        const current = prev[productId]
+        if (!current) return prev
+        return {
+          ...prev,
+          [productId]: { ...current, savedCustomPrice: null, draftCustomPrice: '' },
         }
       })
       setPriceRowState((s) => ({ ...s, [productId]: 'saved' }))
@@ -543,7 +582,7 @@ export function CustomerProductsManager({
                       <div className="flex items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 text-sm font-medium">
-                            <span className="truncate">{product.title}</span>
+                            <span>{product.title}</span>
                             {product.isCustom ? (
                               <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                                 Custom
@@ -551,23 +590,71 @@ export function CustomerProductsManager({
                             ) : null}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {product.packLabel} - {formatCurrency(product.price)}
+                            {product.packLabel}
                           </div>
-                          {customPricing && (
-                            <div className="mt-1.5 flex items-center gap-2">
-                              <Input
-                                value={draft?.draftCustomPrice ?? ''}
-                                placeholder="Custom price"
-                                className={cn('h-8 text-xs', hasInvalidPrice && 'border-destructive')}
-                                onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
-                                onBlur={() => void savePriceOnBlur(product.id)}
-                              />
-                              <PriceRowIndicator
-                                state={priceRowState[product.id]}
-                                onRetry={() => void savePriceOnBlur(product.id)}
-                              />
-                            </div>
-                          )}
+                          <div className="mt-1.5 flex items-center gap-2">
+                            {customPricing ? (
+                              <>
+                                {editingPriceId === product.id ? (
+                                  <Input
+                                    autoFocus
+                                    value={draft?.draftCustomPrice ?? ''}
+                                    placeholder="Price"
+                                    className={cn('h-8 text-xs', hasInvalidPrice && 'border-destructive')}
+                                    onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
+                                    onBlur={() => {
+                                      setEditingPriceId(null)
+                                      void savePriceOnBlur(product.id)
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') {
+                                        event.preventDefault()
+                                        ;(event.target as HTMLInputElement).blur()
+                                      } else if (event.key === 'Escape') {
+                                        updateDraft(product.id, {
+                                          draftCustomPrice:
+                                            draft?.savedCustomPrice === null || draft?.savedCustomPrice === undefined
+                                              ? ''
+                                              : String(draft.savedCustomPrice),
+                                        })
+                                        setEditingPriceId(null)
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingPriceId(product.id)}
+                                    className={cn(
+                                      'text-sm decoration-dotted underline-offset-4 hover:underline tabular-nums',
+                                      draft?.savedCustomPrice !== null && draft?.savedCustomPrice !== undefined && 'font-semibold'
+                                    )}
+                                  >
+                                    {draft?.savedCustomPrice !== null && draft?.savedCustomPrice !== undefined
+                                      ? formatCurrency(draft.savedCustomPrice)
+                                      : formatCurrency(product.price)}
+                                  </button>
+                                )}
+                                {draft?.savedCustomPrice !== null && draft?.savedCustomPrice !== undefined && editingPriceId !== product.id ? (
+                                  <button
+                                    type="button"
+                                    aria-label="Reset to default price"
+                                    title="Reset to default price"
+                                    onClick={() => void resetCustomPrice(product.id)}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : null}
+                                <PriceRowIndicator
+                                  state={priceRowState[product.id]}
+                                  onRetry={() => void savePriceOnBlur(product.id)}
+                                />
+                              </>
+                            ) : (
+                              <span className="text-sm tabular-nums">{formatCurrency(product.price)}</span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex flex-col items-end gap-2">
@@ -614,10 +701,7 @@ export function CustomerProductsManager({
                     <tr className="border-b bg-muted/50">
                       <th className="px-4 py-2 text-left font-medium">Product</th>
                       <th className="px-4 py-2 text-left font-medium">Pack</th>
-                      <th className="px-4 py-2 text-right font-medium">Default Price</th>
-                      {customPricing && (
-                        <th className="px-4 py-2 text-right font-medium">Custom Price</th>
-                      )}
+                      <th className="px-4 py-2 text-right font-medium">Price</th>
                       <th className="px-4 py-2 text-center font-medium">Pin</th>
                       <th className="px-4 py-2 text-center font-medium">Hide</th>
                     </tr>
@@ -629,6 +713,8 @@ export function CustomerProductsManager({
                       const parsed = parseCustomPriceInput(draft?.draftCustomPrice ?? '')
                       const hasInvalidPrice = customPricing && !parsed.valid
                       const toggleSaving = savingToggleIds.has(product.id)
+                      const hasCustomPrice =
+                        draft?.savedCustomPrice !== null && draft?.savedCustomPrice !== undefined
 
                       return (
                         <tr key={product.id} className={cn('border-b last:border-0', hidden && 'opacity-50')}>
@@ -643,24 +729,69 @@ export function CustomerProductsManager({
                             </div>
                           </td>
                           <td className="px-4 py-2 text-muted-foreground">{product.packLabel}</td>
-                          <td className="px-4 py-2 text-right">{formatCurrency(product.price)}</td>
-                          {customPricing ? (
-                            <td className="px-4 py-2 text-right">
+                          <td className="px-4 py-2 text-right">
+                            {customPricing ? (
                               <div className="flex items-center justify-end gap-2">
                                 <PriceRowIndicator
                                   state={priceRowState[product.id]}
                                   onRetry={() => void savePriceOnBlur(product.id)}
                                 />
-                                <Input
-                                  value={draft?.draftCustomPrice ?? ''}
-                                  placeholder="-"
-                                  className={cn('h-8 w-28 text-right text-xs', hasInvalidPrice && 'border-destructive')}
-                                  onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
-                                  onBlur={() => void savePriceOnBlur(product.id)}
-                                />
+                                {editingPriceId === product.id ? (
+                                  <Input
+                                    autoFocus
+                                    value={draft?.draftCustomPrice ?? ''}
+                                    placeholder="-"
+                                    className={cn('h-8 w-28 text-right text-xs', hasInvalidPrice && 'border-destructive')}
+                                    onChange={(event) => updateDraft(product.id, { draftCustomPrice: event.target.value })}
+                                    onBlur={() => {
+                                      setEditingPriceId(null)
+                                      void savePriceOnBlur(product.id)
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') {
+                                        event.preventDefault()
+                                        ;(event.target as HTMLInputElement).blur()
+                                      } else if (event.key === 'Escape') {
+                                        updateDraft(product.id, {
+                                          draftCustomPrice:
+                                            draft?.savedCustomPrice === null || draft?.savedCustomPrice === undefined
+                                              ? ''
+                                              : String(draft.savedCustomPrice),
+                                        })
+                                        setEditingPriceId(null)
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingPriceId(product.id)}
+                                    className={cn(
+                                      'text-xs decoration-dotted underline-offset-4 hover:underline tabular-nums',
+                                      hasCustomPrice && 'font-semibold'
+                                    )}
+                                  >
+                                    {hasCustomPrice
+                                      ? formatCurrency(draft.savedCustomPrice as number)
+                                      : formatCurrency(product.price)}
+                                  </button>
+                                )}
+                                {hasCustomPrice && editingPriceId !== product.id ? (
+                                  <button
+                                    type="button"
+                                    aria-label="Reset to default price"
+                                    title="Reset to default price"
+                                    onClick={() => void resetCustomPrice(product.id)}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : null}
                               </div>
-                            </td>
-                          ) : null}
+                            ) : (
+                              <span className="tabular-nums">{formatCurrency(product.price)}</span>
+                            )}
+                          </td>
                           <td className="px-4 py-2 text-center">
                             <button
                               type="button"

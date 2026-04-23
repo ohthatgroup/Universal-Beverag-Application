@@ -5,7 +5,7 @@ import type { CatalogProduct, Brand } from '@/lib/types'
 import { getProductSizeLabel } from '@/lib/utils'
 
 export type CatalogTab = 'pallets' | 'all'
-export type GroupBy = 'brand' | 'size'
+export type GroupBy = 'brand' | 'size' | 'size-brand'
 
 export interface FilterState {
   brandIds: string[]
@@ -18,6 +18,13 @@ export interface CatalogGroup {
   key: string
   label: string
   products: CatalogProduct[]
+}
+
+export interface CatalogSizeBrandGroup {
+  key: string
+  sizeLabel: string
+  sizeSortValue: number
+  brandGroups: CatalogGroup[]
 }
 
 interface UseCatalogOptions {
@@ -90,7 +97,8 @@ export function useCatalog({
       return Array.from(groups.values())
     }
 
-    // Group by unit size only (pack count ignored).
+    // For 'size' and 'size-brand' modes: primary key is size label.
+    // ('size-brand' also uses the nestedGrouped memo below for its two-level render.)
     const groups = new Map<string, CatalogGroup>()
     for (const product of productsForGroupedView) {
       const sizeKey = getProductSizeLabel(product) ?? 'Other'
@@ -101,6 +109,57 @@ export function useCatalog({
     }
     return Array.from(groups.values())
   }, [filtered, filters.groupBy, isFilterActive, productsForGroupedView])
+
+  // Nested Size → Brand grouping for the tile-grid layout.
+  const nestedGrouped = useMemo<CatalogSizeBrandGroup[]>(() => {
+    if (isFilterActive || filters.groupBy !== 'size-brand') return []
+
+    const sizeMap = new Map<string, CatalogSizeBrandGroup>()
+    for (const product of productsForGroupedView) {
+      const sizeLabel = getProductSizeLabel(product) ?? 'Other'
+      const sizeSortValue =
+        typeof product.size_value === 'number' && Number.isFinite(product.size_value)
+          ? product.size_value
+          : Number.POSITIVE_INFINITY
+
+      let sizeGroup = sizeMap.get(sizeLabel)
+      if (!sizeGroup) {
+        sizeGroup = {
+          key: sizeLabel,
+          sizeLabel,
+          sizeSortValue,
+          brandGroups: [],
+        }
+        sizeMap.set(sizeLabel, sizeGroup)
+      } else if (sizeSortValue < sizeGroup.sizeSortValue) {
+        sizeGroup.sizeSortValue = sizeSortValue
+      }
+
+      const brandKey = product.brand_id ?? 'uncategorized'
+      let brandGroup = sizeGroup.brandGroups.find((g) => g.key === brandKey)
+      if (!brandGroup) {
+        brandGroup = {
+          key: brandKey,
+          label: product.brand?.name ?? 'Other',
+          products: [],
+        }
+        sizeGroup.brandGroups.push(brandGroup)
+      }
+      brandGroup.products.push(product)
+    }
+
+    // Sort sizes ascending by size_value; fall back to label comparison.
+    const result = Array.from(sizeMap.values())
+    result.sort((a, b) => {
+      if (a.sizeSortValue !== b.sizeSortValue) return a.sizeSortValue - b.sizeSortValue
+      return a.sizeLabel.localeCompare(b.sizeLabel)
+    })
+    // Sort brands within each size alphabetically (brand.sort_order is not available per-group here).
+    for (const size of result) {
+      size.brandGroups.sort((a, b) => a.label.localeCompare(b.label))
+    }
+    return result
+  }, [filters.groupBy, isFilterActive, productsForGroupedView])
 
   // Derived: unique brands and sizes for filter dropdowns
   const availableBrands = useMemo<Brand[]>(() => {
@@ -129,6 +188,7 @@ export function useCatalog({
     filters,
     setFilters,
     grouped,
+    nestedGrouped,
     filteredProducts: filtered,
     newItems,
     isFilterActive,

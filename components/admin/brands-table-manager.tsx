@@ -1,9 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Plus } from 'lucide-react'
+import { AdminFab } from '@/components/admin/admin-fab'
+import { BulkActionBar } from '@/components/admin/bulk-action-bar'
+import { ListToolbar } from '@/components/admin/list-toolbar'
+import { RowActions, RowCheckbox } from '@/components/admin/row-actions'
+import { ConfirmSheet } from '@/components/ui/confirm-sheet'
+import { EmptyState } from '@/components/ui/empty-state'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { Button } from '@/components/ui/button'
+import { SaveStatus } from '@/components/ui/save-status'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +42,8 @@ interface BrandRowState extends BrandTableRow {
 interface BrandsTableManagerProps {
   brands: BrandTableRow[]
   searchQuery: string
+  /** Optional search input rendered inside the toolbar row. */
+  search?: ReactNode
 }
 
 function toRowState(row: BrandTableRow): BrandRowState {
@@ -53,7 +62,7 @@ function normalizeBrandApiRow(row: BrandApiRow): BrandTableRow {
   }
 }
 
-export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerProps) {
+export function BrandsTableManager({ brands, searchQuery, search }: BrandsTableManagerProps) {
   const [rows, setRows] = useState<BrandRowState[]>(brands.map(toRowState))
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [rowStatus, setRowStatus] = useState<Record<string, 'saved' | 'error'>>({})
@@ -66,6 +75,7 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
   const [error, setError] = useState<string | null>(null)
   const [createName, setCreateName] = useState('')
   const [createLogoUrl, setCreateLogoUrl] = useState<string | null>(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const savedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const searchIsActive = searchQuery.trim().length > 0
@@ -175,11 +185,13 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
     })
   }
 
+  const requestDeleteSelected = () => {
+    if (busy || selectedRows.length === 0) return
+    setConfirmDeleteOpen(true)
+  }
+
   const deleteSelected = async () => {
     if (busy || selectedRows.length === 0) return
-    const confirmed = window.confirm(`Delete ${selectedRows.length} selected brand(s)?`)
-    if (!confirmed) return
-
     setBusy(true)
     setError(null)
     const ids = selectedRows.map((row) => row.id)
@@ -247,34 +259,23 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
 
   return (
     <div className="space-y-4">
-      {/* Toolbar: pen toggles edit mode; plus opens create modal */}
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          size="icon"
-          variant={editMode ? 'default' : 'outline'}
-          aria-label={editMode ? 'Exit edit mode' : 'Enter edit mode'}
-          title={editMode ? 'Exit edit mode' : 'Edit: show checkboxes + bulk delete'}
-          onClick={() => {
-            setEditMode((prev) => {
-              const next = !prev
-              if (!next) setSelectedIds(new Set())
-              return next
-            })
-          }}
-        >
-          {editMode ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          aria-label="New brand"
-          title="New brand"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
+      <ListToolbar
+        search={search}
+        editMode={editMode}
+        onEditModeChange={(next) => {
+          setEditMode(next)
+          if (!next) setSelectedIds(new Set())
+        }}
+        editTitle={editMode ? 'Exit edit mode' : 'Edit: show checkboxes + bulk delete'}
+        onAdd={() => setCreateOpen(true)}
+        addLabel="New brand"
+      />
+
+      <AdminFab
+        icon={<Plus className="h-6 w-6" />}
+        label="New brand"
+        onClick={() => setCreateOpen(true)}
+      />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md p-4 sm:p-6">
@@ -312,31 +313,37 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
         </DialogContent>
       </Dialog>
 
-      {editMode && selectedCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
-          <span className="text-sm text-muted-foreground">{selectedCount} selected</span>
-          <Button
-            type="button"
-            size="sm"
-            variant="destructive"
-            disabled={busy}
-            onClick={deleteSelected}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Delete
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
-            Clear
-          </Button>
-        </div>
+      {editMode && (
+        <BulkActionBar
+          selectedCount={selectedCount}
+          onDelete={requestDeleteSelected}
+          onClear={() => setSelectedIds(new Set())}
+          busy={busy}
+        />
       )}
+
+      <ConfirmSheet
+        open={confirmDeleteOpen}
+        onOpenChange={(next) => {
+          if (!busy) setConfirmDeleteOpen(next)
+        }}
+        title={`Delete ${selectedCount} brand${selectedCount === 1 ? '' : 's'}?`}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+        pending={busy}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false)
+          void deleteSelected()
+        }}
+      />
       {searchIsActive && editMode && (
         <p className="text-xs text-muted-foreground">Clear search to enable reorder.</p>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No brands found.</p>
+        <EmptyState title="No brands yet" description="Add your first brand to get started." />
       ) : (
         <ul className="divide-y rounded-lg border bg-card">
           {rows.map((row) => {
@@ -346,6 +353,14 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
 
             return (
               <li key={row.id} className="flex items-center gap-3 px-3 py-3">
+                {editMode && (
+                  <RowCheckbox
+                    label={`Select ${row.name}`}
+                    checked={selectedIds.has(row.id)}
+                    onChange={(event) => toggleSelected(row.id, event.target.checked)}
+                    disabled={busy}
+                  />
+                )}
                 <BrandLogoSlot
                   name={row.draftName || row.name}
                   logoUrl={row.draftLogoUrl}
@@ -383,7 +398,7 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
                       type="button"
                       onClick={() => (editMode ? undefined : setEditingNameId(row.id))}
                       className={cn(
-                        'block w-full truncate text-left text-sm font-medium',
+                        'block w-full text-left text-sm font-medium',
                         !editMode && 'hover:underline decoration-dotted underline-offset-4'
                       )}
                       disabled={editMode}
@@ -393,40 +408,20 @@ export function BrandsTableManager({ brands, searchQuery }: BrandsTableManagerPr
                   )}
                 </div>
 
-                <div className="flex min-w-[60px] items-center justify-end gap-1.5 text-xs">
-                  {saving && <span className="text-muted-foreground">Saving…</span>}
-                  {!saving && status === 'saved' && (
-                    <span className="inline-flex items-center gap-1 text-green-600">
-                      <Check className="h-3 w-3" /> Saved
-                    </span>
-                  )}
-                  {!saving && status === 'error' && (
-                    <button
-                      type="button"
-                      onClick={() => {
+                <RowActions
+                  status={
+                    <SaveStatus
+                      state={saving ? 'saving' : status === 'saved' ? 'saved' : status === 'error' ? 'error' : 'idle'}
+                      onRetry={() => {
                         if (row.draftName.trim() !== row.name) {
                           void saveName(row)
                         } else if ((row.draftLogoUrl ?? null) !== (row.logoUrl ?? null)) {
                           void saveLogo(row, row.draftLogoUrl)
                         }
                       }}
-                      className="inline-flex items-center gap-1 text-destructive hover:underline"
-                    >
-                      <RotateCcw className="h-3 w-3" /> Retry
-                    </button>
-                  )}
-                </div>
-
-                {editMode && (
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 shrink-0"
-                    checked={selectedIds.has(row.id)}
-                    onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                    disabled={busy}
-                    aria-label={`Select ${row.name}`}
-                  />
-                )}
+                    />
+                  }
+                />
               </li>
             )
           })}

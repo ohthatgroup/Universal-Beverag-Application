@@ -1,9 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Search, Sparkles } from 'lucide-react'
+import { ChevronDown, Search, Sparkles } from 'lucide-react'
 import { useAutoSavePortal } from '@/lib/hooks/useAutoSavePortal'
 import { useCatalog } from '@/lib/hooks/useCatalog'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
@@ -16,17 +15,21 @@ import {
   getProductDisplayName,
   getProductPackLabel,
 } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  FilterTriggerAnchored,
+  FilterCollapsePanel,
+  FilterMobileSheet,
+  FilterTrigger,
   useFilterPanelState,
 } from '@/components/catalog/filter-panel'
-import { BrowseListGrouped } from '@/components/catalog/browse-list-grouped'
+import { CatalogGrid } from '@/components/catalog/catalog-grid'
+import { ProductTile } from '@/components/catalog/product-tile'
+import { ProductPopout } from '@/components/catalog/product-popout'
 import { CartSummaryBar } from '@/components/catalog/cart-summary-bar'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { ReviewOrderSheet, type ReviewItem } from '@/components/catalog/review-order-sheet'
 import { PalletDetailDialog, type PalletDetailItem } from '@/components/catalog/pallet-detail-dialog'
+import { PortalPageHeader } from '@/components/portal/portal-page-header'
 
 interface OrderBuilderProps {
   token: string
@@ -61,9 +64,7 @@ export function OrderBuilder({
   palletDeals,
   palletItemsByDealId,
   showPrices,
-  defaultGroupBy,
   initialItems,
-  productToPalletDealIds,
   usuals,
 }: OrderBuilderProps) {
   const router = useRouter()
@@ -76,6 +77,7 @@ export function OrderBuilder({
   const [isResetting, setIsResetting] = useState(false)
   const [palletDetailId, setPalletDetailId] = useState<string | null>(null)
   const [palletsExpanded, setPalletsExpanded] = useState(true)
+  const [openProductId, setOpenProductId] = useState<string | null>(null)
 
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {}
@@ -85,11 +87,18 @@ export function OrderBuilder({
     return initial
   })
 
-  const { filters, setFilters, grouped, isFilterActive, availableBrands, availableSizes } =
-    useCatalog({
-      products,
-      defaultGroupBy: defaultGroupBy === 'size' ? 'size' : 'brand',
-    })
+  const {
+    filters,
+    setFilters,
+    grouped,
+    nestedGrouped,
+    isFilterActive,
+    availableBrands,
+    availableSizes,
+  } = useCatalog({
+    products,
+    defaultGroupBy: 'size-brand',
+  })
 
   const filterPanelState = useFilterPanelState(filters.sizeFilters, filters.brandIds)
 
@@ -140,6 +149,21 @@ export function OrderBuilder({
     () => browseGroups.flatMap((group) => group.products),
     [browseGroups]
   )
+
+  const browseNestedGroups = useMemo(() => {
+    if (isFilterActive) return nestedGrouped
+    return nestedGrouped
+      .map((size) => ({
+        ...size,
+        brandGroups: size.brandGroups
+          .map((brand) => ({
+            ...brand,
+            products: brand.products.filter((product) => !usualProductIds.has(product.id)),
+          }))
+          .filter((brand) => brand.products.length > 0),
+      }))
+      .filter((size) => size.brandGroups.length > 0)
+  }, [nestedGrouped, isFilterActive, usualProductIds])
 
   const hasSearchQuery = filters.searchQuery.trim().length > 0
   const renderFlat = isFilterActive || hasSearchQuery
@@ -256,15 +280,10 @@ export function OrderBuilder({
 
   return (
     <div className="pb-28 md:pb-8">
-      <header className="flex items-center justify-between gap-2 pb-2">
-        <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link href={`${basePath}/orders`}>
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Back
-          </Link>
-        </Button>
-        <span className="text-sm font-medium">{formatDeliveryDate(deliveryDate)}</span>
-      </header>
+      <PortalPageHeader
+        back={{ href: basePath }}
+        title={formatDeliveryDate(deliveryDate)}
+      />
 
       {palletDeals.length > 0 && (
         <section className="space-y-2">
@@ -317,21 +336,10 @@ export function OrderBuilder({
                           {showPrices && <> · {formatCurrency(deal.price)}</>}
                         </div>
                       </div>
-                      {qty === 0 ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setPalletQuantity(deal, 1)}
-                        >
-                          Add
-                        </Button>
-                      ) : (
-                        <QuantitySelector
-                          quantity={qty}
-                          onChange={(next) => setPalletQuantity(deal, next)}
-                        />
-                      )}
+                      <QuantitySelector
+                        quantity={qty}
+                        onChange={(next) => setPalletQuantity(deal, next)}
+                      />
                     </li>
                   )
                 })}
@@ -343,32 +351,24 @@ export function OrderBuilder({
 
       <div className="pt-4">
         {showUsuals ? (
-          <div className="divide-y rounded-md border">
-            {usuals
-              .map((u) => ({ usual: u, product: productById.get(u.productId) }))
-              .filter((e) => e.product)
-              .map(({ usual, product }) => {
-                const p = product!
-                const qty = quantities[`product:${p.id}`] ?? 0
-                return (
-                  <div key={p.id} className="flex items-center gap-3 px-3 py-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">
-                        {getProductDisplayName(p, p.brand?.name ?? null)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {getProductPackLabel(p) ?? ''}
-                        {showPrices && <> · {formatCurrency(p.effective_price)}</>}
-                      </div>
-                    </div>
-                    <QuantitySelector
-                      quantity={qty}
-                      onChange={(next) => setProductQuantity(p, next)}
-                    />
-                  </div>
-                )
-              })}
-          </div>
+          <section>
+            <div className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Favorites
+            </div>
+            <div className="grid grid-cols-4 gap-2 md:grid-cols-8">
+              {usuals
+                .map((u) => productById.get(u.productId))
+                .filter((p): p is CatalogProduct => Boolean(p))
+                .map((p) => (
+                  <ProductTile
+                    key={p.id}
+                    product={p}
+                    quantity={quantities[`product:${p.id}`] ?? 0}
+                    onOpen={() => setOpenProductId(p.id)}
+                  />
+                ))}
+            </div>
+          </section>
         ) : null}
 
         <div className="pt-4">
@@ -394,44 +394,71 @@ export function OrderBuilder({
                     }
                   />
                 </div>
-                <FilterTriggerAnchored
-                  state={filterPanelState}
-                  groupBy={filters.groupBy}
-                  onGroupByChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
-                  sizes={availableSizes}
-                  selectedSizes={filters.sizeFilters}
-                  onSizeToggle={(size) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      sizeFilters: prev.sizeFilters.includes(size)
-                        ? prev.sizeFilters.filter((s) => s !== size)
-                        : [...prev.sizeFilters, size],
-                    }))
-                  }
-                  onSizeClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
-                  brands={availableBrands}
-                  selectedBrandIds={filters.brandIds}
-                  onBrandToggle={(brandId) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      brandIds: prev.brandIds.includes(brandId)
-                        ? prev.brandIds.filter((b) => b !== brandId)
-                        : [...prev.brandIds, brandId],
-                    }))
-                  }
-                  onBrandClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
-                />
+                <FilterTrigger state={filterPanelState} />
               </div>
 
-              <BrowseListGrouped
-                groups={browseGroups}
-                groupBy={filters.groupBy}
+              <FilterCollapsePanel
+                state={filterPanelState}
+                groupBy={filters.groupBy === 'brand' ? 'brand' : 'size'}
+                onGroupByChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
+                sizes={availableSizes}
+                selectedSizes={filters.sizeFilters}
+                onSizeToggle={(size) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    sizeFilters: prev.sizeFilters.includes(size)
+                      ? prev.sizeFilters.filter((s) => s !== size)
+                      : [...prev.sizeFilters, size],
+                  }))
+                }
+                onSizeClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
+                brands={availableBrands}
+                selectedBrandIds={filters.brandIds}
+                onBrandToggle={(brandId) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    brandIds: prev.brandIds.includes(brandId)
+                      ? prev.brandIds.filter((b) => b !== brandId)
+                      : [...prev.brandIds, brandId],
+                  }))
+                }
+                onBrandClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
+              />
+
+              <FilterMobileSheet
+                state={filterPanelState}
+                groupBy={filters.groupBy === 'brand' ? 'brand' : 'size'}
+                onGroupByChange={(groupBy) => setFilters((prev) => ({ ...prev, groupBy }))}
+                sizes={availableSizes}
+                selectedSizes={filters.sizeFilters}
+                onSizeToggle={(size) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    sizeFilters: prev.sizeFilters.includes(size)
+                      ? prev.sizeFilters.filter((s) => s !== size)
+                      : [...prev.sizeFilters, size],
+                  }))
+                }
+                onSizeClear={() => setFilters((prev) => ({ ...prev, sizeFilters: [] }))}
+                brands={availableBrands}
+                selectedBrandIds={filters.brandIds}
+                onBrandToggle={(brandId) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    brandIds: prev.brandIds.includes(brandId)
+                      ? prev.brandIds.filter((b) => b !== brandId)
+                      : [...prev.brandIds, brandId],
+                  }))
+                }
+                onBrandClear={() => setFilters((prev) => ({ ...prev, brandIds: [] }))}
+              />
+
+              <CatalogGrid
+                nestedGroups={browseNestedGroups}
                 flat={renderFlat}
                 flatProducts={browseList}
                 quantityFor={(product) => quantities[`product:${product.id}`] ?? 0}
-                onChange={(product, next) => setProductQuantity(product, next)}
-                showPrices={showPrices}
-                productToPalletDealIds={productToPalletDealIds}
+                onOpen={(product) => setOpenProductId(product.id)}
               />
           </section>
         </div>
@@ -475,6 +502,20 @@ export function OrderBuilder({
           {statusMessage}
         </div>
       )}
+
+      <ProductPopout
+        product={openProductId ? productById.get(openProductId) ?? null : null}
+        quantity={openProductId ? quantities[`product:${openProductId}`] ?? 0 : 0}
+        onChange={(next) => {
+          if (!openProductId) return
+          const product = productById.get(openProductId)
+          if (product) setProductQuantity(product, next)
+        }}
+        onOpenChange={(open) => {
+          if (!open) setOpenProductId(null)
+        }}
+        showPrices={showPrices}
+      />
     </div>
   )
 }

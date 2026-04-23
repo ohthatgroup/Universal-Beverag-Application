@@ -34,6 +34,7 @@ export function BrowseRow({
 
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
+      <QuantitySelector quantity={quantity} onChange={onChange} />
       {thumbSrc ? (
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-background">
           <Image
@@ -57,7 +58,6 @@ export function BrowseRow({
           {showPrices && <> · {formatCurrency(product.effective_price)}</>}
         </div>
       </div>
-      <QuantitySelector quantity={quantity} onChange={onChange} />
     </div>
   )
 }

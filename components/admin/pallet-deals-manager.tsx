@@ -2,18 +2,15 @@
 
 import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowDown,
-  ArrowDownToLine,
-  ArrowUp,
-  ArrowUpToLine,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { type ReactNode } from 'react'
+import { Plus } from 'lucide-react'
 import { AdminFab } from '@/components/admin/admin-fab'
+import { BulkActionBar } from '@/components/admin/bulk-action-bar'
+import { ListToolbar } from '@/components/admin/list-toolbar'
+import { RowActions, RowCheckbox, RowReorderArrows } from '@/components/admin/row-actions'
+import { ConfirmSheet } from '@/components/ui/confirm-sheet'
+import { EmptyState } from '@/components/ui/empty-state'
+import { PalletStatusDot } from '@/components/ui/status-dot'
 import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency } from '@/lib/utils'
 
@@ -28,78 +25,11 @@ export interface PalletDealRow {
 interface PalletDealsManagerProps {
   deals: PalletDealRow[]
   searchQuery: string
+  /** Optional search input rendered inside the toolbar row. */
+  search?: ReactNode
 }
 
-interface ReorderArrowsProps {
-  onTop: () => void
-  onUp: () => void
-  onDown: () => void
-  onBottom: () => void
-  isFirst: boolean
-  isLast: boolean
-  disabled?: boolean
-}
-
-function ReorderArrows({ onTop, onUp, onDown, onBottom, isFirst, isLast, disabled }: ReorderArrowsProps) {
-  return (
-    <div className="inline-flex items-center gap-0.5" data-no-row-nav="true">
-      <button
-        type="button"
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-        onClick={(event) => {
-          event.stopPropagation()
-          onTop()
-        }}
-        disabled={disabled || isFirst}
-        aria-label="Move to top"
-        title="Move to top"
-      >
-        <ArrowUpToLine className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-        onClick={(event) => {
-          event.stopPropagation()
-          onUp()
-        }}
-        disabled={disabled || isFirst}
-        aria-label="Move up"
-        title="Move up"
-      >
-        <ArrowUp className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-        onClick={(event) => {
-          event.stopPropagation()
-          onDown()
-        }}
-        disabled={disabled || isLast}
-        aria-label="Move down"
-        title="Move down"
-      >
-        <ArrowDown className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-        onClick={(event) => {
-          event.stopPropagation()
-          onBottom()
-        }}
-        disabled={disabled || isLast}
-        aria-label="Move to bottom"
-        title="Move to bottom"
-      >
-        <ArrowDownToLine className="h-4 w-4" />
-      </button>
-    </div>
-  )
-}
-
-export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerProps) {
+export function PalletDealsManager({ deals, searchQuery, search }: PalletDealsManagerProps) {
   const router = useRouter()
   const [rows, setRows] = useState<PalletDealRow[]>(deals)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -107,6 +37,27 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
   const [busy, setBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+
+  const createDeal = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const response = await fetch('/api/admin/pallet-deals', { method: 'POST' })
+      const payload = (await response.json().catch(() => null)) as
+        | { data?: { palletDealId?: string }; error?: { message?: string } }
+        | null
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Failed to create pallet deal')
+      }
+      const palletDealId = payload?.data?.palletDealId
+      if (!palletDealId) throw new Error('Pallet deal was created without an id')
+      router.push(`/admin/catalog/pallets/${palletDealId}`)
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Failed to create pallet deal')
+      setCreating(false)
+    }
+  }
 
   const searchIsActive = searchQuery.trim().length > 0
 
@@ -181,11 +132,13 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
     })
   }
 
+  const requestDeleteSelected = () => {
+    if (busy || selectedRows.length === 0) return
+    setConfirmDeleteOpen(true)
+  }
+
   const deleteSelected = async () => {
     if (busy || selectedRows.length === 0) return
-    const confirmed = window.confirm(`Delete ${selectedRows.length} selected pallet deal(s)?`)
-    if (!confirmed) return
-
     setBusy(true)
     setError(null)
     const ids = selectedRows.map((row) => row.id)
@@ -214,37 +167,6 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
     }
   }
 
-  const createDeal = async () => {
-    if (creating) return
-
-    setCreating(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/admin/pallet-deals', {
-        method: 'POST',
-      })
-      const payload = (await response.json().catch(() => null)) as
-        | { data?: { palletDealId?: string }; error?: { message?: string } }
-        | null
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? 'Failed to create pallet deal')
-      }
-
-      const palletDealId = payload?.data?.palletDealId
-      if (!palletDealId) {
-        throw new Error('Pallet deal was created without an id')
-      }
-
-      router.push(`/admin/catalog/pallets/${palletDealId}`)
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Failed to create pallet deal')
-    } finally {
-      setCreating(false)
-    }
-  }
-
   const onRowClick = (event: MouseEvent<HTMLElement>, id: string) => {
     if (editMode) return
     if (isInteractiveRowTarget(event.target)) return
@@ -261,25 +183,17 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
 
   return (
     <div className="space-y-4">
-      {/* Toolbar: pen toggles edit mode */}
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          size="icon"
-          variant={editMode ? 'default' : 'outline'}
-          aria-label={editMode ? 'Exit edit mode' : 'Enter edit mode'}
-          title={editMode ? 'Exit edit mode' : 'Edit: show checkboxes + reorder arrows'}
-          onClick={() => {
-            setEditMode((prev) => {
-              const next = !prev
-              if (!next) setSelectedIds(new Set())
-              return next
-            })
-          }}
-        >
-          {editMode ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-        </Button>
-      </div>
+      <ListToolbar
+        search={search}
+        editMode={editMode}
+        onEditModeChange={(next) => {
+          setEditMode(next)
+          if (!next) setSelectedIds(new Set())
+        }}
+        editTitle={editMode ? 'Exit edit mode' : 'Edit: show checkboxes + reorder arrows'}
+        onAdd={() => void createDeal()}
+        addLabel="New pallet deal"
+      />
 
       <AdminFab
         icon={<Plus className="h-6 w-6" />}
@@ -288,31 +202,37 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
         disabled={creating}
       />
 
-      {editMode && selectedCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
-          <span className="text-sm text-muted-foreground">{selectedCount} selected</span>
-          <Button
-            type="button"
-            size="sm"
-            variant="destructive"
-            disabled={busy}
-            onClick={deleteSelected}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Delete
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
-            Clear
-          </Button>
-        </div>
+      {editMode && (
+        <BulkActionBar
+          selectedCount={selectedCount}
+          onDelete={requestDeleteSelected}
+          onClear={() => setSelectedIds(new Set())}
+          busy={busy}
+        />
       )}
+
+      <ConfirmSheet
+        open={confirmDeleteOpen}
+        onOpenChange={(next) => {
+          if (!busy) setConfirmDeleteOpen(next)
+        }}
+        title={`Delete ${selectedCount} pallet deal${selectedCount === 1 ? '' : 's'}?`}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+        pending={busy}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false)
+          void deleteSelected()
+        }}
+      />
       {searchIsActive && editMode && (
         <p className="text-xs text-muted-foreground">Clear search to enable reorder.</p>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No pallet deals.</p>
+        <EmptyState title="No pallet deals yet" description="Create a pallet deal to offer bundled discounts." />
       ) : (
         <ul className="divide-y rounded-lg border bg-card">
           {rows.map((row, index) => {
@@ -327,36 +247,37 @@ export function PalletDealsManager({ deals, searchQuery }: PalletDealsManagerPro
                 role="button"
                 tabIndex={0}
               >
+                {editMode && (
+                  <RowCheckbox
+                    label={`Select ${row.title}`}
+                    checked={selectedIds.has(row.id)}
+                    onChange={(event) => toggleSelected(row.id, event.target.checked)}
+                    disabled={busy}
+                  />
+                )}
+                <PalletStatusDot isActive={row.isActive} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{row.title}</div>
+                  <div className="text-sm font-medium">{row.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {row.palletType} · {row.isActive ? 'Active' : 'Inactive'} · {formatCurrency(row.price)}
+                    {row.palletType} · {formatCurrency(row.price)}
                   </div>
                 </div>
 
-                {editMode && !searchIsActive && (
-                  <ReorderArrows
-                    onTop={() => moveRowBy(row.id, 'top')}
-                    onUp={() => moveRowBy(row.id, 'up')}
-                    onDown={() => moveRowBy(row.id, 'down')}
-                    onBottom={() => moveRowBy(row.id, 'bottom')}
-                    isFirst={isFirst}
-                    isLast={isLast}
-                    disabled={busy}
-                  />
-                )}
-
-                {editMode && (
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 shrink-0"
-                    checked={selectedIds.has(row.id)}
-                    onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                    onClick={(event) => event.stopPropagation()}
-                    disabled={busy}
-                    aria-label={`Select ${row.title}`}
-                  />
-                )}
+                <RowActions
+                  reorder={
+                    editMode && !searchIsActive ? (
+                      <RowReorderArrows
+                        onTop={() => moveRowBy(row.id, 'top')}
+                        onUp={() => moveRowBy(row.id, 'up')}
+                        onDown={() => moveRowBy(row.id, 'down')}
+                        onBottom={() => moveRowBy(row.id, 'bottom')}
+                        isFirst={isFirst}
+                        isLast={isLast}
+                        disabled={busy}
+                      />
+                    ) : null
+                  }
+                />
               </li>
             )
           })}

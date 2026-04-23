@@ -1,4 +1,4 @@
-import { AdminTopBar } from '@/components/layout/admin-top-bar'
+import { AdminNav } from '@/components/admin/admin-nav'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,7 +9,7 @@ export default function AdminLayout({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      <AdminTopBar />
+      <AdminNav />
       <main>
         <div className="mx-auto max-w-6xl p-4 md:p-6">{children}</div>
       </main>

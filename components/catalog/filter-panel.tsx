@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import type { Brand } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -108,9 +108,11 @@ export function FilterTrigger({
 }
 
 /**
- * Wrap the trigger button in this to anchor the desktop drawer under it.
- * Place this component where you want the Filters button; the desktop
- * drawer renders as an overlay beneath it.
+ * Renders the Filters trigger button + desktop collapsible panel + mobile
+ * Sheet. On desktop the panel spans the parent container width and pushes
+ * siblings below it. Use this when the parent is a block-level container
+ * (not a flex row); for flex-row callers, use `FilterTrigger` inline and
+ * render `FilterCollapsePanel` separately below the row.
  */
 export function FilterTriggerAnchored(
   props: FilterPanelProps & { state: FilterPanelState; triggerClassName?: string },
@@ -131,7 +133,6 @@ export function FilterTriggerAnchored(
     triggerClassName,
   } = props
 
-  const wrapperRef = useRef<HTMLDivElement>(null)
   const [isDesktop, setIsDesktop] = useState(false)
 
   // Track viewport so the portaled mobile Sheet only activates on <sm. The
@@ -147,22 +148,14 @@ export function FilterTriggerAnchored(
     return () => mql.removeEventListener('change', update)
   }, [])
 
-  // Close desktop drawer on outside click or Escape.
+  // Close desktop panel on Escape.
   useEffect(() => {
     if (!state.open || !isDesktop) return
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node | null
-      if (target && wrapperRef.current && !wrapperRef.current.contains(target)) {
-        state.setOpen(false)
-      }
-    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') state.setOpen(false)
     }
-    document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onPointerDown)
       document.removeEventListener('keydown', onKey)
     }
   }, [state, isDesktop])
@@ -187,15 +180,16 @@ export function FilterTriggerAnchored(
   )
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <>
       <FilterTrigger state={state} className={triggerClassName} />
 
-      {/* Desktop anchored drawer — absolute overlay, does not push content */}
+      {/* Desktop full-width collapsible panel — spans the content container,
+          pushes siblings rather than overlaying them. */}
       <div
         className={cn(
-          'absolute right-0 top-full z-40 mt-2 hidden w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-card shadow-lg transition-[max-height,opacity] duration-200 ease-out sm:block',
+          'hidden overflow-hidden rounded-xl border bg-card transition-[max-height,opacity,margin] duration-200 ease-out sm:block',
           state.open
-            ? 'max-h-[60vh] opacity-100'
+            ? 'mt-3 max-h-[60vh] opacity-100'
             : 'pointer-events-none max-h-0 opacity-0',
         )}
         aria-hidden={!state.open}
@@ -218,7 +212,133 @@ export function FilterTriggerAnchored(
           </SheetContent>
         </Sheet>
       )}
+    </>
+  )
+}
+
+/**
+ * Desktop-only collapsible panel, renders nothing on <sm. Place this in the
+ * document flow where you want the full-width panel to appear (typically
+ * directly below the row containing the Filters trigger). Pair with
+ * `FilterTrigger` rendered inline. The mobile Sheet must also be rendered
+ * somewhere — easiest is to let `FilterTriggerAnchored` handle it, or mount
+ * a dedicated `FilterMobileSheet` component.
+ */
+export function FilterCollapsePanel(props: FilterPanelProps & { state: FilterPanelState }) {
+  const {
+    state,
+    groupBy,
+    onGroupByChange,
+    sizes,
+    selectedSizes,
+    onSizeToggle,
+    onSizeClear,
+    brands,
+    selectedBrandIds,
+    onBrandToggle,
+    onBrandClear,
+    extra,
+  } = props
+
+  // Close on Escape when open on desktop.
+  useEffect(() => {
+    if (!state.open) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') state.setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [state])
+
+  return (
+    <div
+      className={cn(
+        'hidden overflow-hidden rounded-xl border bg-card transition-[max-height,opacity,margin] duration-200 ease-out sm:block',
+        state.open
+          ? 'mt-3 max-h-[60vh] opacity-100'
+          : 'pointer-events-none max-h-0 opacity-0',
+      )}
+      aria-hidden={!state.open}
+    >
+      <div className="max-h-[60vh] overflow-y-auto p-4">
+        <div className="space-y-4">
+          <GroupByChips groupBy={groupBy} onChange={onGroupByChange} />
+          <SizeChips
+            sizes={sizes}
+            selectedSizes={selectedSizes}
+            onToggle={onSizeToggle}
+            onClear={onSizeClear}
+          />
+          <BrandChips
+            brands={brands}
+            selectedBrandIds={selectedBrandIds}
+            onToggle={onBrandToggle}
+            onClear={onBrandClear}
+          />
+          {extra}
+        </div>
+      </div>
     </div>
+  )
+}
+
+/**
+ * Mobile-only Sheet. Render once somewhere in the tree. Renders nothing on
+ * sm+ viewports.
+ */
+export function FilterMobileSheet(props: FilterPanelProps & { state: FilterPanelState }) {
+  const {
+    state,
+    groupBy,
+    onGroupByChange,
+    sizes,
+    selectedSizes,
+    onSizeToggle,
+    onSizeClear,
+    brands,
+    selectedBrandIds,
+    onBrandToggle,
+    onBrandClear,
+    extra,
+  } = props
+
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(min-width: 640px)')
+    const update = () => setIsDesktop(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [])
+
+  if (isDesktop) return null
+
+  return (
+    <Sheet open={state.open} onOpenChange={state.setOpen}>
+      <SheetContent side="right" className="w-full max-w-sm overflow-y-auto p-4">
+        <SheetHeader className="mb-4">
+          <SheetTitle>Filters</SheetTitle>
+        </SheetHeader>
+        <div className="space-y-4">
+          <GroupByChips groupBy={groupBy} onChange={onGroupByChange} />
+          <SizeChips
+            sizes={sizes}
+            selectedSizes={selectedSizes}
+            onToggle={onSizeToggle}
+            onClear={onSizeClear}
+          />
+          <BrandChips
+            brands={brands}
+            selectedBrandIds={selectedBrandIds}
+            onToggle={onBrandToggle}
+            onClear={onBrandClear}
+          />
+          {extra}
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 

@@ -76,11 +76,20 @@ export function NewCustomerDialog({ action, variant = 'header' }: NewCustomerDia
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {variant === 'fab' ? (
-          <AdminFab icon={<Plus className="h-6 w-6" />} label="New customer" />
+          <AdminFab
+            icon={<Plus className="h-6 w-6" />}
+            label="New customer"
+            className="sm:hidden"
+          />
         ) : (
-          <Button size="sm" className="gap-1.5">
+          <Button
+            type="button"
+            size="icon"
+            aria-label="New customer"
+            title="New customer"
+            className="hidden sm:inline-flex"
+          >
             <Plus className="h-4 w-4" />
-            New customer
           </Button>
         )}
       </DialogTrigger>

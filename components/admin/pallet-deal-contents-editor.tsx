@@ -158,20 +158,22 @@ export function PalletDealContentsEditor({
           const isSaving = savingIds.has(row.id)
 
           return (
-            <div key={row.id} className="flex flex-wrap items-center gap-2 border-b py-2.5 last:border-0">
-              <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-                <div className={`truncate text-sm ${hasQuantity ? 'font-medium' : 'text-muted-foreground'}`}>
+            <div key={row.id} className="flex items-center gap-3 border-b py-2.5 last:border-0">
+              <div className="shrink-0">
+                <QuantitySelector
+                  quantity={quantity}
+                  onChange={(next) =>
+                    palletType === 'single' ? changeSingle(row.id, next) : changeMixed(row.id, next)
+                  }
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={`text-sm ${hasQuantity ? 'font-medium' : 'text-muted-foreground'}`}>
                   {row.title}
                 </div>
                 <div className="text-xs text-muted-foreground">{row.packLabel}</div>
               </div>
-              <QuantitySelector
-                quantity={quantity}
-                onChange={(next) =>
-                  palletType === 'single' ? changeSingle(row.id, next) : changeMixed(row.id, next)
-                }
-              />
-              {isSaving ? <span className="text-xs text-muted-foreground">Saving...</span> : null}
+              {isSaving ? <span className="shrink-0 text-xs text-muted-foreground">Saving...</span> : null}
             </div>
           )
         })}

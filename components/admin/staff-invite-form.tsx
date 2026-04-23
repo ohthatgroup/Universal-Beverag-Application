@@ -14,7 +14,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-export function StaffInviteForm() {
+interface StaffInviteFormProps {
+  variant?: 'header' | 'fab'
+}
+
+export function StaffInviteForm({ variant = 'header' }: StaffInviteFormProps = {}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [contactName, setContactName] = useState('')
@@ -57,7 +61,25 @@ export function StaffInviteForm() {
 
   return (
     <>
-      <AdminFab icon={<Plus className="h-6 w-6" />} label="Invite staff" onClick={() => setOpen(true)} />
+      {variant === 'fab' ? (
+        <AdminFab
+          icon={<Plus className="h-6 w-6" />}
+          label="Invite staff"
+          onClick={() => setOpen(true)}
+          className="sm:hidden"
+        />
+      ) : (
+        <Button
+          type="button"
+          size="icon"
+          aria-label="Invite staff"
+          title="Invite staff"
+          onClick={() => setOpen(true)}
+          className="hidden sm:inline-flex"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md p-4 sm:p-6">

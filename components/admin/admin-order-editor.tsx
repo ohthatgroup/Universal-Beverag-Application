@@ -5,14 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
-  ChevronDown,
-  Copy,
-  Download,
-  Mail,
-  MessageSquare,
   MoreVertical,
   Plus,
-  Share2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,10 +14,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { OrderStatusForm } from '@/components/admin/order-status-form'
+import { ShareWithCustomerMenu } from '@/components/admin/share-with-customer-menu'
+import { ShareSubmittedOrderMenu } from '@/components/admin/share-submitted-order-menu'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import type { OrderStatus } from '@/lib/types'
 import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
@@ -33,7 +28,7 @@ import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
 // - No desktop drag (never had it here; catalog handles its own reorder).
 // - Back uses router.back() with a safe fallback to `backHref`.
 // - Status moved out of the primary bar, into a small meta row.
-// - "Share with customer" is now a dropdown (Copy link / SMS / Email).
+// - Share surface is status-switched: draft = copy-only button, submitted/delivered = rich menu.
 // - Add Product lives on the right of the Items (N) section header.
 
 export interface AdminOrderEditorItem {
@@ -63,6 +58,7 @@ export interface AdminOrderEditorProps {
   backLabel: string
   shareLink: string | null
   csvHref: string
+  salesmanOfficeEmail: string | null
   onCancelAction: React.ReactNode
   onDeleteAction: React.ReactNode
   addProductSlot?: React.ReactNode
@@ -84,21 +80,13 @@ export function AdminOrderEditor({
   backLabel,
   shareLink,
   csvHref,
+  salesmanOfficeEmail,
   onCancelAction,
   onDeleteAction,
   addProductSlot,
   markDeliveredSlot,
 }: AdminOrderEditorProps) {
   const router = useRouter()
-  const [shareCopied, setShareCopied] = useState(false)
-
-  const absoluteShareLink = (() => {
-    if (!shareLink) return null
-    if (/^https?:\/\//i.test(shareLink)) return shareLink
-    if (typeof window === 'undefined') return shareLink
-    const normalized = shareLink.startsWith('/') ? shareLink : `/${shareLink}`
-    return `${window.location.origin}${normalized}`
-  })()
 
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -106,30 +94,6 @@ export function AdminOrderEditor({
     } else {
       router.push(backHref)
     }
-  }
-
-  const copyShareLink = async () => {
-    if (!absoluteShareLink) return
-    try {
-      await navigator.clipboard.writeText(absoluteShareLink)
-      setShareCopied(true)
-      setTimeout(() => setShareCopied(false), 1500)
-    } catch {
-      // ignored
-    }
-  }
-
-  const shareViaSms = () => {
-    if (!absoluteShareLink) return
-    const body = encodeURIComponent(`Review your order: ${absoluteShareLink}`)
-    window.location.href = `sms:?&body=${body}`
-  }
-
-  const shareViaEmail = () => {
-    if (!absoluteShareLink) return
-    const subject = encodeURIComponent(`Your order — ${formatDeliveryDate(deliveryDate)}`)
-    const body = encodeURIComponent(`Review your order here: ${absoluteShareLink}`)
-    window.location.href = `mailto:${customerEmail ?? ''}?subject=${subject}&body=${body}`
   }
 
   return (
@@ -153,13 +117,6 @@ export function AdminOrderEditor({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem asChild>
-                <a href={csvHref}>
-                  <Download className="mr-2 h-3.5 w-3.5" />
-                  Export CSV
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
                 <div>{onCancelAction}</div>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="text-destructive focus:text-destructive">
@@ -179,30 +136,20 @@ export function AdminOrderEditor({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <OrderStatusForm orderId={orderId} initialStatus={status} />
           {markDeliveredSlot}
-          {shareLink ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" size="sm" className="gap-1.5">
-                  <Share2 className="h-3.5 w-3.5" />
-                  {shareCopied ? 'Copied' : 'Share'}
-                  <ChevronDown className="ml-0.5 h-3.5 w-3.5 opacity-80" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-44">
-                <DropdownMenuItem onClick={copyShareLink}>
-                  <Copy className="mr-2 h-3.5 w-3.5" />
-                  Copy link
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={shareViaSms}>
-                  <MessageSquare className="mr-2 h-3.5 w-3.5" />
-                  Share via SMS
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={shareViaEmail} disabled={!customerEmail}>
-                  <Mail className="mr-2 h-3.5 w-3.5" />
-                  Share via email
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {shareLink && status === 'draft' ? (
+            <ShareWithCustomerMenu url={shareLink} label="Copy draft link" />
+          ) : null}
+          {shareLink && (status === 'submitted' || status === 'delivered') ? (
+            <ShareSubmittedOrderMenu
+              orderId={orderId}
+              customerName={customerName}
+              customerEmail={customerEmail}
+              deliveryDate={deliveryDate}
+              shareLink={shareLink}
+              csvHref={csvHref}
+              markdownHref={`/api/orders/${orderId}/markdown`}
+              salesmanOfficeEmail={salesmanOfficeEmail}
+            />
           ) : null}
         </div>
 
@@ -290,57 +237,83 @@ function AdminOrderLine({ item }: { item: AdminOrderEditorItem }) {
     setEditingPrice(false)
   }
 
+  const priceEditor = (
+    <>
+      {editingPrice ? (
+        <Input
+          ref={inputRef}
+          type="number"
+          step="0.01"
+          min="0"
+          value={draftPrice}
+          onChange={(e) => setDraftPrice(e.target.value)}
+          onBlur={commitPrice}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commitPrice()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              cancelPrice()
+            }
+          }}
+          className="h-7 w-20 text-right text-sm tabular-nums"
+          aria-label="Unit price"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingPrice(true)}
+          className="text-right underline decoration-dotted underline-offset-2 hover:text-foreground"
+          aria-label="Edit unit price"
+        >
+          {formatCurrency(unitPrice)}
+        </button>
+      )}
+    </>
+  )
+
+  const lineTotal = unitPrice * quantity
+
   return (
-    <div className="flex items-center gap-3 px-3 py-3">
-      <div className="min-w-0 flex-1">
+    <>
+      {/* Desktop: horizontal row — quantity picker leftmost */}
+      <div className="hidden items-center gap-3 px-3 py-3 md:flex">
+        <div className="shrink-0">
+          <QuantitySelector quantity={quantity} onChange={setQuantity} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <TitleEl
+            {...(titleProps as { href: string })}
+            className="block text-sm font-medium hover:underline"
+          >
+            {item.label}
+          </TitleEl>
+          {item.pack && <div className="text-xs text-muted-foreground">{item.pack}</div>}
+        </div>
+
+        <div className="w-20 shrink-0 text-right text-sm tabular-nums">{priceEditor}</div>
+      </div>
+
+      {/* Mobile: stacked card — quantity picker leftmost in action row */}
+      <div className="flex flex-col gap-2 px-3 py-3 md:hidden">
         <TitleEl
           {...(titleProps as { href: string })}
-          className="block truncate text-sm font-medium hover:underline"
+          className="block text-sm font-medium hover:underline"
         >
           {item.label}
         </TitleEl>
-        {item.pack && <div className="truncate text-xs text-muted-foreground">{item.pack}</div>}
+        {item.pack && <div className="text-xs text-muted-foreground">{item.pack}</div>}
+        <div className="flex items-center justify-between gap-3">
+          <QuantitySelector quantity={quantity} onChange={setQuantity} />
+          <div className="text-sm tabular-nums">{priceEditor}</div>
+        </div>
+        <div className="text-right text-sm font-medium tabular-nums">
+          {formatCurrency(lineTotal)}
+        </div>
       </div>
-
-      <div className="shrink-0">
-        <QuantitySelector quantity={quantity} onChange={setQuantity} />
-      </div>
-
-      <div className="w-20 shrink-0 text-right text-sm tabular-nums">
-        {editingPrice ? (
-          <Input
-            ref={inputRef}
-            type="number"
-            step="0.01"
-            min="0"
-            value={draftPrice}
-            onChange={(e) => setDraftPrice(e.target.value)}
-            onBlur={commitPrice}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                commitPrice()
-              } else if (e.key === 'Escape') {
-                e.preventDefault()
-                cancelPrice()
-              }
-            }}
-            className="h-7 w-20 text-right text-sm tabular-nums"
-            aria-label="Unit price"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditingPrice(true)}
-            className="w-full text-right underline decoration-dotted underline-offset-2 hover:text-foreground"
-            aria-label="Edit unit price"
-          >
-            {formatCurrency(unitPrice)}
-          </button>
-        )}
-      </div>
-
-    </div>
+    </>
   )
 }
 

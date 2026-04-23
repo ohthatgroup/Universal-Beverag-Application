@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogPortal, DialogOverlay, DialogClose, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
 import { cn, formatCurrency, formatDeliveryDate } from '@/lib/utils'
 
@@ -101,35 +102,35 @@ export function ReviewOrderSheet({
               <ul className="divide-y">
                 {items.map((item) => (
                   <li key={item.key} className="py-3">
-                    <div className="font-medium leading-snug">{item.label}</div>
-                    {item.details && (
-                      <div className="text-xs text-muted-foreground">{item.details}</div>
-                    )}
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      {showPrices ? (
-                        <div className="text-xs text-muted-foreground">
-                          {formatCurrency(item.unitPrice)} × {item.quantity}
-                        </div>
-                      ) : (
-                        <span />
-                      )}
-                      <div className="flex items-center gap-3">
-                        {showPrices && (
-                          <span className="text-sm font-medium tabular-nums">
-                            {formatCurrency(item.lineTotal)}
-                          </span>
-                        )}
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 shrink-0">
                         <QuantitySelector
                           quantity={item.quantity}
                           onChange={(next) => onChangeQuantity(item.key, next)}
                         />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium leading-snug">{item.label}</div>
+                        {item.details && (
+                          <div className="text-xs text-muted-foreground">{item.details}</div>
+                        )}
+                        {showPrices && (
+                          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>
+                              {formatCurrency(item.unitPrice)} × {item.quantity}
+                            </span>
+                            <span className="text-sm font-medium tabular-nums text-foreground">
+                              {formatCurrency(item.lineTotal)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <div className="py-6 text-sm text-muted-foreground">No items added yet.</div>
+              <EmptyState title="No items yet" description="Add products from the catalog." />
             )}
           </div>
 

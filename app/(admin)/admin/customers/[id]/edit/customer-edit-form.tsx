@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TagChipInput } from '@/components/ui/tag-chip-input'
 import { DangerZoneDeleteCustomer } from '@/components/admin/danger-zone-delete-customer'
 
 type InitialValues = {
@@ -16,6 +17,8 @@ type InitialValues = {
   city: string
   state: string
   zip: string
+  tags: string[]
+  location: string
   show_prices: boolean
   custom_pricing: boolean
   default_group: 'brand' | 'size'
@@ -25,10 +28,12 @@ export function CustomerEditForm({
   customerId,
   businessName,
   initialValues,
+  tagSuggestions = [],
 }: {
   customerId: string
   businessName: string
   initialValues: InitialValues
+  tagSuggestions?: string[]
 }) {
   const router = useRouter()
   const [values, setValues] = useState(initialValues)
@@ -55,6 +60,8 @@ export function CustomerEditForm({
           city: values.city,
           state: values.state,
           zip: values.zip,
+          tags: values.tags,
+          location: values.location,
           showPrices: values.show_prices,
           customPricing: values.custom_pricing,
           defaultGroup: values.default_group,
@@ -181,6 +188,38 @@ export function CustomerEditForm({
                 value={values.zip}
                 onChange={(e) => set('zip', e.target.value)}
               />
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Targeting
+          </h2>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="tags">Tags</Label>
+              <TagChipInput
+                id="tags"
+                value={values.tags}
+                onChange={(next) => set('tags', next)}
+                suggestions={tagSuggestions}
+              />
+              <p className="text-xs text-muted-foreground">
+                Type and press Enter to add. Used for targeting banners and announcements.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                name="location"
+                value={values.location}
+                onChange={(e) => set('location', e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Freeform. Targeting uses substring match (&quot;Austin&quot; matches &quot;Austin, TX&quot;).
+              </p>
             </div>
           </div>
         </section>

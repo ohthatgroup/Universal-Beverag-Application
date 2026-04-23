@@ -75,3 +75,29 @@ export async function getCustomerIdByName(businessName: string): Promise<string>
     return id
   })
 }
+
+/**
+ * Look up the latest submitted order id for a customer business name.
+ */
+export async function getSubmittedOrderIdByCustomerName(businessName: string): Promise<string> {
+  return withDb(async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      `select o.id
+       from orders o
+       join profiles p on p.id = o.customer_id
+       where p.role = 'customer'
+         and p.business_name = $1
+         and o.status = 'submitted'
+       order by o.delivery_date desc, o.created_at desc, o.id desc
+       limit 1`,
+      [businessName]
+    )
+
+    const id = rows[0]?.id
+    if (!id) {
+      throw new Error(`Unable to find submitted order for "${businessName}"`)
+    }
+
+    return id
+  })
+}

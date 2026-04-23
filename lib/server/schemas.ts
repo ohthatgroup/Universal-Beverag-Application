@@ -39,3 +39,38 @@ export const portalProfileUpdateSchema = z.object({
   state: z.string().max(100).optional().or(z.literal('')),
   zip: z.string().max(20).optional().or(z.literal('')),
 })
+
+// Presets — catalog visibility templates.
+export const createPresetSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).nullable().optional(),
+})
+
+const presetBrandRuleSchema = z.object({
+  brandId: uuidSchema,
+  isHidden: z.boolean(),
+  isPinned: z.boolean(),
+})
+
+const presetSizeRuleSchema = z.object({
+  sizeKey: z.string().trim().min(1).max(40),
+  isHidden: z.boolean(),
+})
+
+const presetProductRuleSchema = z.object({
+  productId: uuidSchema,
+  isHidden: z.boolean(),
+  isPinned: z.boolean(),
+})
+
+export const updatePresetSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  brandRules: z.array(presetBrandRuleSchema).optional(),
+  sizeRules: z.array(presetSizeRuleSchema).optional(),
+  productRules: z.array(presetProductRuleSchema).optional(),
+})
+
+export const applyPresetSchema = z.object({
+  customerId: uuidSchema,
+})

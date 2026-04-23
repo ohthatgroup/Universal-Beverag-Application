@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SaveStatus, type SaveState } from '@/components/ui/save-status'
 import type { Profile } from '@/lib/types'
 
 interface AccountFormProps {
@@ -22,13 +23,7 @@ export function AccountForm({ token, profile }: AccountFormProps) {
     zip: profile.zip ?? '',
   })
 
-  type SaveState =
-    | { kind: 'idle' }
-    | { kind: 'saving' }
-    | { kind: 'saved' }
-    | { kind: 'error'; message: string }
-
-  const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' })
+  const [saveState, setSaveState] = useState<SaveState>('idle')
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -39,8 +34,8 @@ export function AccountForm({ token, profile }: AccountFormProps) {
 
   const handleChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    if (saveState.kind === 'saved' || saveState.kind === 'error') {
-      setSaveState({ kind: 'idle' })
+    if (saveState === 'saved' || saveState === 'error') {
+      setSaveState('idle')
     }
   }
 
@@ -49,7 +44,7 @@ export function AccountForm({ token, profile }: AccountFormProps) {
       clearTimeout(savedTimerRef.current)
       savedTimerRef.current = null
     }
-    setSaveState({ kind: 'saving' })
+    setSaveState('saving')
 
     try {
       const response = await fetch('/api/portal/profile', {
@@ -61,27 +56,18 @@ export function AccountForm({ token, profile }: AccountFormProps) {
         body: JSON.stringify(formData),
       })
 
-      const payload = (await response.json().catch(() => null)) as
-        | { data?: { updated: boolean } }
-        | { error?: { message?: string } }
-        | null
-
       if (!response.ok) {
-        const message =
-          payload && 'error' in payload
-            ? payload.error?.message ?? 'Failed to save'
-            : 'Failed to save'
-        setSaveState({ kind: 'error', message })
+        setSaveState('error')
         return
       }
 
-      setSaveState({ kind: 'saved' })
+      setSaveState('saved')
       savedTimerRef.current = setTimeout(() => {
-        setSaveState({ kind: 'idle' })
+        setSaveState('idle')
         savedTimerRef.current = null
-      }, 1500)
+      }, 1200)
     } catch {
-      setSaveState({ kind: 'error', message: 'Network error — please try again' })
+      setSaveState('error')
     }
   }
 
@@ -89,13 +75,6 @@ export function AccountForm({ token, profile }: AccountFormProps) {
     e.preventDefault()
     void submit()
   }
-
-  const buttonLabel =
-    saveState.kind === 'saving'
-      ? 'Saving…'
-      : saveState.kind === 'saved'
-      ? 'Saved ✓'
-      : 'Save changes'
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pb-24 md:pb-0">
@@ -179,24 +158,10 @@ export function AccountForm({ token, profile }: AccountFormProps) {
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
-          <Button type="submit" disabled={saveState.kind === 'saving'}>
-            {buttonLabel}
+          <Button type="submit" disabled={saveState === 'saving'}>
+            Save changes
           </Button>
-          {saveState.kind === 'saved' && (
-            <p className="text-sm text-muted-foreground">Changes saved</p>
-          )}
-          {saveState.kind === 'error' && (
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <span>{saveState.message}</span>
-              <button
-                type="button"
-                onClick={() => void submit()}
-                className="font-medium underline-offset-4 hover:underline"
-              >
-                Retry
-              </button>
-            </div>
-          )}
+          <SaveStatus state={saveState} onRetry={() => void submit()} />
         </div>
       </div>
     </form>

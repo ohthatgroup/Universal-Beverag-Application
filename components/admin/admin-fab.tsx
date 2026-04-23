@@ -17,7 +17,7 @@ export const AdminFab = forwardRef<HTMLButtonElement, AdminFabProps>(
         aria-label={label}
         title={label}
         className={cn(
-          'fixed bottom-6 right-5 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg backdrop-blur transition-transform hover:scale-105 disabled:opacity-60 md:bottom-8',
+          'fixed bottom-6 right-5 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg backdrop-blur transition-transform hover:scale-105 disabled:opacity-60 sm:hidden',
           className
         )}
         {...rest}

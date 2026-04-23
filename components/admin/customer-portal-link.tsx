@@ -70,7 +70,7 @@ export function CustomerPortalLink({ customerId, accessToken }: CustomerPortalLi
         Share this permanent link with the customer. They can create orders and view history without logging in.
       </p>
       <div className="flex items-center gap-2">
-        <code className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 text-xs">
+        <code className="flex-1 break-all rounded-md border bg-muted/50 px-3 py-2 text-xs">
           {portalUrl}
         </code>
         <Button size="sm" variant="outline" onClick={copyLink}>

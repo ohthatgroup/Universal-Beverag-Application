@@ -27,6 +27,16 @@ const badgeVariants = cva(
           "border-transparent bg-status-delivered-bg text-status-delivered",
         cancelled:
           "border-transparent bg-status-cancelled-bg text-status-cancelled",
+        active:
+          "border-transparent bg-status-active-bg text-status-active",
+        inactive:
+          "border-transparent bg-status-inactive-bg text-status-inactive",
+        discontinued:
+          "border-transparent bg-status-discontinued-bg text-status-discontinued",
+        invited:
+          "border-transparent bg-status-invited-bg text-status-invited",
+        disabled:
+          "border-transparent bg-status-disabled-bg text-status-disabled",
       },
     },
     defaultVariants: {

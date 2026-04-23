@@ -1,5 +1,5 @@
 import { OrdersList } from '@/components/orders/orders-list'
-import { PortalGreeting } from '@/components/portal/portal-greeting'
+import { PortalPageHeader } from '@/components/portal/portal-page-header'
 import { StartOrderHero } from '@/components/portal/start-order-hero'
 import { DraftResumeStrip } from '@/components/portal/draft-resume-strip'
 import { PastOrdersSection } from '@/components/portal/past-orders-section'
@@ -81,12 +81,11 @@ export default async function PortalHome({
 
   const nonDraftCurrentOrders = currentOrders.filter((order) => order.status !== 'draft')
 
+  const greetingName = (profile.business_name ?? '').trim() || (profile.contact_name ?? '').trim()
+
   return (
     <div className="space-y-8">
-      <PortalGreeting
-        businessName={profile.business_name}
-        contactName={profile.contact_name}
-      />
+      {greetingName ? <PortalPageHeader title={greetingName} /> : null}
 
       <StartOrderHero token={token} initialDate={nextDeliveryDate} />
 

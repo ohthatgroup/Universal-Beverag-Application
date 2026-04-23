@@ -1,5 +1,6 @@
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { AccountForm } from '@/components/portal/account-form'
+import { PortalPageHeader } from '@/components/portal/portal-page-header'
 
 export default async function PortalAccountPage({
   params,
@@ -11,7 +12,7 @@ export default async function PortalAccountPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Account</h1>
+      <PortalPageHeader back={{ href: `/portal/${token}` }} title="Account" />
       <AccountForm token={token} profile={profile} />
     </div>
   )

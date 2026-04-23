@@ -14,6 +14,19 @@ const nullableString = z
   .nullable()
   .optional()
 
+const tagArray = z
+  .array(z.string())
+  .transform((values) =>
+    Array.from(
+      new Set(
+        values
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+      )
+    )
+  )
+  .optional()
+
 const updateCustomerSchema = z.object({
   businessName: nullableString,
   contactName: nullableString,
@@ -23,6 +36,8 @@ const updateCustomerSchema = z.object({
   city: nullableString,
   state: nullableString,
   zip: nullableString,
+  tags: tagArray,
+  location: nullableString,
   showPrices: z.boolean().optional(),
   customPricing: z.boolean().optional(),
   defaultGroup: z.enum(['brand', 'size']).optional(),
@@ -49,12 +64,14 @@ export async function PATCH(
       city: string | null
       state: string | null
       zip: string | null
+      tags: string[]
+      location: string | null
       show_prices: boolean
       custom_pricing: boolean
       default_group: string
     }>(
       `select id, business_name, contact_name, email, phone, address, city, state, zip,
-              show_prices, custom_pricing, default_group
+              tags, location, show_prices, custom_pricing, default_group
        from profiles where id = $1 and role = 'customer' limit 1`,
       [id]
     )
@@ -70,6 +87,8 @@ export async function PATCH(
       city: payload.city ?? current.city,
       state: payload.state ?? current.state,
       zip: payload.zip ?? current.zip,
+      tags: payload.tags ?? current.tags,
+      location: payload.location ?? current.location,
       show_prices: payload.showPrices ?? current.show_prices,
       custom_pricing: payload.customPricing ?? current.custom_pricing,
       default_group: payload.defaultGroup ?? current.default_group,
@@ -86,6 +105,7 @@ export async function PATCH(
     if ('city' in payload) next.city = payload.city ?? null
     if ('state' in payload) next.state = payload.state ?? null
     if ('zip' in payload) next.zip = payload.zip ?? null
+    if ('location' in payload) next.location = payload.location ?? null
 
     const { rows } = await db.query<{
       id: string
@@ -102,9 +122,11 @@ export async function PATCH(
            city = $7,
            state = $8,
            zip = $9,
-           show_prices = $10,
-           custom_pricing = $11,
-           default_group = $12,
+           tags = $10,
+           location = $11,
+           show_prices = $12,
+           custom_pricing = $13,
+           default_group = $14,
            updated_at = now()
        where id = $1 and role = 'customer'
        returning id, show_prices, custom_pricing, default_group`,
@@ -118,6 +140,8 @@ export async function PATCH(
         next.city,
         next.state,
         next.zip,
+        next.tags,
+        next.location,
         next.show_prices,
         next.custom_pricing,
         next.default_group,

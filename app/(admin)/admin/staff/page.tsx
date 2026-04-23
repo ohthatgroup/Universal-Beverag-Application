@@ -1,7 +1,6 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { StaffInviteForm } from '@/components/admin/staff-invite-form'
 import { StaffTableManager, type StaffListRow as StaffManagerRow } from '@/components/admin/staff-table-manager'
+import { PageHeader } from '@/components/ui/page-header'
 import { buildStaffInvitePath, buildStaffInviteToken, listStaffRows } from '@/lib/server/staff-invites'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
@@ -31,21 +30,13 @@ export default async function StaffPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          href="/admin"
-          className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Admin
-        </Link>
-        <h1 className="text-2xl font-semibold">Staff</h1>
-        <p className="text-sm text-muted-foreground">
-          {rows.length} member{rows.length === 1 ? '' : 's'}
-        </p>
-      </div>
+      <PageHeader
+        title="Staff"
+        description={`${rows.length} member${rows.length === 1 ? '' : 's'}`}
+        actions={<StaffInviteForm variant="header" />}
+      />
 
-      <StaffInviteForm />
+      <StaffInviteForm variant="fab" />
 
       <StaffTableManager rows={rows} />
     </div>

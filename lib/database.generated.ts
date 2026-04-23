@@ -37,6 +37,42 @@ export type Database = {
         Relationships: [
         ]
       }
+      customer_brands: {
+        Row: {
+          customer_id: string
+          brand_id: string
+          is_hidden: boolean
+          is_pinned: boolean
+        }
+        Insert: {
+          customer_id: string
+          brand_id: string
+          is_hidden?: boolean
+          is_pinned?: boolean
+        }
+        Update: {
+          customer_id?: string
+          brand_id?: string
+          is_hidden?: boolean
+          is_pinned?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'customer_brands_brand_id_fkey'
+            columns: ['brand_id']
+            isOneToOne: false
+            referencedRelation: 'brands'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_brands_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       customer_products: {
         Row: {
           customer_id: string
@@ -44,6 +80,8 @@ export type Database = {
           excluded: boolean
           custom_price: number | null
           is_usual: boolean
+          is_hidden: boolean
+          is_pinned: boolean
         }
         Insert: {
           customer_id: string
@@ -51,6 +89,8 @@ export type Database = {
           excluded?: boolean
           custom_price?: number | null
           is_usual?: boolean
+          is_hidden?: boolean
+          is_pinned?: boolean
         }
         Update: {
           customer_id?: string
@@ -58,6 +98,8 @@ export type Database = {
           excluded?: boolean
           custom_price?: number | null
           is_usual?: boolean
+          is_hidden?: boolean
+          is_pinned?: boolean
         }
         Relationships: [
           {
@@ -72,6 +114,32 @@ export type Database = {
             columns: ['product_id']
             isOneToOne: false
             referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      customer_sizes: {
+        Row: {
+          customer_id: string
+          size_key: string
+          is_hidden: boolean
+        }
+        Insert: {
+          customer_id: string
+          size_key: string
+          is_hidden?: boolean
+        }
+        Update: {
+          customer_id?: string
+          size_key?: string
+          is_hidden?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'customer_sizes_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]
@@ -276,6 +344,129 @@ export type Database = {
         Relationships: [
         ]
       }
+      preset_brand_rules: {
+        Row: {
+          preset_id: string
+          brand_id: string
+          is_hidden: boolean
+          is_pinned: boolean
+        }
+        Insert: {
+          preset_id: string
+          brand_id: string
+          is_hidden?: boolean
+          is_pinned?: boolean
+        }
+        Update: {
+          preset_id?: string
+          brand_id?: string
+          is_hidden?: boolean
+          is_pinned?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'preset_brand_rules_brand_id_fkey'
+            columns: ['brand_id']
+            isOneToOne: false
+            referencedRelation: 'brands'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preset_brand_rules_preset_id_fkey'
+            columns: ['preset_id']
+            isOneToOne: false
+            referencedRelation: 'presets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      preset_product_rules: {
+        Row: {
+          preset_id: string
+          product_id: string
+          is_hidden: boolean
+          is_pinned: boolean
+        }
+        Insert: {
+          preset_id: string
+          product_id: string
+          is_hidden?: boolean
+          is_pinned?: boolean
+        }
+        Update: {
+          preset_id?: string
+          product_id?: string
+          is_hidden?: boolean
+          is_pinned?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'preset_product_rules_preset_id_fkey'
+            columns: ['preset_id']
+            isOneToOne: false
+            referencedRelation: 'presets'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preset_product_rules_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      preset_size_rules: {
+        Row: {
+          preset_id: string
+          size_key: string
+          is_hidden: boolean
+        }
+        Insert: {
+          preset_id: string
+          size_key: string
+          is_hidden?: boolean
+        }
+        Update: {
+          preset_id?: string
+          size_key?: string
+          is_hidden?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'preset_size_rules_preset_id_fkey'
+            columns: ['preset_id']
+            isOneToOne: false
+            referencedRelation: 'presets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      presets: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+        ]
+      }
       product_cutoff_overrides: {
         Row: {
           product_id: string
@@ -403,6 +594,11 @@ export type Database = {
           created_at: string
           updated_at: string
           disabled_at: string | null
+          tags: string[]
+          location: string | null
+          location_lat: number | null
+          location_lng: number | null
+          office_email: string | null
         }
         Insert: {
           id?: string
@@ -423,6 +619,11 @@ export type Database = {
           created_at?: string
           updated_at?: string
           disabled_at?: string | null
+          tags?: string[]
+          location?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          office_email?: string | null
         }
         Update: {
           id?: string
@@ -443,6 +644,11 @@ export type Database = {
           created_at?: string
           updated_at?: string
           disabled_at?: string | null
+          tags?: string[]
+          location?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          office_email?: string | null
         }
         Relationships: [
         ]

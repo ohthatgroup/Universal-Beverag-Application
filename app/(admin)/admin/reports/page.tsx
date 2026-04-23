@@ -1,7 +1,7 @@
 import { addDays, todayISODate } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { Money } from '@/components/ui/money'
-import { StatusDot } from '@/components/ui/status-dot'
+import { OrderStatusDot } from '@/components/ui/status-dot'
 import { Separator } from '@/components/ui/separator'
 import { ReportDatePresets } from '@/components/admin/report-date-presets'
 import { getRequestDb } from '@/lib/server/db'
@@ -110,7 +110,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             {orderRows.map((order) => (
               <div key={order.id} className="flex items-center justify-between gap-4 rounded-md border p-3">
                 <div className="flex items-center gap-3">
-                  <StatusDot status={order.status as OrderStatus} />
+                  <OrderStatusDot status={order.status as OrderStatus} />
                   <div className="font-medium">{order.delivery_date}</div>
                 </div>
                 <div className="text-right">

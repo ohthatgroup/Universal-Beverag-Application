@@ -1,15 +1,21 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { redirect } from 'next/navigation'
-import { CustomersSearchIndex, type CustomerIndexRow } from '@/components/admin/customers-search-index'
+import { CustomersTableManager, type CustomerListRow } from '@/components/admin/customers-table-manager'
+import { LiveQueryInput } from '@/components/admin/live-query-input'
 import { NewCustomerDialog } from '@/components/admin/new-customer-dialog'
+import { PageHeader } from '@/components/ui/page-header'
 import { getRequestDb } from '@/lib/server/db'
 import { provisionCustomerProfile } from '@/lib/server/customer-provisioning'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
-export default async function CustomersPage() {
+interface CustomersPageProps {
+  searchParams?: Promise<{ q?: string }>
+}
+
+export default async function CustomersPage({ searchParams }: CustomersPageProps) {
   await requirePageAuth(['salesman'])
   const db = await getRequestDb()
+  const resolved = searchParams ? await searchParams : undefined
+  const searchQuery = (resolved?.q ?? '').trim()
 
   const { rows: customers } = await db.query<{
     id: string
@@ -18,8 +24,7 @@ export default async function CustomersPage() {
     email: string | null
     phone: string | null
     access_token: string | null
-    last_order_date: string | null
-    last_order_status: string | null
+    tags: string[]
   }>(
     `select
         p.id,
@@ -28,34 +33,20 @@ export default async function CustomersPage() {
         p.email,
         p.phone,
         p.access_token,
-        max(o.delivery_date)::text as last_order_date,
-        (select status from orders
-           where customer_id = p.id
-           order by delivery_date desc, created_at desc
-           limit 1) as last_order_status
+        p.tags
       from profiles p
-      left join orders o on o.customer_id = p.id
       where p.role = 'customer'
-      group by p.id, p.business_name, p.contact_name, p.email, p.phone, p.access_token
       order by p.business_name asc nulls last, p.contact_name asc nulls last, p.id asc`
   )
 
-  const rows: CustomerIndexRow[] = customers.map((c) => ({
+  const rows: CustomerListRow[] = customers.map((c) => ({
     id: c.id,
     businessName: c.business_name ?? c.contact_name ?? 'Unnamed customer',
     email: c.email,
     phone: c.phone,
-    accessToken: c.access_token,
-    lastOrderDate: c.last_order_date,
-    lastOrderStatus: c.last_order_status,
+    portalUrl: c.access_token ? `/portal/${c.access_token}` : null,
+    tags: c.tags,
   }))
-
-  // Recently opened: derive from most-recent order activity (proxy until a real recents table)
-  const recentIds = [...rows]
-    .filter((r) => r.lastOrderDate)
-    .sort((a, b) => (a.lastOrderDate! < b.lastOrderDate! ? 1 : -1))
-    .slice(0, 5)
-    .map((r) => r.id)
 
   async function createCustomer(formData: FormData) {
     'use server'
@@ -73,20 +64,22 @@ export default async function CustomersPage() {
   }
 
   return (
-    <>
-      <div className="mx-auto w-full max-w-xl pt-2">
-        <Link
-          href="/admin"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Admin
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold">Customers</h1>
-        <p className="text-sm text-muted-foreground">{rows.length} customers</p>
-      </div>
-      <CustomersSearchIndex rows={rows} recentIds={recentIds} />
+    <div className="space-y-4">
+      <PageHeader
+        title="Customers"
+        description={`${rows.length} customer${rows.length === 1 ? '' : 's'}`}
+        actions={<NewCustomerDialog action={createCustomer} variant="header" />}
+      />
+
+      <CustomersTableManager
+        rows={rows}
+        searchQuery={searchQuery}
+        search={
+          <LiveQueryInput placeholder="Search customers..." initialValue={searchQuery} />
+        }
+      />
+
       <NewCustomerDialog action={createCustomer} variant="fab" />
-    </>
+    </div>
   )
 }

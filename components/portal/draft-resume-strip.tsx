@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
-import { StatusDot } from '@/components/ui/status-dot'
+import { OrderStatusDot } from '@/components/ui/status-dot'
 import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import { formatDeliveryDate } from '@/lib/utils'
 
@@ -28,7 +28,7 @@ export function DraftResumeStrip({ token, drafts }: DraftResumeStripProps) {
               href={href}
               className="group flex min-w-[220px] shrink-0 items-center gap-3 rounded-md border bg-status-draft-bg px-3 py-2 transition-colors hover:border-primary/40 sm:min-w-0"
             >
-              <StatusDot status="draft" />
+              <OrderStatusDot status="draft" />
               <div className="flex-1 text-sm">
                 <div className="font-medium">{formatDeliveryDate(draft.deliveryDate)}</div>
                 <div className="text-xs text-muted-foreground">{draft.itemCount} items</div>

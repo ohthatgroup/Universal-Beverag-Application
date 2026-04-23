@@ -33,7 +33,7 @@ export default async function AdminOrderDetailPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined
   const returnTo = resolveReturnTo(resolvedSearchParams?.returnTo)
   const backLabel = getBackLabel(returnTo)
-  await requirePageAuth(['salesman'])
+  const auth = await requirePageAuth(['salesman'])
   const db = await getRequestDb()
 
   const { rows: orderRows } = await db.query<{
@@ -57,8 +57,15 @@ export default async function AdminOrderDetailPage({
     notFound()
   }
 
-  const [{ rows: customers }, { rows: items }, { rows: products }, { rows: pallets }, { rows: brands }, { rows: priorOrdered }] =
-    await Promise.all([
+  const [
+    { rows: customers },
+    { rows: items },
+    { rows: products },
+    { rows: pallets },
+    { rows: brands },
+    { rows: priorOrdered },
+    { rows: salesmanRows },
+  ] = await Promise.all([
       order.customer_id
         ? db.query<{
             id: string
@@ -118,7 +125,13 @@ export default async function AdminOrderDetailPage({
             [order.customer_id]
           )
         : Promise.resolve({ rows: [] }),
+      db.query<{ office_email: string | null }>(
+        `select office_email from profiles where id = $1 limit 1`,
+        [auth.userId]
+      ),
     ])
+
+  const salesmanOfficeEmail = salesmanRows[0]?.office_email ?? null
 
   const customer = customers[0] ?? null
   const productById = new Map(products.map((product) => [product.id, product] as const))
@@ -230,6 +243,7 @@ export default async function AdminOrderDetailPage({
       backLabel={backLabel}
       shareLink={orderDeepLink}
       csvHref={`/api/orders/${order.id}/csv`}
+      salesmanOfficeEmail={salesmanOfficeEmail}
       addProductSlot={
         order.status === 'draft' ? (
           <ProductPickerDialog

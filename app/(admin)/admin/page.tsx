@@ -1,18 +1,11 @@
 import Link from 'next/link'
 import { ChevronRight, LogOut } from 'lucide-react'
-import { redirect } from 'next/navigation'
 import { BulkUploadPanel } from '@/components/admin/bulk-upload-panel'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
-import { getAuth } from '@/lib/auth/server'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
-
-async function signOut() {
-  'use server'
-  await getAuth().signOut()
-  redirect('/auth/login')
-}
+import { signOutAction } from './actions'
 
 export default async function AdminDrawerPage() {
   const context = await requirePageAuth(['salesman'])
@@ -41,7 +34,7 @@ export default async function AdminDrawerPage() {
     context.profile.email ?? context.profile.contact_name ?? 'Signed in'
 
   return (
-    <div className="mx-auto max-w-lg space-y-8 pb-10 pt-2">
+    <div className="mx-auto max-w-2xl space-y-8 pb-10 pt-2">
       <PageHeader
         title="Settings"
         description="Jump to a resource, move data in bulk, or manage your account."
@@ -49,7 +42,7 @@ export default async function AdminDrawerPage() {
 
       <section className="space-y-2">
         <h2 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Manage
+          Resources
         </h2>
         <ul className="divide-y rounded-xl border bg-card">
           {items.map((item) => (
@@ -86,7 +79,7 @@ export default async function AdminDrawerPage() {
             <div className="text-sm font-medium">{accountLabel}</div>
           </div>
           <div className="flex justify-end border-t px-4 py-3">
-            <form action={signOut}>
+            <form action={signOutAction}>
               <Button type="submit" variant="outline" size="sm" className="text-destructive">
                 <LogOut className="mr-1.5 h-4 w-4" />
                 Sign out

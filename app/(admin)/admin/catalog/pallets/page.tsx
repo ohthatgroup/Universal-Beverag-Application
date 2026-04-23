@@ -1,7 +1,6 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { PalletDealsManager, type PalletDealRow } from '@/components/admin/pallet-deals-manager'
 import { LiveQueryInput } from '@/components/admin/live-query-input'
+import { PageHeader } from '@/components/ui/page-header'
 import { getRequestDb } from '@/lib/server/db'
 import { requirePageAuth } from '@/lib/server/page-auth'
 
@@ -46,29 +45,21 @@ export default async function PalletsPage({ searchParams }: PalletsPageProps) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          href="/admin"
-          className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Admin
-        </Link>
-        <h1 className="text-2xl font-semibold">Pallet Deals</h1>
-        <p className="text-sm text-muted-foreground">
-          {rows.length} deal{rows.length === 1 ? '' : 's'}
-        </p>
-      </div>
-
-      <LiveQueryInput
-        placeholder="Search pallets..."
-        initialValue={searchQuery}
-        className="w-full"
+      <PageHeader
+        title="Pallet Deals"
+        description={`${rows.length} deal${rows.length === 1 ? '' : 's'}`}
       />
 
       <PalletDealsManager
         deals={rows}
         searchQuery={searchQuery}
+        search={
+          <LiveQueryInput
+            placeholder="Search pallets..."
+            initialValue={searchQuery}
+            className="w-full"
+          />
+        }
       />
     </div>
   )

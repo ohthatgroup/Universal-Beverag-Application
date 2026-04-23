@@ -18,6 +18,8 @@ type CustomerRecord = {
   city: string | null
   state: string | null
   zip: string | null
+  tags: string[]
+  location: string | null
   show_prices: boolean | null
   custom_pricing: boolean | null
   default_group: 'brand' | 'size' | null
@@ -30,7 +32,7 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
 
   const { rows: customers } = await db.query<CustomerRecord>(
     `select id, business_name, contact_name, email, phone, address, city, state, zip,
-            show_prices, custom_pricing, default_group
+            tags, location, show_prices, custom_pricing, default_group
      from profiles
      where id = $1 and role = 'customer'
      limit 1`,
@@ -66,6 +68,8 @@ export default async function CustomerEditPage({ params }: { params: Promise<{ i
           city: customer.city ?? '',
           state: customer.state ?? '',
           zip: customer.zip ?? '',
+          tags: customer.tags,
+          location: customer.location ?? '',
           show_prices: customer.show_prices ?? true,
           custom_pricing: customer.custom_pricing ?? false,
           default_group: customer.default_group ?? 'brand',

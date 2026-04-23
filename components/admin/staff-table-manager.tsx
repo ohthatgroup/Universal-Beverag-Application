@@ -22,6 +22,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { buttonVariants } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
+import { StaffStatusDot } from '@/components/ui/status-dot'
 import { cn } from '@/lib/utils'
 
 export interface StaffListRow {
@@ -36,23 +38,6 @@ export interface StaffListRow {
 
 interface StaffTableManagerProps {
   rows: StaffListRow[]
-}
-
-function StatusDot({ status }: { status: StaffListRow['status'] }) {
-  const dotColor =
-    status === 'active'
-      ? 'bg-green-500'
-      : status === 'invited'
-        ? 'bg-yellow-500'
-        : 'bg-muted-foreground/40'
-  const label = status === 'active' ? 'Active' : status === 'invited' ? 'Invited' : 'Disabled'
-  return (
-    <span
-      className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`}
-      aria-label={label}
-      title={label}
-    />
-  )
 }
 
 type ConfirmState =
@@ -158,7 +143,7 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
   }
 
   if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">No staff accounts yet.</p>
+    return <EmptyState title="No staff accounts yet" description="Invite a staff member to get started." />
   }
 
   return (
@@ -172,10 +157,10 @@ export function StaffTableManager({ rows: initialRows }: StaffTableManagerProps)
           const rowFlash = flash?.id === row.id ? flash.message : null
           return (
             <li key={row.id} className="flex items-center gap-3 px-3 py-3">
-              <StatusDot status={row.status} />
+              <StaffStatusDot status={row.status} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{row.displayName}</div>
-                <div className="truncate text-xs text-muted-foreground">{row.email ?? 'No email'}</div>
+                <div className="text-sm font-medium">{row.displayName}</div>
+                <div className="text-xs text-muted-foreground">{row.email ?? 'No email'}</div>
               </div>
 
               {rowFlash ? (

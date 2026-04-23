@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
-  FilterTriggerAnchored,
+  FilterCollapsePanel,
+  FilterMobileSheet,
+  FilterTrigger,
   useFilterPanelState,
 } from '@/components/catalog/filter-panel'
 import { QuantitySelector } from '@/components/catalog/quantity-selector'
@@ -237,7 +239,7 @@ export function ProductPickerDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-[42rem] overflow-hidden p-3 sm:max-h-[92vh] sm:w-[calc(100vw-1.5rem)] sm:p-6">
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-[56rem] overflow-hidden p-3 sm:max-h-[92vh] sm:w-[calc(100vw-1.5rem)] sm:p-6">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -247,51 +249,92 @@ export function ProductPickerDialog({
 
         <div className="flex min-h-0 flex-col space-y-3">
           <div className="flex items-center gap-2">
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search products..."
-                className="pl-9"
+                className="w-full pl-9"
               />
             </div>
-            <FilterTriggerAnchored
-              state={filterPanelState}
-              groupBy={groupBy}
-              onGroupByChange={setGroupBy}
-              sizes={availableSizes}
-              selectedSizes={sizes}
-              onSizeToggle={(s) =>
-                setSizes((prev) =>
-                  prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-                )
-              }
-              onSizeClear={() => setSizes([])}
-              brands={availableBrands}
-              selectedBrandIds={brandLabels}
-              onBrandToggle={(id) =>
-                setBrandLabels((prev) =>
-                  prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-                )
-              }
-              onBrandClear={() => setBrandLabels([])}
-            />
+            <FilterTrigger state={filterPanelState} />
           </div>
 
-          {previouslyOrderedIds.length > 0 && (
-            <label className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-              <input
-                type="checkbox"
-                checked={showPrevious}
-                onChange={(event) => setShowPrevious(event.target.checked)}
-              />
-              <span>Show previously ordered only</span>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {previouslyOrderedIds.length}
-              </span>
-            </label>
-          )}
+          <FilterCollapsePanel
+            state={filterPanelState}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
+            sizes={availableSizes}
+            selectedSizes={sizes}
+            onSizeToggle={(s) =>
+              setSizes((prev) =>
+                prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+              )
+            }
+            onSizeClear={() => setSizes([])}
+            brands={availableBrands}
+            selectedBrandIds={brandLabels}
+            onBrandToggle={(id) =>
+              setBrandLabels((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+              )
+            }
+            onBrandClear={() => setBrandLabels([])}
+            extra={
+              previouslyOrderedIds.length > 0 ? (
+                <label className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showPrevious}
+                    onChange={(event) => setShowPrevious(event.target.checked)}
+                  />
+                  <span>Previously ordered</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {previouslyOrderedIds.length}
+                  </span>
+                </label>
+              ) : null
+            }
+          />
+
+          <FilterMobileSheet
+            state={filterPanelState}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
+            sizes={availableSizes}
+            selectedSizes={sizes}
+            onSizeToggle={(s) =>
+              setSizes((prev) =>
+                prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+              )
+            }
+            onSizeClear={() => setSizes([])}
+            brands={availableBrands}
+            selectedBrandIds={brandLabels}
+            onBrandToggle={(id) =>
+              setBrandLabels((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+              )
+            }
+            onBrandClear={() => setBrandLabels([])}
+            extra={
+              previouslyOrderedIds.length > 0 ? (
+                <label className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showPrevious}
+                    onChange={(event) => setShowPrevious(event.target.checked)}
+                  />
+                  <span>Previously ordered</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {previouslyOrderedIds.length}
+                  </span>
+                </label>
+              ) : null
+            }
+          />
+
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -353,34 +396,36 @@ function renderPickerRow(
   },
 ) {
   const { mode, quantity, onQuantityChange } = opts
-  const showQuantitySelector = mode === 'order' && quantity > 0
   return (
-    <div key={product.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{product.title}</div>
-        <div className="text-xs text-muted-foreground">
-          {product.brandLabel} - {product.packLabel}
-        </div>
-      </div>
-      <div className="flex items-center justify-between gap-2 sm:justify-end sm:gap-3">
-        <div className="text-sm text-muted-foreground">{formatCurrency(product.price)}</div>
-        {showQuantitySelector ? (
+    <div key={product.id} className="flex items-center gap-3 px-3 py-2.5">
+      {mode === 'order' ? (
+        <div className="shrink-0">
           <QuantitySelector
             quantity={quantity}
             onChange={(next) => onQuantityChange(product, next)}
           />
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            className="shrink-0"
-            disabled={isAddingId === product.id}
-            onClick={() => addProduct(product)}
-          >
-            {isAddingId === product.id ? 'Adding...' : 'Add'}
-          </Button>
-        )}
+        </div>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">{product.title}</div>
+        <div className="text-xs text-muted-foreground">
+          {product.brandLabel} - {product.packLabel}
+        </div>
       </div>
+      <div className="shrink-0 text-sm text-muted-foreground tabular-nums">
+        {formatCurrency(product.price)}
+      </div>
+      {mode !== 'order' ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0"
+          disabled={isAddingId === product.id}
+          onClick={() => addProduct(product)}
+        >
+          {isAddingId === product.id ? 'Adding...' : 'Add'}
+        </Button>
+      ) : null}
     </div>
   )
 }

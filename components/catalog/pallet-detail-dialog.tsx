@@ -108,10 +108,10 @@ export function PalletDetailDialog({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">
+                      <div className="text-sm font-medium">
                         {item.product_title}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         {[item.brand_name, item.pack_label]
                           .filter(Boolean)
                           .join(' · ')}
@@ -131,12 +131,12 @@ export function PalletDetailDialog({
           </div>
 
           {onChange && (
-            <div className="flex items-center justify-between border-t pt-4">
-              <span className="text-sm font-medium">In your order</span>
+            <div className="flex items-center gap-3 border-t pt-4">
               <QuantitySelector
                 quantity={quantity ?? 0}
                 onChange={onChange}
               />
+              <span className="text-sm font-medium">In your order</span>
             </div>
           )}
         </div>

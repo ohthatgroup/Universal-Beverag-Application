@@ -2,18 +2,15 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowDown,
-  ArrowDownToLine,
-  ArrowUp,
-  ArrowUpToLine,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react'
-import { LiveQueryInput } from '@/components/admin/live-query-input'
+import { Plus } from 'lucide-react'
+import { AdminFab } from '@/components/admin/admin-fab'
+import { BulkActionBar } from '@/components/admin/bulk-action-bar'
+import { ConfirmSheet } from '@/components/ui/confirm-sheet'
+import { EmptyState } from '@/components/ui/empty-state'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
+import { ListToolbar } from '@/components/admin/list-toolbar'
+import { RowCheckbox, RowReorderArrows } from '@/components/admin/row-actions'
+import { ProductStatusDot, type ProductLifecycle } from '@/components/ui/status-dot'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,32 +25,8 @@ import { isInteractiveRowTarget } from '@/lib/row-navigation'
 import { formatCurrency, PACK_UOM_OPTIONS } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
-type ProductLifecycle = 'discontinued' | 'active'
-
 function getLifecycle(row: { isDiscontinued: boolean }): ProductLifecycle {
   return row.isDiscontinued ? 'discontinued' : 'active'
-}
-
-const PRODUCT_DOT_CLASSES: Record<ProductLifecycle, string> = {
-  discontinued: 'bg-red-500',
-  active: 'bg-green-500',
-}
-
-const PRODUCT_DOT_LABELS: Record<ProductLifecycle, string> = {
-  discontinued: 'Discontinued',
-  active: 'Active',
-}
-
-function ProductStatusDot({ lifecycle, className }: { lifecycle: ProductLifecycle; className?: string }) {
-  const label = PRODUCT_DOT_LABELS[lifecycle]
-  return (
-    <span
-      role="img"
-      aria-label={`Status: ${label}`}
-      title={label}
-      className={cn('inline-block h-2 w-2 shrink-0 rounded-full', PRODUCT_DOT_CLASSES[lifecycle], className)}
-    />
-  )
 }
 
 const NEW_ROW_TINT = 'bg-blue-50/70'
@@ -77,12 +50,14 @@ interface CatalogProductsManagerProps {
   products: CatalogProductRow[]
   brands: CatalogBrandOption[]
   searchQuery: string
+  /** Optional search input rendered inside the toolbar row. */
+  search?: React.ReactNode
 }
 
 const CREATE_NEW_BRAND_VALUE = '__create_new_brand__'
 const CREATE_NEW_SIZE_UNIT_VALUE = '__create_new_size_unit__'
 
-export function CatalogProductsManager({ products, brands, searchQuery }: CatalogProductsManagerProps) {
+export function CatalogProductsManager({ products, brands, searchQuery, search }: CatalogProductsManagerProps) {
   const router = useRouter()
   const [rows, setRows] = useState<CatalogProductRow[]>(products)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -95,6 +70,7 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
   const [createBrandName, setCreateBrandName] = useState('')
   const [createSizeUnitValue, setCreateSizeUnitValue] = useState('')
   const [createSizeUnitName, setCreateSizeUnitName] = useState('')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   const searchIsActive = searchQuery.trim().length > 0
 
@@ -177,11 +153,13 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
     void applyOrder(nextRows)
   }
 
+  const requestDeleteSelected = () => {
+    if (busy || selectedRows.length === 0) return
+    setConfirmDeleteOpen(true)
+  }
+
   const deleteSelected = async () => {
     if (busy || selectedRows.length === 0) return
-    const confirmed = window.confirm(`Delete ${selectedRows.length} selected product(s)?`)
-    if (!confirmed) return
-
     setBusy(true)
     setError(null)
     const ids = selectedRows.map((row) => row.id)
@@ -301,39 +279,23 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
 
   return (
     <div className="space-y-3">
-      {/* Search dominates; pen toggles edit mode; plus opens create-product modal */}
-      <div className="flex items-center gap-2">
-        <LiveQueryInput
-          placeholder="Search products..."
-          initialValue={searchQuery}
-          className="flex-1"
-        />
-        <Button
-          type="button"
-          size="icon"
-          variant={editMode ? 'default' : 'outline'}
-          aria-label={editMode ? 'Exit edit mode' : 'Enter edit mode'}
-          title={editMode ? 'Exit edit mode' : 'Edit: show checkboxes + reorder arrows'}
-          onClick={() => {
-            setEditMode((prev) => {
-              const next = !prev
-              if (!next) setSelectedIds(new Set())
-              return next
-            })
-          }}
-        >
-          {editMode ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          aria-label="New product"
-          title="New product"
-          onClick={() => setShowCreateDialog(true)}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
+      <ListToolbar
+        search={search}
+        editMode={editMode}
+        onEditModeChange={(next) => {
+          setEditMode(next)
+          if (!next) setSelectedIds(new Set())
+        }}
+        editTitle={editMode ? 'Exit edit mode' : 'Edit: show checkboxes + reorder arrows'}
+        onAdd={() => setShowCreateDialog(true)}
+        addLabel="New product"
+      />
+
+      <AdminFab
+        icon={<Plus className="h-6 w-6" />}
+        label="New product"
+        onClick={() => setShowCreateDialog(true)}
+      />
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-[42rem] overflow-y-auto p-4 sm:p-6">
@@ -426,18 +388,30 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
         </DialogContent>
       </Dialog>
 
-      {editMode && selectedCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
-          <span className="text-sm text-muted-foreground">{selectedCount} selected</span>
-          <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={deleteSelected}>
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Delete
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
-            Clear
-          </Button>
-        </div>
+      {editMode && (
+        <BulkActionBar
+          selectedCount={selectedCount}
+          onDelete={requestDeleteSelected}
+          onClear={() => setSelectedIds(new Set())}
+          busy={busy}
+        />
       )}
+
+      <ConfirmSheet
+        open={confirmDeleteOpen}
+        onOpenChange={(next) => {
+          if (!busy) setConfirmDeleteOpen(next)
+        }}
+        title={`Delete ${selectedCount} product${selectedCount === 1 ? '' : 's'}?`}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+        pending={busy}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false)
+          void deleteSelected()
+        }}
+      />
 
       {searchIsActive && editMode && (
         <p className="text-xs text-muted-foreground">Clear search to enable reorder arrows.</p>
@@ -445,7 +419,7 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No products available.</p>
+        <EmptyState title="No products yet" description="Add your first product to get started." />
       ) : (
         <>
           {/* Mobile list */}
@@ -461,13 +435,11 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                   )}
                 >
                   {editMode && (
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
+                    <RowCheckbox
+                      className="mt-1"
+                      label={`Select ${row.title}`}
                       checked={selectedIds.has(row.id)}
                       onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                      onClick={(event) => event.stopPropagation()}
-                      aria-label={`Select ${row.title}`}
                     />
                   )}
                   <ProductStatusDot lifecycle={lifecycle} className="mt-1.5" />
@@ -479,7 +451,7 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                   >
                     <div
                       className={cn(
-                        'truncate text-sm font-medium',
+                        'text-sm font-medium',
                         lifecycle === 'discontinued' && 'text-muted-foreground'
                       )}
                     >
@@ -491,7 +463,7 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                     <div className="text-xs text-muted-foreground">{formatCurrency(row.price)}</div>
                   </button>
                   {editMode && !searchIsActive && (
-                    <ReorderArrows
+                    <RowReorderArrows
                       disabled={busy}
                       isFirst={index === 0}
                       isLast={index === rows.length - 1}
@@ -513,12 +485,11 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                 <tr className="border-b bg-muted/50">
                   {editMode && (
                     <th className="w-10 px-2 py-3 text-left">
-                      <input
-                        type="checkbox"
+                      <RowCheckbox
+                        label="Select all"
                         checked={allSelected}
                         onChange={(event) => toggleAll(event.target.checked)}
                         disabled={busy}
-                        aria-label="Select all"
                       />
                     </th>
                   )}
@@ -548,11 +519,10 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                     >
                       {editMode && (
                         <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
-                          <input
-                            type="checkbox"
+                          <RowCheckbox
+                            label={`Select ${row.title}`}
                             checked={selectedIds.has(row.id)}
                             onChange={(event) => toggleSelected(row.id, event.target.checked)}
-                            aria-label={`Select ${row.title}`}
                           />
                         </td>
                       )}
@@ -572,7 +542,7 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
                       <td className="px-4 py-3 text-right">{formatCurrency(row.price)}</td>
                       {editMode && (
                         <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
-                          <ReorderArrows
+                          <RowReorderArrows
                             disabled={busy || searchIsActive}
                             isFirst={index === 0}
                             isLast={index === rows.length - 1}
@@ -595,66 +565,3 @@ export function CatalogProductsManager({ products, brands, searchQuery }: Catalo
   )
 }
 
-function ReorderArrows({
-  disabled,
-  isFirst,
-  isLast,
-  onUp,
-  onDown,
-  onTop,
-  onBottom,
-}: {
-  disabled: boolean
-  isFirst: boolean
-  isLast: boolean
-  onUp: () => void
-  onDown: () => void
-  onTop: () => void
-  onBottom: () => void
-}) {
-  const stop = (e: MouseEvent) => e.stopPropagation()
-  return (
-    <div className="flex items-center gap-1" onClick={stop}>
-      <button
-        type="button"
-        aria-label="Move to top"
-        title="Move to top"
-        disabled={disabled || isFirst}
-        onClick={onTop}
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-      >
-        <ArrowUpToLine className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        aria-label="Move up"
-        title="Move up"
-        disabled={disabled || isFirst}
-        onClick={onUp}
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-      >
-        <ArrowUp className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        aria-label="Move down"
-        title="Move down"
-        disabled={disabled || isLast}
-        onClick={onDown}
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-      >
-        <ArrowDown className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        aria-label="Move to bottom"
-        title="Move to bottom"
-        disabled={disabled || isLast}
-        onClick={onBottom}
-        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-      >
-        <ArrowDownToLine className="h-4 w-4" />
-      </button>
-    </div>
-  )
-}

@@ -65,6 +65,26 @@ const config: Config = {
             DEFAULT: "hsl(var(--status-cancelled))",
             bg: "hsl(var(--status-cancelled-bg))",
           },
+          active: {
+            DEFAULT: "hsl(var(--status-active))",
+            bg: "hsl(var(--status-active-bg))",
+          },
+          inactive: {
+            DEFAULT: "hsl(var(--status-inactive))",
+            bg: "hsl(var(--status-inactive-bg))",
+          },
+          discontinued: {
+            DEFAULT: "hsl(var(--status-discontinued))",
+            bg: "hsl(var(--status-discontinued-bg))",
+          },
+          invited: {
+            DEFAULT: "hsl(var(--status-invited))",
+            bg: "hsl(var(--status-invited-bg))",
+          },
+          disabled: {
+            DEFAULT: "hsl(var(--status-disabled))",
+            bg: "hsl(var(--status-disabled-bg))",
+          },
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, Copy, Mail, MessageSquare, MoreVertical, Package2, Pencil, Plus, RefreshCcw, Share2, Trash2 } from 'lucide-react'
+import { Check, Copy, MoreVertical, Package2, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -200,51 +200,20 @@ export function CustomerStartOrderButton() {
 }
 
 export function CustomerSharePortalMenu() {
-  const { portalUrl, copied, copyPortal, regenerateToken } = useCtx()
+  const { portalUrl, copied, copyPortal } = useCtx()
   const disabled = !portalUrl
 
-  const smsHref = portalUrl ? `sms:?body=${encodeURIComponent(`Your portal: ${portalUrl}`)}` : '#'
-  const mailHref = portalUrl
-    ? `mailto:?subject=${encodeURIComponent('Your portal access')}&body=${encodeURIComponent(`Your portal link: ${portalUrl}`)}`
-    : '#'
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled}
-          className="h-9"
-        >
-          <Share2 className="mr-1.5 h-4 w-4" />
-          Share portal
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-48">
-        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void copyPortal() }} disabled={disabled}>
-          {copied ? <Check className="mr-2 h-3.5 w-3.5" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
-          {copied ? 'Copied' : 'Copy portal link'}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void regenerateToken() }}>
-          <RefreshCcw className="mr-2 h-3.5 w-3.5" />
-          Regenerate link
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild disabled={disabled}>
-          <a href={smsHref}>
-            <MessageSquare className="mr-2 h-3.5 w-3.5" />
-            Share via SMS
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild disabled={disabled}>
-          <a href={mailHref}>
-            <Mail className="mr-2 h-3.5 w-3.5" />
-            Share via email
-          </a>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      onClick={() => void copyPortal()}
+      className="h-9"
+    >
+      {copied ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
+      {copied ? 'Copied' : 'Copy portal link'}
+    </Button>
   )
 }

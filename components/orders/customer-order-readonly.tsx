@@ -1,13 +1,14 @@
-import Link from 'next/link'
-import { ArrowLeft, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
 import type { OrderStatus } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import { formatDeliveryDate } from '@/lib/utils'
 import { Money } from '@/components/ui/money'
-import { StatusDot } from '@/components/ui/status-dot'
+import { OrderStatusDot } from '@/components/ui/status-dot'
 import { getStatusLabel } from '@/lib/utils'
+import { PortalPageHeader } from '@/components/portal/portal-page-header'
+import { EmptyState } from '@/components/ui/empty-state'
 
 interface CustomerReadonlyLineItem {
   id: string
@@ -34,34 +35,28 @@ interface CustomerOrderReadonlyProps {
 }
 
 export function CustomerOrderReadonly({ token, order, items, showPrices }: CustomerOrderReadonlyProps) {
-  const ordersHref = `${buildCustomerPortalBasePath(token) ?? '/portal'}/orders`
+  const homeHref = buildCustomerPortalBasePath(token) ?? '/portal'
 
   return (
     <div className="space-y-4 p-4 pb-20 md:pb-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-            <Link href={ordersHref}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+      <PortalPageHeader
+        back={{ href: homeHref }}
+        title={formatDeliveryDate(order.delivery_date)}
+        subtitle={
+          <span className="inline-flex items-center gap-1.5">
+            <OrderStatusDot status={order.status} />
+            {getStatusLabel(order.status)}
+          </span>
+        }
+        action={
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/api/portal/orders/${order.id}/csv?token=${token}`}>
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              CSV
+            </a>
           </Button>
-          <div>
-            <h1 className="text-lg font-semibold">{formatDeliveryDate(order.delivery_date)}</h1>
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <StatusDot status={order.status} />
-              {getStatusLabel(order.status)}
-            </div>
-          </div>
-        </div>
-
-        <Button variant="outline" size="sm" asChild>
-          <a href={`/api/portal/orders/${order.id}/csv?token=${token}`}>
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            CSV
-          </a>
-        </Button>
-      </div>
+        }
+      />
 
       {/* Summary */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -97,7 +92,7 @@ export function CustomerOrderReadonly({ token, order, items, showPrices }: Custo
           </div>
         ))}
 
-        {items.length === 0 && <p className="text-sm text-muted-foreground py-4">No line items.</p>}
+        {items.length === 0 && <EmptyState title="No line items" />}
       </div>
 
       {/* Total */}
