@@ -78,3 +78,9 @@ All tables have RLS enabled. `is_salesman()` (SECURITY DEFINER) is the key helpe
 ### Type Safety
 
 ESLint enforces `@typescript-eslint/no-explicit-any` as an error everywhere except `lib/database.generated.ts`. When regenerating DB types, run `npm run db:types:generate` rather than editing the file manually.
+
+## Scope
+
+When the user gives an **implementation task** (e.g. "implement X", "build Y", "write the test", "fix the bug"), ignore the saved "design-only on UBA" preference for that task. Execute end-to-end: markup, state, queries, API routes, migrations, tests — whatever the task requires. Do not split work into a "design shipped / backend handoff" pattern unless explicitly asked.
+
+The design-only default still applies to ambiguous design-review or visual-polish requests where backend involvement is unclear — in those cases, ask or stay design-only.
