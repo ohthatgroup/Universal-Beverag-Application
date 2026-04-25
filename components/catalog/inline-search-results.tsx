@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { ProductTile } from '@/components/catalog/product-tile'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Stepper } from '@/components/ui/stepper'
 import { FAMILIES } from '@/lib/catalog/families'
 import type { CatalogProduct } from '@/lib/types'
 import type { ProductFamily } from '@/lib/server/schemas'
@@ -12,6 +13,7 @@ interface InlineSearchResultsProps {
   products: CatalogProduct[]
   quantityFor: (product: CatalogProduct) => number
   onOpenProduct: (product: CatalogProduct) => void
+  onSetQuantity: (product: CatalogProduct, next: number) => void
 }
 
 const TILE_GRID_CLASSES = 'grid grid-cols-3 gap-1.5 md:grid-cols-5'
@@ -24,6 +26,7 @@ export function InlineSearchResults({
   products,
   quantityFor,
   onOpenProduct,
+  onSetQuantity,
 }: InlineSearchResultsProps) {
   const sections = useMemo(() => {
     const trimmed = query.trim().toLowerCase()
@@ -70,6 +73,12 @@ export function InlineSearchResults({
                 product={product}
                 quantity={quantityFor(product)}
                 onOpen={() => onOpenProduct(product)}
+                overlaySlot={
+                  <Stepper
+                    quantity={quantityFor(product)}
+                    onChange={(next) => onSetQuantity(product, next)}
+                  />
+                }
               />
             ))}
           </div>
