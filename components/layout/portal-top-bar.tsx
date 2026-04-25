@@ -7,10 +7,9 @@ import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 
 interface PortalTopBarProps {
   token: string
-  customerName: string
 }
 
-export function PortalTopBar({ token, customerName }: PortalTopBarProps) {
+export function PortalTopBar({ token }: PortalTopBarProps) {
   const base = buildCustomerPortalBasePath(token) ?? '/portal'
 
   return (

@@ -24,13 +24,12 @@ export default async function PortalLayout({
 }) {
   const { token } = await params
 
-  const { profile } = await resolveCustomerToken(token)
-  const customerName =
-    profile.business_name?.trim() || profile.contact_name?.trim() || 'Account'
+  // resolveCustomerToken still runs as the 404 gate for invalid tokens.
+  await resolveCustomerToken(token)
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalTopBar token={token} customerName={customerName} />
+      <PortalTopBar token={token} />
       <main>
         <div className="mx-auto max-w-3xl p-4 md:p-6">
           {children}

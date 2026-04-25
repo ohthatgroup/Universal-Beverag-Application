@@ -60,6 +60,11 @@ const ADMIN_LINKS: NavLink[] = [
     match: (p) => p.startsWith('/admin/reports'),
   },
   {
+    href: '/admin/announcements',
+    label: 'Announcements',
+    match: (p) => p.startsWith('/admin/announcements'),
+  },
+  {
     href: '/admin/staff',
     label: 'Staff',
     match: (p) => p.startsWith('/admin/staff'),
