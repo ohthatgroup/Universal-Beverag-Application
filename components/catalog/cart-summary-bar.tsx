@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn, formatCurrency } from '@/lib/utils'
-import { surfaceOverlayPrimary } from '@/lib/design/surfaces'
+import { surfaceOverlay } from '@/lib/design/surfaces'
 
 interface CartSummaryBarProps {
   itemCount: number
@@ -16,6 +16,9 @@ interface CartSummaryBarProps {
 //   - Mobile: edge-to-edge band pinned to the bottom of the viewport.
 //   - Desktop (md+): floating pill, max-width matching the page content
 //     container so the bar visually aligns with the page's logo + profile.
+//
+// Per doctrine Rule 6: the bar uses neutral `surfaceOverlay`. The accent
+// Review button is the single primary affordance — no double-tinting.
 export function CartSummaryBar({
   itemCount,
   totalValue,
@@ -25,21 +28,13 @@ export function CartSummaryBar({
   if (itemCount === 0) return null
 
   return (
-    <div
-      className={cn(
-        'fixed inset-x-0 bottom-0 z-30 px-0 md:bottom-4 md:px-4',
-        // Outer wrapper just centers the inner pill on desktop.
-      )}
-    >
+    <div className="fixed inset-x-0 bottom-0 z-30 px-0 md:bottom-4 md:px-4">
       <div
         className={cn(
           'mx-auto flex items-center justify-between gap-3 p-3',
-          // Mobile: edge-to-edge band with a top border for separation.
-          'border-t border-primary/20',
-          // Desktop: pill — rounded, contained max-width, soft drop shadow,
-          // no top border (floats independently above the page).
-          'md:max-w-3xl md:rounded-full md:border md:px-5 md:py-2.5 md:shadow-2xl',
-          surfaceOverlayPrimary,
+          // Desktop: pill — rounded-full, contained max-width, soft drop shadow.
+          'md:max-w-3xl md:rounded-full md:px-5 md:py-2.5 md:shadow-2xl',
+          surfaceOverlay,
         )}
       >
         <div className="flex items-baseline gap-2 text-sm">
