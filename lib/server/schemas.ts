@@ -21,6 +21,10 @@ export const cloneOrderSchema = z.object({
   deliveryDate: isoDateSchema,
 })
 
+export const updateDeliveryDateSchema = z.object({
+  deliveryDate: isoDateSchema,
+})
+
 export const passwordResetRequestSchema = z.object({
   email: z.string().trim().email().max(320),
 })
@@ -74,3 +78,214 @@ export const updatePresetSchema = z.object({
 export const applyPresetSchema = z.object({
   customerId: uuidSchema,
 })
+
+// ---- Products -----------------------------------------------------------
+// Derived navigation metadata. See db/migrations/*_products_browse_model_fields.sql.
+
+export const productFamilyEnum = z.enum([
+  'soda',
+  'water',
+  'sports_hydration',
+  'tea_juice',
+  'energy_coffee',
+  'other',
+])
+export type ProductFamily = z.infer<typeof productFamilyEnum>
+
+export const browseModelEnum = z.enum([
+  'format-led',
+  'water-type-led',
+  'subline-then-size',
+  'brand-led',
+  'price-point-led',
+])
+export type BrowseModel = z.infer<typeof browseModelEnum>
+
+export const waterTypeEnum = z.enum(['still', 'sparkling', 'enhanced', 'coconut'])
+export type WaterType = z.infer<typeof waterTypeEnum>
+
+// Create schema: defaults apply for booleans, family, and browse_model so
+// callers can omit them.
+const productCreateFields = {
+  brand_id: uuidSchema.nullable(),
+  title: z.string().min(1).max(300),
+  pack_details: z.string().max(200).nullable(),
+  pack_count: z.number().int().positive().nullable(),
+  size_value: z.number().positive().nullable(),
+  size_uom: z.string().max(40).nullable(),
+  price: z.number().nonnegative(),
+  image_url: z.string().max(2000).nullable(),
+  is_new: z.boolean().default(false),
+  is_discontinued: z.boolean().default(false),
+  tags: z.array(z.string().max(80)).nullable(),
+
+  product_family: productFamilyEnum.default('other'),
+  browse_model: browseModelEnum.default('brand-led'),
+  subline: z.string().max(120).nullable().optional(),
+  pack_key: z.string().max(60).nullable().optional(),
+  water_type: waterTypeEnum.nullable().optional(),
+  price_point: z.string().max(40).nullable().optional(),
+  is_zero_sugar: z.boolean().default(false),
+  is_diet: z.boolean().default(false),
+  is_caffeine_free: z.boolean().default(false),
+  is_sparkling: z.boolean().default(false),
+  search_aliases: z.array(z.string().max(120)).nullable().optional(),
+}
+
+// Update schema: every field is independently optional with NO defaults, so a
+// partial PATCH like `{ is_diet: true }` parses to exactly that — the PATCH
+// route's column-by-column SET clause writes only what the curator touched.
+const productUpdateFields = {
+  brand_id: uuidSchema.nullable(),
+  title: z.string().min(1).max(300),
+  pack_details: z.string().max(200).nullable(),
+  pack_count: z.number().int().positive().nullable(),
+  size_value: z.number().positive().nullable(),
+  size_uom: z.string().max(40).nullable(),
+  price: z.number().nonnegative(),
+  image_url: z.string().max(2000).nullable(),
+  is_new: z.boolean(),
+  is_discontinued: z.boolean(),
+  tags: z.array(z.string().max(80)).nullable(),
+
+  product_family: productFamilyEnum,
+  browse_model: browseModelEnum,
+  subline: z.string().max(120).nullable(),
+  pack_key: z.string().max(60).nullable(),
+  water_type: waterTypeEnum.nullable(),
+  price_point: z.string().max(40).nullable(),
+  is_zero_sugar: z.boolean(),
+  is_diet: z.boolean(),
+  is_caffeine_free: z.boolean(),
+  is_sparkling: z.boolean(),
+  search_aliases: z.array(z.string().max(120)).nullable(),
+}
+
+export const productCreateSchema = z.object(productCreateFields)
+export const productUpdateSchema = z.object(productUpdateFields).partial()
+
+export type ProductCreateInput = z.infer<typeof productCreateSchema>
+export type ProductUpdateInput = z.infer<typeof productUpdateSchema>
+
+// Family → metadata visibility matrix.
+// Single source of truth for which derived-navigation fields apply to which
+// family. The admin product form uses `getVisibleFieldsForFamily()` to show or
+// hide inputs when the user picks a product_family. The customer-facing
+// FamilySheet uses the same matrix to decide which row chips to surface
+// ("Diet", "Zero", "Sparkling", "$0.99") and which to ignore.
+
+export type ProductMetaField =
+  | 'subline'
+  | 'pack_key'
+  | 'water_type'
+  | 'price_point'
+  | 'is_zero_sugar'
+  | 'is_diet'
+  | 'is_caffeine_free'
+  | 'is_sparkling'
+  | 'search_aliases'
+
+interface FamilyMatrixEntry {
+  defaultBrowseModel: BrowseModel
+  applies: Record<ProductMetaField, boolean>
+  commonSublines?: readonly string[]
+}
+
+export const FAMILY_FIELD_MATRIX: Record<ProductFamily, FamilyMatrixEntry> = {
+  soda: {
+    defaultBrowseModel: 'format-led',
+    applies: {
+      subline:           true,
+      pack_key:          true,
+      water_type:        false,
+      price_point:       false,
+      is_zero_sugar:     true,
+      is_diet:           true,
+      is_caffeine_free:  true,
+      is_sparkling:      false,
+      search_aliases:    true,
+    },
+    commonSublines: ['Regular', 'Diet', 'Zero', 'Cherry', 'Vanilla', 'Caffeine Free'],
+  },
+  water: {
+    defaultBrowseModel: 'water-type-led',
+    applies: {
+      subline:           false,
+      pack_key:          true,
+      water_type:        true,
+      price_point:       false,
+      is_zero_sugar:     false,
+      is_diet:           false,
+      is_caffeine_free:  false,
+      is_sparkling:      true,
+      search_aliases:    true,
+    },
+  },
+  sports_hydration: {
+    defaultBrowseModel: 'subline-then-size',
+    applies: {
+      subline:           true,
+      pack_key:          true,
+      water_type:        false,
+      price_point:       false,
+      is_zero_sugar:     true,
+      is_diet:           false,
+      is_caffeine_free:  false,
+      is_sparkling:      false,
+      search_aliases:    true,
+    },
+    commonSublines: [
+      'Thirst Quencher', 'Gatorade Zero', 'G2', 'Endurance', 'Gatorlyte',
+      'BodyArmor', 'BodyArmor LYTE', 'Propel', 'Powerade', 'Powerade Zero',
+    ],
+  },
+  tea_juice: {
+    defaultBrowseModel: 'brand-led',
+    applies: {
+      subline:           false,
+      pack_key:          true,
+      water_type:        false,
+      price_point:       true,
+      is_zero_sugar:     true,
+      is_diet:           true,
+      is_caffeine_free:  true,
+      is_sparkling:      false,
+      search_aliases:    true,
+    },
+  },
+  energy_coffee: {
+    defaultBrowseModel: 'brand-led',
+    applies: {
+      subline:           true,
+      pack_key:          true,
+      water_type:        false,
+      price_point:       false,
+      is_zero_sugar:     true,
+      is_diet:           false,
+      is_caffeine_free:  false,
+      is_sparkling:      false,
+      search_aliases:    true,
+    },
+  },
+  other: {
+    defaultBrowseModel: 'brand-led',
+    applies: {
+      subline:           false,
+      pack_key:          true,
+      water_type:        false,
+      price_point:       false,
+      is_zero_sugar:     false,
+      is_diet:           false,
+      is_caffeine_free:  false,
+      is_sparkling:      false,
+      search_aliases:    true,
+    },
+  },
+}
+
+export function getVisibleFieldsForFamily(family: ProductFamily): ProductMetaField[] {
+  const entry = FAMILY_FIELD_MATRIX[family]
+  return (Object.entries(entry.applies) as [ProductMetaField, boolean][])
+    .filter(([, applies]) => applies)
+    .map(([field]) => field)
+}

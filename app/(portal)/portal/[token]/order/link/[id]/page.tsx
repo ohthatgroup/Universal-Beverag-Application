@@ -4,7 +4,7 @@ import { CustomerOrderReadonly } from '@/components/orders/customer-order-readon
 import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { getUsualsForCustomer } from '@/lib/server/portal-usuals'
-import type { Brand, CatalogProduct, CustomerProduct, OrderStatus, PalletDeal, Product } from '@/lib/types'
+import type { Brand, CatalogProduct, CustomerProduct, OrderStatus, Product } from '@/lib/types'
 import { getProductDisplayName, getProductPackLabel } from '@/lib/utils'
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -133,10 +133,12 @@ export default async function PortalOrderLinkPage({
     )
   }
 
-  const [productsResult, brandsResult, customerProductsResult, palletDealsResult, orderItemsResult, usuals] =
+  const [productsResult, brandsResult, customerProductsResult, orderItemsResult, usuals] =
     await Promise.all([
       db.query<Product>(
-        `select id, brand_id, customer_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, is_new, is_discontinued, tags, case_length, case_width, case_height, sort_order, created_at::text, updated_at::text
+        `select id, brand_id, customer_id, title, pack_details, pack_count, size_value, size_uom, price, image_url, is_new, is_discontinued, tags, case_length, case_width, case_height, sort_order, created_at::text, updated_at::text,
+                product_family, browse_model, subline, pack_key, water_type, price_point,
+                is_zero_sugar, is_diet, is_caffeine_free, is_sparkling, search_aliases
          from products
          where is_discontinued = false
            and (customer_id is null or customer_id = $1)
@@ -154,12 +156,6 @@ export default async function PortalOrderLinkPage({
          where customer_id = $1`,
         [customerId]
       ),
-      db.query<PalletDeal>(
-        `select id, title, pallet_type, image_url, price, savings_text, description, is_active, sort_order, created_at::text
-         from pallet_deals
-         where is_active = true
-         order by sort_order asc`
-      ),
       db.query<{
         product_id: string | null
         pallet_deal_id: string | null
@@ -174,76 +170,8 @@ export default async function PortalOrderLinkPage({
       getUsualsForCustomer(db, customerId),
     ])
 
-  const palletDealIds = palletDealsResult.rows.map((deal) => deal.id)
-  const palletItemsResult = palletDealIds.length
-    ? await db.query<{
-        pallet_deal_id: string
-        product_id: string
-        quantity: number
-        product_title: string
-        brand_name: string | null
-        pack_details: string | null
-        pack_count: number | null
-        size_value: number | null
-        size_uom: string | null
-        image_url: string | null
-      }>(
-        `select pdi.pallet_deal_id,
-                pdi.product_id,
-                pdi.quantity,
-                p.title as product_title,
-                b.name as brand_name,
-                p.pack_details,
-                p.pack_count,
-                p.size_value,
-                p.size_uom,
-                p.image_url
-         from pallet_deal_items pdi
-         join products p on p.id = pdi.product_id
-         left join brands b on b.id = p.brand_id
-         where pdi.pallet_deal_id = any($1::uuid[])`,
-        [palletDealIds]
-      )
-    : { rows: [] }
-
   const brandById = new Map(brandsResult.rows.map((brand) => [brand.id, brand]))
   const customerProductById = new Map(customerProductsResult.rows.map((entry) => [entry.product_id, entry]))
-  const productToPalletDealIds: Record<string, string[]> = {}
-  const palletItemsByDealId: Record<
-    string,
-    Array<{
-      product_id: string
-      product_title: string
-      brand_name: string | null
-      pack_label: string | null
-      image_url: string | null
-      quantity: number
-    }>
-  > = {}
-
-  for (const row of palletItemsResult.rows) {
-    const current = productToPalletDealIds[row.product_id] ?? []
-    if (!current.includes(row.pallet_deal_id)) {
-      current.push(row.pallet_deal_id)
-      productToPalletDealIds[row.product_id] = current
-    }
-
-    const dealItems = palletItemsByDealId[row.pallet_deal_id] ?? []
-    dealItems.push({
-      product_id: row.product_id,
-      product_title: row.product_title,
-      brand_name: row.brand_name,
-      pack_label: getProductPackLabel({
-        pack_details: row.pack_details,
-        pack_count: row.pack_count,
-        size_value: row.size_value,
-        size_uom: row.size_uom,
-      }),
-      image_url: row.image_url,
-      quantity: row.quantity,
-    })
-    palletItemsByDealId[row.pallet_deal_id] = dealItems
-  }
 
   const catalogProducts: CatalogProduct[] = productsResult.rows
     .filter((product) => !customerProductById.get(product.id)?.excluded)
@@ -264,12 +192,9 @@ export default async function PortalOrderLinkPage({
       orderId={order.id}
       deliveryDate={order.delivery_date}
       products={catalogProducts}
-      palletDeals={palletDealsResult.rows}
-      palletItemsByDealId={palletItemsByDealId}
       showPrices={profile.show_prices}
       defaultGroupBy={profile.default_group}
       initialItems={orderItemsResult.rows}
-      productToPalletDealIds={productToPalletDealIds}
       usuals={usuals}
     />
   )

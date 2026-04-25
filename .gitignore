@@ -25,7 +25,6 @@
 # misc
 .DS_Store
 *.pem
-/supabase/.temp/
 
 # debug
 npm-debug.log*
@@ -46,8 +45,19 @@ Universal Beverages Price list MAR. 25 25 DRINKS (2).xlsx
 !/tests/unit/
 /tests/unit/*
 !/tests/unit/auth-safe-messages.test.ts
+!/tests/unit/extracted-products-migration.test.ts
 !/tests/unit/section-gated-pdf-import.test.ts
 /scripts/*
 !/scripts/extract-pdf-layout.py
+!/scripts/import-official-product-images.ts
+!/scripts/migrate-extracted-products.ts
+!/scripts/product-image-search.ts
+!/scripts/scrape-manufacturer-product-images.ts
 !/scripts/section-gated-pdf-import.ts
 /docs
+!/tests/unit/import-official-product-images.test.ts
+!/tests/unit/product-image-search.test.ts
+!/tests/unit/scrape-manufacturer-product-images.test.ts
+
+# claude code local settings — never commit
+/.claude/

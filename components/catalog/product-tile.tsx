@@ -2,70 +2,92 @@
 
 import Image from 'next/image'
 import type { CatalogProduct } from '@/lib/types'
-import {
-  cn,
-  getProductDisplayName,
-  getProductSizeLabel,
-} from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 interface ProductTileProps {
   product: CatalogProduct
   quantity: number
   onOpen: () => void
+  // Optional control slot below the image. When provided, the image area
+  // fills the rest of the card and the slot hugs the bottom edge inside a
+  // tight bordered bar — no gap, no whitespace under the controls.
+  footerSlot?: React.ReactNode
 }
 
-function initialFor(name: string): string {
-  const trimmed = name.trim()
-  if (!trimmed) return '·'
-  return trimmed.charAt(0).toUpperCase()
-}
-
-export function ProductTile({ product, quantity, onOpen }: ProductTileProps) {
-  const displayName = getProductDisplayName(product, product.brand?.name ?? null)
-  const sizeLabel = getProductSizeLabel(product) ?? ''
-  const brandName = product.brand?.name ?? ''
-  const thumbSrc = product.image_url ?? product.brand?.logo_url ?? null
+// Image-first product tile.
+//
+// Without footerSlot: image fills the whole card, edge-to-edge. Used by
+// FamilySheet / search results.
+// With footerSlot: image fills the top portion, controls live in a tight
+// bar directly beneath, hugging the image. Used by usuals.
+export function ProductTile({
+  product,
+  quantity,
+  onOpen,
+  footerSlot,
+}: ProductTileProps) {
+  const brandName = product.brand?.name ?? null
+  const thumbSrc = product.image_url ?? null
   const hasQty = quantity > 0
-  const ariaLabel = [brandName, product.title, sizeLabel, hasQty ? `qty ${quantity}` : null]
+  const ariaLabel = [brandName, product.title, hasQty ? `qty ${quantity}` : null]
     .filter(Boolean)
     .join(', ')
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={ariaLabel || displayName}
+    <div
       className={cn(
-        'relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-md border bg-card p-1 transition',
-        'hover:border-primary/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
-        hasQty && 'border-primary/60 ring-1 ring-primary/30',
+        'relative flex aspect-[4/5] w-full flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition',
+        'hover:shadow-md',
+        hasQty && 'border-primary/60 ring-1 ring-primary/40',
       )}
     >
-      {thumbSrc ? (
-        <Image
-          src={thumbSrc}
-          alt=""
-          width={160}
-          height={160}
-          className="h-full w-full object-contain"
-          unoptimized
+      {/* Image area — fills the available vertical space. With a
+          footerSlot it shrinks just enough to make room for the bar
+          below; without one, it takes the full card. */}
+      <div className="relative flex-1">
+        {thumbSrc ? (
+          <Image
+            src={thumbSrc}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 12vw, (min-width: 640px) 18vw, 33vw"
+            className="object-cover"
+            unoptimized
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 p-3">
+            <span className="line-clamp-4 text-center text-sm font-bold leading-tight text-muted-foreground">
+              {product.title}
+            </span>
+          </div>
+        )}
+
+        {/* Open-target — image area only. */}
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={ariaLabel || product.title}
+          className="absolute inset-0 z-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
         />
-      ) : (
-        <span
-          className="flex h-full w-full items-center justify-center rounded bg-muted text-lg font-semibold text-muted-foreground"
-          aria-hidden="true"
-        >
-          {initialFor(displayName)}
-        </span>
+
+        {/* Top-right qty badge — floats over the image. */}
+        {hasQty && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-2 top-2 z-20 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-primary/90 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground shadow-md backdrop-blur-sm"
+          >
+            {quantity}
+          </span>
+        )}
+      </div>
+
+      {/* Footer bar — hugs the image bottom edge with a single divider
+          line; no inset, no gap, no extra whitespace under the controls. */}
+      {footerSlot && (
+        <div className="flex flex-none items-center justify-center border-t bg-background px-1.5 py-1">
+          {footerSlot}
+        </div>
       )}
-      {hasQty && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute right-1 top-1 min-w-[1.25rem] rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-primary-foreground shadow-sm"
-        >
-          {quantity}
-        </span>
-      )}
-    </button>
+    </div>
   )
 }

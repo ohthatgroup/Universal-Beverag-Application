@@ -89,6 +89,17 @@ export interface Product {
   sort_order: number
   created_at: string
   updated_at: string
+  product_family: string
+  browse_model: string
+  subline: string | null
+  pack_key: string | null
+  water_type: string | null
+  price_point: string | null
+  is_zero_sugar: boolean
+  is_diet: boolean
+  is_caffeine_free: boolean
+  is_sparkling: boolean
+  search_aliases: string[] | null
 }
 
 export interface ProductInsert {
@@ -109,6 +120,17 @@ export interface ProductInsert {
   case_width?: number | null
   case_height?: number | null
   sort_order?: number
+  product_family?: string
+  browse_model?: string
+  subline?: string | null
+  pack_key?: string | null
+  water_type?: string | null
+  price_point?: string | null
+  is_zero_sugar?: boolean
+  is_diet?: boolean
+  is_caffeine_free?: boolean
+  is_sparkling?: boolean
+  search_aliases?: string[] | null
 }
 
 export type ProductUpdate = Partial<ProductInsert>

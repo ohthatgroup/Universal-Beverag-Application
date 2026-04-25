@@ -1,28 +1,7 @@
 'use client'
 
 import type { Brand } from '@/lib/types'
-import { cn } from '@/lib/utils'
-
-const chipBase =
-  'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap'
-const chipActive = 'border-accent bg-accent text-accent-foreground'
-const chipIdle = 'border-border bg-background text-foreground hover:border-foreground/40'
-
-interface FacetRowProps {
-  label: string
-  children: React.ReactNode
-}
-
-function FacetRow({ label, children }: FacetRowProps) {
-  return (
-    <div className="space-y-2 rounded-xl border bg-card p-4">
-      <span className="block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
-    </div>
-  )
-}
+import { FilterChip, FilterChipRow } from '@/components/ui/filter-chip'
 
 interface BrandChipsProps {
   brands: Brand[]
@@ -38,34 +17,24 @@ export function BrandChips({
   onClear,
 }: BrandChipsProps) {
   if (brands.length === 0) return null
-
   const selectedSet = new Set(selectedBrandIds)
-
   return (
-    <FacetRow label="Brand">
-      {brands.map((brand) => {
-        const active = selectedSet.has(brand.id)
-        return (
-          <button
-            key={brand.id}
-            type="button"
-            onClick={() => onToggle(brand.id)}
-            className={cn(chipBase, active ? chipActive : chipIdle)}
-          >
-            {brand.name}
-          </button>
-        )
-      })}
-      {selectedBrandIds.length > 0 && onClear && (
-        <button
-          type="button"
-          onClick={onClear}
-          className={cn(chipBase, chipIdle, 'text-muted-foreground')}
+    <FilterChipRow label="Brand">
+      {brands.map((brand) => (
+        <FilterChip
+          key={brand.id}
+          active={selectedSet.has(brand.id)}
+          onClick={() => onToggle(brand.id)}
         >
+          {brand.name}
+        </FilterChip>
+      ))}
+      {selectedBrandIds.length > 0 && onClear && (
+        <FilterChip variant="ghost" onClick={onClear}>
           Clear
-        </button>
+        </FilterChip>
       )}
-    </FacetRow>
+    </FilterChipRow>
   )
 }
 
@@ -83,34 +52,24 @@ export function SizeChips({
   onClear,
 }: SizeChipsProps) {
   if (sizes.length === 0) return null
-
   const selectedSet = new Set(selectedSizes)
-
   return (
-    <FacetRow label="Size">
-      {sizes.map((size) => {
-        const active = selectedSet.has(size)
-        return (
-          <button
-            key={size}
-            type="button"
-            onClick={() => onToggle(size)}
-            className={cn(chipBase, active ? chipActive : chipIdle)}
-          >
-            {size}
-          </button>
-        )
-      })}
-      {selectedSizes.length > 0 && onClear && (
-        <button
-          type="button"
-          onClick={onClear}
-          className={cn(chipBase, chipIdle, 'text-muted-foreground')}
+    <FilterChipRow label="Size">
+      {sizes.map((size) => (
+        <FilterChip
+          key={size}
+          active={selectedSet.has(size)}
+          onClick={() => onToggle(size)}
         >
+          {size}
+        </FilterChip>
+      ))}
+      {selectedSizes.length > 0 && onClear && (
+        <FilterChip variant="ghost" onClick={onClear}>
           Clear
-        </button>
+        </FilterChip>
       )}
-    </FacetRow>
+    </FilterChipRow>
   )
 }
 
@@ -124,20 +83,16 @@ interface GroupByChipsProps {
 
 export function GroupByChips({ groupBy, onChange }: GroupByChipsProps) {
   return (
-    <FacetRow label="Group">
-      {(['brand', 'size'] as const).map((value) => {
-        const active = groupBy === value
-        return (
-          <button
-            key={value}
-            type="button"
-            onClick={() => onChange(value)}
-            className={cn(chipBase, active ? chipActive : chipIdle)}
-          >
-            {value === 'brand' ? 'Brand' : 'Size'}
-          </button>
-        )
-      })}
-    </FacetRow>
+    <FilterChipRow label="Group">
+      {(['brand', 'size'] as const).map((value) => (
+        <FilterChip
+          key={value}
+          active={groupBy === value}
+          onClick={() => onChange(value)}
+        >
+          {value === 'brand' ? 'Brand' : 'Size'}
+        </FilterChip>
+      ))}
+    </FilterChipRow>
   )
 }

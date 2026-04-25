@@ -493,6 +493,77 @@ export type Database = {
           },
         ]
       }
+      product_image_sources: {
+        Row: {
+          product_id: string
+          source: string
+          source_product_code: string | null
+          source_product_url: string | null
+          image_url: string
+          image_width: number | null
+          image_height: number | null
+          matched_product_name: string | null
+          matched_brand_name: string | null
+          matched_quantity: string | null
+          match_score: number
+          license_name: string
+          license_url: string | null
+          attribution: string | null
+          reviewed_at: string | null
+          created_at: string
+          updated_at: string
+          permission_basis: string | null
+        }
+        Insert: {
+          product_id: string
+          source: string
+          source_product_code?: string | null
+          source_product_url?: string | null
+          image_url: string
+          image_width?: number | null
+          image_height?: number | null
+          matched_product_name?: string | null
+          matched_brand_name?: string | null
+          matched_quantity?: string | null
+          match_score: number
+          license_name: string
+          license_url?: string | null
+          attribution?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+          permission_basis?: string | null
+        }
+        Update: {
+          product_id?: string
+          source?: string
+          source_product_code?: string | null
+          source_product_url?: string | null
+          image_url?: string
+          image_width?: number | null
+          image_height?: number | null
+          matched_product_name?: string | null
+          matched_brand_name?: string | null
+          matched_quantity?: string | null
+          match_score?: number
+          license_name?: string
+          license_url?: string | null
+          attribution?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+          permission_basis?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'product_image_sources_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       products: {
         Row: {
           id: string
@@ -514,6 +585,17 @@ export type Database = {
           sort_order: number
           created_at: string
           updated_at: string
+          product_family: string
+          browse_model: string
+          subline: string | null
+          pack_key: string | null
+          water_type: string | null
+          price_point: string | null
+          is_zero_sugar: boolean
+          is_diet: boolean
+          is_caffeine_free: boolean
+          is_sparkling: boolean
+          search_aliases: string[] | null
         }
         Insert: {
           id?: string
@@ -535,6 +617,17 @@ export type Database = {
           sort_order?: number
           created_at?: string
           updated_at?: string
+          product_family?: string
+          browse_model?: string
+          subline?: string | null
+          pack_key?: string | null
+          water_type?: string | null
+          price_point?: string | null
+          is_zero_sugar?: boolean
+          is_diet?: boolean
+          is_caffeine_free?: boolean
+          is_sparkling?: boolean
+          search_aliases?: string[] | null
         }
         Update: {
           id?: string
@@ -556,6 +649,17 @@ export type Database = {
           sort_order?: number
           created_at?: string
           updated_at?: string
+          product_family?: string
+          browse_model?: string
+          subline?: string | null
+          pack_key?: string | null
+          water_type?: string | null
+          price_point?: string | null
+          is_zero_sugar?: boolean
+          is_diet?: boolean
+          is_caffeine_free?: boolean
+          is_sparkling?: boolean
+          search_aliases?: string[] | null
         }
         Relationships: [
           {

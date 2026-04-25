@@ -8,48 +8,42 @@ interface UsualsListProps {
   usuals: Usual[]
   productById: Map<string, CatalogProduct>
   quantities: Record<string, number>
-  productToPalletDealIds: Record<string, string[]>
   onSetQuantity: (product: CatalogProduct, quantity: number) => void
-  onOpenPallets?: (productId: string) => void
+  onOpenProduct: (product: CatalogProduct) => void
   showPrices: boolean
 }
 
+// Image-first 2-column grid (mobile) / 3-col (desktop). Renders one
+// UsualRow card per usual product. Hidden when there are no resolvable
+// usuals (e.g. first-time customer).
 export function UsualsList({
   usuals,
   productById,
   quantities,
-  productToPalletDealIds,
   onSetQuantity,
-  onOpenPallets,
+  onOpenProduct,
   showPrices,
 }: UsualsListProps) {
   const entries = usuals
-    .map((u) => ({ usual: u, product: productById.get(u.productId) }))
-    .filter((entry): entry is { usual: Usual; product: CatalogProduct } =>
-      Boolean(entry.product)
-    )
+    .map((usual) => productById.get(usual.productId))
+    .filter((product): product is CatalogProduct => Boolean(product))
 
   if (entries.length === 0) return null
 
   return (
     <section className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-h3 font-semibold">Your usuals</h2>
-        <span className="text-xs text-muted-foreground">based on your recent orders</span>
-      </div>
-
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-        {entries.map(({ usual, product }) => (
+      <h2 className="px-1 text-sm font-semibold text-foreground/80">
+        Your usuals
+      </h2>
+      <div className="grid grid-cols-2 gap-1 md:grid-cols-3 lg:grid-cols-4">
+        {entries.map((product) => (
           <UsualRow
             key={product.id}
             product={product}
-            typicalQty={usual.typicalQty}
-            reason={usual.reason}
             quantity={quantities[`product:${product.id}`] ?? 0}
             onChange={(next) => onSetQuantity(product, next)}
+            onOpen={() => onOpenProduct(product)}
             showPrices={showPrices}
-            hasPalletDeal={(productToPalletDealIds[product.id] ?? []).length > 0}
-            onOpenPallets={onOpenPallets ? () => onOpenPallets(product.id) : undefined}
           />
         ))}
       </div>
