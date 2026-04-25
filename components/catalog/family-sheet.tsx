@@ -227,9 +227,6 @@ export function FamilySheet({
 
   return (
     <>
-    {isFamilyMode && !filterPanelOpen && (
-      <FamilyPillSwitcher activeFamily={activeFamily} onSelect={goToFamily} />
-    )}
     <Panel
       open={isOpen}
       onOpenChange={onOpenChange}
@@ -238,6 +235,9 @@ export function FamilySheet({
       srTitle={isSearchMode ? 'Search products' : familyDef?.label ?? 'Products'}
       contentClassName="h-[92dvh] gap-0 p-0"
     >
+        {isFamilyMode && !filterPanelOpen && (
+          <FamilyPillSwitcher activeFamily={activeFamily} onSelect={goToFamily} />
+        )}
         <div className="flex items-center gap-2 border-b border-foreground/10 px-4 py-3">
           <button
             type="button"

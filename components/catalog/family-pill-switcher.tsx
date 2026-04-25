@@ -13,33 +13,37 @@ interface FamilyPillSwitcherProps {
 // Per-family pill colors. Active = saturated fill; inactive = muted tint.
 // Same hue family for both states so the active pill reads as "same family,
 // stronger signal" rather than a different element.
+// Active = saturated fill of the family hue. Inactive = muted same-hue tint
+// with a darker same-hue border so the active pill stands out visually
+// against the inactive ones. Border weight is 1px; the active pill's
+// matching-color border simply blends with the fill.
 const PILL_COLORS: Record<
   ProductFamily,
   { active: string; inactive: string }
 > = {
   soda: {
     active: 'bg-red-500 text-white border-red-500',
-    inactive: 'bg-red-50 text-red-700 border-red-100 hover:bg-red-100',
+    inactive: 'bg-red-50 text-red-700 border-red-300 hover:bg-red-100',
   },
   water: {
     active: 'bg-sky-500 text-white border-sky-500',
-    inactive: 'bg-sky-50 text-sky-700 border-sky-100 hover:bg-sky-100',
+    inactive: 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100',
   },
   sports_hydration: {
     active: 'bg-emerald-500 text-white border-emerald-500',
-    inactive: 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100',
+    inactive: 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100',
   },
   tea_juice: {
     active: 'bg-amber-500 text-white border-amber-500',
-    inactive: 'bg-amber-50 text-amber-800 border-amber-100 hover:bg-amber-100',
+    inactive: 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100',
   },
   energy_coffee: {
     active: 'bg-violet-500 text-white border-violet-500',
-    inactive: 'bg-violet-50 text-violet-700 border-violet-100 hover:bg-violet-100',
+    inactive: 'bg-violet-50 text-violet-700 border-violet-300 hover:bg-violet-100',
   },
   other: {
     active: 'bg-foreground text-background border-foreground',
-    inactive: 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80',
+    inactive: 'bg-muted text-muted-foreground border-foreground/20 hover:bg-muted/80',
   },
 }
 
@@ -74,6 +78,10 @@ export function FamilyPillSwitcher({
               ref={active ? activeRef : null}
               type="button"
               onClick={() => onSelect(family.key)}
+              // Stop pointerdown from bubbling to the Radix Dialog Overlay,
+              // which would otherwise treat the tap as "outside the panel"
+              // and close the FamilySheet before our onClick fires.
+              onPointerDown={(event) => event.stopPropagation()}
               aria-pressed={active}
               className={cn(
                 'inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors backdrop-blur-md',
