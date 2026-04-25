@@ -70,11 +70,11 @@ export function ReviewOrderSheet({
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
             // Mobile: pinned bottom, edge-to-edge, ~68dvh, rounded top corners.
-            'inset-x-0 bottom-0 h-[68dvh] rounded-t-2xl border-t',
+            'inset-x-0 bottom-0 h-[68dvh] rounded-t-xl border-t',
             // Desktop: contained — inset on left, right, and bottom matching
             // the cart bar's margins so it reads as a floating panel
             // anchored to the page content rather than a full-bleed sheet.
-            'md:inset-x-4 md:bottom-4 md:mx-auto md:h-[68dvh] md:max-w-3xl md:rounded-2xl md:border',
+            'md:inset-x-4 md:bottom-4 md:mx-auto md:h-[68dvh] md:max-w-3xl md:rounded-xl md:border',
           )}
         >
           <SurfaceHeader className="px-1">
