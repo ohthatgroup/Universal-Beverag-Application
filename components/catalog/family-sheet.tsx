@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { ProductTile } from '@/components/catalog/product-tile'
 import { Stepper } from '@/components/ui/stepper'
 import { BrandChips, SizeChips } from '@/components/catalog/filter-chips'
-import { FilterChip } from '@/components/ui/filter-chip'
+import { FamilyPillSwitcher } from '@/components/catalog/family-pill-switcher'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FAMILIES, getFamilyDefinition } from '@/lib/catalog/families'
 import type { CatalogProduct, Brand } from '@/lib/types'
@@ -52,10 +52,8 @@ export function FamilySheet({
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  // Family-mode-only: an inline search input expands when the user taps the
-  // 🔍 icon. Stays open until cleared. Doesn't swap modes — it just narrows
-  // the family-mode grid.
-  const [inlineSearchOpen, setInlineSearchOpen] = useState(false)
+  // Family-mode-only inline search: always visible in the header, narrows
+  // the current family's grid as the user types.
   const [inlineQuery, setInlineQuery] = useState('')
 
   // Reset filters when family changes or the sheet closes.
@@ -63,7 +61,6 @@ export function FamilySheet({
     setSelectedBrandIds([])
     setSelectedSizes([])
     setFilterPanelOpen(false)
-    setInlineSearchOpen(false)
     setInlineQuery('')
   }, [activeFamily, isOpen])
 
@@ -72,19 +69,13 @@ export function FamilySheet({
     if (!isSearchMode) setSearchQuery('')
   }, [isSearchMode])
 
-  // Auto-focus the appropriate input on open.
+  // Auto-focus the search input on open.
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const inlineSearchInputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (!isSearchMode) return
     const id = setTimeout(() => searchInputRef.current?.focus(), 80)
     return () => clearTimeout(id)
   }, [isSearchMode])
-  useEffect(() => {
-    if (!inlineSearchOpen) return
-    const id = setTimeout(() => inlineSearchInputRef.current?.focus(), 80)
-    return () => clearTimeout(id)
-  }, [inlineSearchOpen])
 
   // Family-mode product list: filter to active family, then apply chip
   // filters, then the inline search if any.
@@ -236,6 +227,9 @@ export function FamilySheet({
 
   return (
     <>
+    {isFamilyMode && (
+      <FamilyPillSwitcher activeFamily={activeFamily} onSelect={goToFamily} />
+    )}
     <Panel
       open={isOpen}
       onOpenChange={onOpenChange}
@@ -256,51 +250,21 @@ export function FamilySheet({
 
           {isFamilyMode && familyDef && (
             <>
-              {/* When the inline-search input is open it expands into the
-                  flex-1 slot. Otherwise the slot is empty (the active pill
-                  in the switcher below carries the "you are here" signal). */}
-              {inlineSearchOpen ? (
-                <div className="relative min-w-0 flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    ref={inlineSearchInputRef}
-                    placeholder={`Search ${familyDef.label}…`}
-                    className="rounded-full border-transparent bg-muted pl-9 shadow-none focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring"
-                    value={inlineQuery}
-                    onChange={(event) => setInlineQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') {
-                        event.preventDefault()
-                        setInlineQuery('')
-                        setInlineSearchOpen(false)
-                      }
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="min-w-0 flex-1" aria-hidden />
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (inlineSearchOpen) {
-                    setInlineQuery('')
-                    setInlineSearchOpen(false)
-                  } else {
-                    setInlineSearchOpen(true)
-                  }
-                }}
-                aria-label={inlineSearchOpen ? 'Close search' : 'Search'}
-                aria-pressed={inlineSearchOpen}
-                className={cn(
-                  'flex h-9 w-9 flex-none items-center justify-center rounded-full hover:bg-muted',
-                  inlineSearchOpen
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <Search className="h-4 w-4" />
-              </button>
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={`Search ${familyDef.label}…`}
+                  className="rounded-full border-transparent bg-muted pl-9 shadow-none focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring"
+                  value={inlineQuery}
+                  onChange={(event) => setInlineQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      setInlineQuery('')
+                    }
+                  }}
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setFilterPanelOpen((open) => !open)}
@@ -332,32 +296,6 @@ export function FamilySheet({
           )}
         </div>
 
-        {/* Pill switcher (family mode only). The active pill auto-scrolls
-            into view so the user always sees where they are even after a
-            family change shifts the visible window. */}
-        {isFamilyMode && (
-          <div>
-            <div className="flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {FAMILIES.map((family) => {
-                const active = family.key === activeFamily
-                return (
-                  <span
-                    key={family.key}
-                    ref={(node) => {
-                      if (active && node) {
-                        node.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
-                      }
-                    }}
-                  >
-                    <FilterChip active={active} onClick={() => goToFamily(family.key)}>
-                      {family.label}
-                    </FilterChip>
-                  </span>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 pb-24 pt-3">
