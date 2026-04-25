@@ -73,7 +73,7 @@ export function ProductPopout({
           // Override the shared dialog's `grid` display so the inner
           // aspect-square photo respects the capsule's stated width.
           'block w-[calc(100vw-1.5rem)] max-w-[22rem] gap-0 p-4',
-          'max-h-[88dvh] overflow-y-auto rounded-3xl',
+          'max-h-[88dvh] overflow-y-auto rounded-xl',
           surfaceFloating,
           // Hide Radix's default X — tap-outside dismisses.
           '[&>button]:hidden',
@@ -82,7 +82,7 @@ export function ProductPopout({
         <DialogTitle className="sr-only">{product.title}</DialogTitle>
 
         {/* Packaging photo — square, flush with the capsule's inner edge. */}
-        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-background/40">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-background/40">
           {thumbSrc ? (
             <Image
               src={thumbSrc}
