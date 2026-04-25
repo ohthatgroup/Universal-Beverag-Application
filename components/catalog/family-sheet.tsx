@@ -2,17 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from '@/components/ui/sheet'
+import { Panel } from '@/components/ui/panel'
 import { Input } from '@/components/ui/input'
 import { ProductTile } from '@/components/catalog/product-tile'
 import { Stepper } from '@/components/ui/stepper'
 import { BrandChips, SizeChips } from '@/components/catalog/filter-chips'
 import { FilterChip } from '@/components/ui/filter-chip'
-import { SurfaceHeader } from '@/components/ui/surface'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FAMILIES, getFamilyDefinition } from '@/lib/catalog/families'
 import type { CatalogProduct, Brand } from '@/lib/types'
@@ -240,19 +235,15 @@ export function FamilySheet({
   const goToFamily = (family: ProductFamily) => onStateChange({ mode: 'family', family })
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        // Override default close-button placement (we render our own) and let
-        // the sheet take 92dvh so a sliver of page peeks above it.
-        className="flex h-[92dvh] flex-col gap-0 p-0 [&>button]:hidden"
-      >
-        {/* Visually hidden title for a11y — Radix requires it. */}
-        <SheetTitle className="sr-only">
-          {isSearchMode ? 'Search products' : familyDef?.label ?? 'Products'}
-        </SheetTitle>
-
-        <SurfaceHeader>
+    <Panel
+      open={isOpen}
+      onOpenChange={onOpenChange}
+      variant="bottom-sheet"
+      width="content"
+      srTitle={isSearchMode ? 'Search products' : familyDef?.label ?? 'Products'}
+      contentClassName="h-[92dvh] gap-0 p-0"
+    >
+        <div className="flex items-center gap-2 border-b border-foreground/10 px-4 py-3">
           <button
             type="button"
             onClick={() => onStateChange({ mode: 'closed' })}
@@ -338,7 +329,7 @@ export function FamilySheet({
               />
             </div>
           )}
-        </SurfaceHeader>
+        </div>
 
         {/* Pill switcher (family mode only). The active pill auto-scrolls
             into view so the user always sees where they are even after a
@@ -510,7 +501,6 @@ export function FamilySheet({
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+    </Panel>
   )
 }
