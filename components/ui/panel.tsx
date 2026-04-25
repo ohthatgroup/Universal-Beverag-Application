@@ -24,6 +24,10 @@ interface PanelProps {
   // a11y title — required by Radix Dialog. Pass via children's `<Panel.Header>`
   // or via the `srTitle` prop for screen-reader-only titles.
   srTitle?: string
+  // When true, prevent Radix from auto-focusing the first focusable child on
+  // open. Use for popouts where auto-focusing an input would pop the iOS
+  // keyboard before the user is ready to type.
+  preventAutoFocus?: boolean
   children: React.ReactNode
 }
 
@@ -46,6 +50,7 @@ export function Panel({
   overlayClassName,
   contentClassName,
   srTitle,
+  preventAutoFocus = false,
   children,
 }: PanelProps) {
   return (
@@ -60,6 +65,9 @@ export function Panel({
           )}
         />
         <DialogPrimitive.Content
+          onOpenAutoFocus={
+            preventAutoFocus ? (event) => event.preventDefault() : undefined
+          }
           className={cn(
             'fixed z-50 flex flex-col overflow-hidden bg-background border border-foreground/10 shadow-2xl outline-none',
             // Variant positioning + animation

@@ -52,6 +52,7 @@ export function ProductPopout({
       variant="centered"
       srTitle={product.title}
       contentClassName="max-w-[22rem] p-4"
+      preventAutoFocus
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-background/40">
         {thumbSrc ? (
