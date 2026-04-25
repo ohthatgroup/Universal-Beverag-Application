@@ -101,7 +101,7 @@ export function EditableDeliveryDate({
         <button
           type="button"
           onClick={beginEdit}
-          className="group inline-flex items-center gap-1.5 rounded-md text-lg font-semibold leading-tight focus:outline-none focus:ring-2 focus:ring-ring"
+          className="group inline-flex items-center gap-1.5 rounded-xl px-1.5 py-0.5 text-lg font-semibold leading-tight transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
           aria-label={`Change delivery date — currently ${formatDeliveryDate(deliveryDate)}`}
         >
           <span>{formatDeliveryDate(deliveryDate)}</span>
