@@ -1,7 +1,7 @@
 'use client'
 
 import { ProductTile } from '@/components/catalog/product-tile'
-import { QuantitySelector } from '@/components/catalog/quantity-selector'
+import { Stepper } from '@/components/ui/stepper'
 import type { CatalogProduct } from '@/lib/types'
 
 export interface UsualRowProps {
@@ -9,24 +9,21 @@ export interface UsualRowProps {
   quantity: number
   onChange: (next: number) => void
   onOpen: () => void
-  // Kept on the prop surface for compatibility — pricing lives in the popout.
+  // Kept on the prop surface for API symmetry — pricing lives in the popout.
   showPrices: boolean
 }
 
-// Usuals variant of the ProductTile: same image-first card, but with the
-// QuantitySelector slotted into the bottom glass strip so reorders are a
-// single tap. Tapping the image area still opens the popout for full details.
+// Usuals variant of the ProductTile: the image fills the entire card,
+// the Stepper overlays the bottom as a floating dug-in pill (Rule 4).
+// Tapping anywhere on the image (outside the pill) opens the popout for
+// full details.
 export function UsualRow({ product, quantity, onChange, onOpen }: UsualRowProps) {
   return (
     <ProductTile
       product={product}
       quantity={quantity}
       onOpen={onOpen}
-      footerSlot={
-        <div className="flex justify-center">
-          <QuantitySelector quantity={quantity} onChange={onChange} />
-        </div>
-      }
+      overlaySlot={<Stepper quantity={quantity} onChange={onChange} />}
     />
   )
 }
