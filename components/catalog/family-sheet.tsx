@@ -273,7 +273,7 @@ export function FamilySheet({
                   <Input
                     ref={inlineSearchInputRef}
                     placeholder={`Search ${familyDef.label}…`}
-                    className="pl-9"
+                    className="rounded-full border-transparent bg-muted pl-9 shadow-none focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring"
                     value={inlineQuery}
                     onChange={(event) => setInlineQuery(event.target.value)}
                     onKeyDown={(event) => {
@@ -332,7 +332,7 @@ export function FamilySheet({
               <Input
                 ref={searchInputRef}
                 placeholder="Search products..."
-                className="pl-9"
+                className="rounded-full border-transparent bg-muted pl-9 shadow-none focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
@@ -344,7 +344,7 @@ export function FamilySheet({
             into view so the user always sees where they are even after a
             family change shifts the visible window. */}
         {isFamilyMode && (
-          <div className="border-t">
+          <div>
             <div className="flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {FAMILIES.map((family) => {
                 const active = family.key === activeFamily
@@ -369,7 +369,7 @@ export function FamilySheet({
 
         {/* Filter panel (family mode + open) */}
         {isFamilyMode && filterPanelOpen && (
-          <div className="border-t bg-muted/30 px-4 py-3">
+          <div className="bg-muted/30 px-4 py-3">
             <div className="space-y-3">
               <SizeChips
                 sizes={familySizes}
