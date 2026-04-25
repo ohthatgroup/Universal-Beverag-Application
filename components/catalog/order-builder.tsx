@@ -19,8 +19,8 @@ import {
   type FamilySheetMode,
 } from '@/components/catalog/family-sheet'
 import { ProductPopout } from '@/components/catalog/product-popout'
-import { CartSummaryBar } from '@/components/catalog/cart-summary-bar'
-import { ReviewOrderSheet, type ReviewItem } from '@/components/catalog/review-order-sheet'
+import { CartReviewSurface } from '@/components/catalog/cart-review-surface'
+import type { ReviewItem } from '@/components/catalog/review-order-sheet'
 import { InlineSearchResults } from '@/components/catalog/inline-search-results'
 import { EditableDeliveryDate } from '@/components/catalog/editable-delivery-date'
 import { PortalPageHeader } from '@/components/portal/portal-page-header'
@@ -275,21 +275,14 @@ export function OrderBuilder({
         )}
       </div>
 
-      <CartSummaryBar
-        itemCount={totalItems}
-        totalValue={totalValue}
-        showPrices={showPrices}
-        onReview={() => setIsReviewOpen(true)}
-      />
-
-      <ReviewOrderSheet
+      <CartReviewSurface
         open={isReviewOpen}
         onOpenChange={setIsReviewOpen}
-        deliveryDate={deliveryDate}
-        items={reviewItems}
         itemCount={totalItems}
         totalValue={totalValue}
         showPrices={showPrices}
+        deliveryDate={deliveryDate}
+        items={reviewItems}
         error={error}
         isResetting={isResetting}
         isSubmitting={isSubmitting}
