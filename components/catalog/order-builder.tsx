@@ -24,7 +24,6 @@ import { InlineSearchResults } from '@/components/catalog/inline-search-results'
 import { EditableDeliveryDate } from '@/components/catalog/editable-delivery-date'
 import { PortalPageHeader } from '@/components/portal/portal-page-header'
 import { Search, X } from 'lucide-react'
-import { surfaceFloating } from '@/lib/design/surfaces'
 import { cn } from '@/lib/utils'
 
 interface OrderBuilderProps {
@@ -222,8 +221,7 @@ export function OrderBuilder({
             results grid. Clearing returns to the default page. */}
         <div
           className={cn(
-            'flex items-center gap-2 rounded-full px-4 py-2.5 shadow-sm transition-colors hover:bg-background/80',
-            surfaceFloating,
+            'flex items-center gap-2 rounded-full border border-foreground/10 bg-background px-4 py-2.5 shadow-sm transition-colors hover:bg-muted/50',
           )}
         >
           <Search className="h-4 w-4 flex-none text-muted-foreground" />
