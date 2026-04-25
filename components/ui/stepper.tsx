@@ -71,10 +71,6 @@ export function Stepper({
     if (clamped !== valueRef.current) {
       valueRef.current = clamped
       onChange(clamped)
-    } else if (next !== clamped) {
-      // Typed value was out of range; snap visible draft back even if no
-      // onChange fires (parent already has the canonical value).
-      setDraft(String(clamped))
     }
   }
 
