@@ -31,7 +31,7 @@ interface FamilySheetProps {
   onSetQuantity: (product: CatalogProduct, next: number) => void
 }
 
-const TILE_GRID_CLASSES = 'grid grid-cols-3 gap-1.5 md:grid-cols-5'
+const TILE_GRID_CLASSES = 'grid grid-cols-3 gap-1 md:grid-cols-5'
 
 export function FamilySheet({
   state,
@@ -227,7 +227,7 @@ export function FamilySheet({
 
   return (
     <>
-    {isFamilyMode && (
+    {isFamilyMode && !filterPanelOpen && (
       <FamilyPillSwitcher activeFamily={activeFamily} onSelect={goToFamily} />
     )}
     <Panel
@@ -298,7 +298,7 @@ export function FamilySheet({
 
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-4 pb-24 pt-3">
+        <div className="flex-1 overflow-y-auto px-2 pb-24 pt-3">
           {isFamilyMode && familyProducts.length === 0 && (
             <EmptyState
               title="No products match"

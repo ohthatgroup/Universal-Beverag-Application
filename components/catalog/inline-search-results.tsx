@@ -16,7 +16,7 @@ interface InlineSearchResultsProps {
   onSetQuantity: (product: CatalogProduct, next: number) => void
 }
 
-const TILE_GRID_CLASSES = 'grid grid-cols-3 gap-1.5 md:grid-cols-5'
+const TILE_GRID_CLASSES = 'grid grid-cols-3 gap-1 md:grid-cols-5'
 
 // Grid of tiles matching the user's typed query, grouped by family for
 // orientation. Renders inline beneath the page's search input — no modal,

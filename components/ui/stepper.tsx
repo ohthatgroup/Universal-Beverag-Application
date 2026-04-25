@@ -74,8 +74,8 @@ export function Stepper({
     }
   }
 
-  const dim = size === 'md' ? 'h-10 w-10' : 'h-9 w-9'
-  const inputDim = size === 'md' ? 'h-10 w-10 text-base' : 'h-9 w-10 text-sm'
+  const dim = size === 'md' ? 'h-10 w-10' : 'h-8 w-8'
+  const inputDim = size === 'md' ? 'h-10 w-10 text-base' : 'h-8 w-9 text-sm'
 
   return (
     <div

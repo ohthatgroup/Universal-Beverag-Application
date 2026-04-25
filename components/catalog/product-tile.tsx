@@ -82,11 +82,12 @@ export function ProductTile({
         </span>
       )}
 
-      {/* Floating control overlay. Anchored bottom-center, breathing room
-          inset on both sides + bottom (`inset-x-3 bottom-3`). Image
-          continues behind/around the overlay. */}
+      {/* Floating control overlay. Anchored bottom-center, tight inset on
+          both sides + bottom (`inset-x-1 bottom-2`) so the Stepper fits
+          inside the tile bounds even on narrow viewports. Image continues
+          behind/around the overlay. */}
       {overlaySlot && (
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-1 bottom-2 z-20 flex justify-center">
           <div className="pointer-events-auto">{overlaySlot}</div>
         </div>
       )}
