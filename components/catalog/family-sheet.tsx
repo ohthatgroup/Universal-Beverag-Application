@@ -235,6 +235,7 @@ export function FamilySheet({
   const goToFamily = (family: ProductFamily) => onStateChange({ mode: 'family', family })
 
   return (
+    <>
     <Panel
       open={isOpen}
       onOpenChange={onOpenChange}
@@ -358,36 +359,6 @@ export function FamilySheet({
           </div>
         )}
 
-        {/* Filter panel (family mode + open) */}
-        {isFamilyMode && filterPanelOpen && (
-          <div className="bg-muted/30 px-4 py-3">
-            <div className="space-y-3">
-              <SizeChips
-                sizes={familySizes}
-                selectedSizes={selectedSizes}
-                onToggle={(size) =>
-                  setSelectedSizes((prev) =>
-                    prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size],
-                  )
-                }
-                onClear={() => setSelectedSizes([])}
-              />
-              <BrandChips
-                brands={familyBrands}
-                selectedBrandIds={selectedBrandIds}
-                onToggle={(brandId) =>
-                  setSelectedBrandIds((prev) =>
-                    prev.includes(brandId)
-                      ? prev.filter((b) => b !== brandId)
-                      : [...prev, brandId],
-                  )
-                }
-                onClear={() => setSelectedBrandIds([])}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 pb-24 pt-3">
           {isFamilyMode && familyProducts.length === 0 && (
@@ -502,5 +473,63 @@ export function FamilySheet({
           )}
         </div>
     </Panel>
+    <Panel
+      open={isFamilyMode && filterPanelOpen}
+      onOpenChange={(next) => setFilterPanelOpen(next)}
+      variant="side-sheet"
+      srTitle="Filters"
+    >
+      <div className="flex items-center gap-2 border-b border-foreground/10 px-4 py-3">
+        <span className="flex-1 text-base font-semibold">Filters</span>
+        <button
+          type="button"
+          onClick={() => setFilterPanelOpen(false)}
+          aria-label="Close filters"
+          className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="space-y-4">
+          <SizeChips
+            sizes={familySizes}
+            selectedSizes={selectedSizes}
+            onToggle={(size) =>
+              setSelectedSizes((prev) =>
+                prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size],
+              )
+            }
+            onClear={() => setSelectedSizes([])}
+          />
+          <BrandChips
+            brands={familyBrands}
+            selectedBrandIds={selectedBrandIds}
+            onToggle={(brandId) =>
+              setSelectedBrandIds((prev) =>
+                prev.includes(brandId)
+                  ? prev.filter((b) => b !== brandId)
+                  : [...prev, brandId],
+              )
+            }
+            onClear={() => setSelectedBrandIds([])}
+          />
+        </div>
+      </div>
+      <div className="space-y-3 border-t border-foreground/10 px-5 py-4">
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedSizes([])
+            setSelectedBrandIds([])
+          }}
+          className="text-sm font-medium text-muted-foreground hover:text-destructive disabled:opacity-40"
+          disabled={selectedSizes.length + selectedBrandIds.length === 0}
+        >
+          Clear all
+        </button>
+      </div>
+    </Panel>
+    </>
   )
 }
