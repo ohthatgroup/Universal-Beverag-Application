@@ -69,7 +69,7 @@ export function StartOrderHero({ token, initialDate }: StartOrderHeroProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <div className="inline-flex h-11 items-center rounded-md border bg-background">
+        <div className="inline-flex h-11 items-center rounded-xl border bg-background">
           <button
             type="button"
             onClick={() => moveDate(-1)}

@@ -257,7 +257,7 @@ export function FamilySheet({
             type="button"
             onClick={() => onStateChange({ mode: 'closed' })}
             aria-label="Close"
-            className="flex h-9 w-9 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -301,7 +301,7 @@ export function FamilySheet({
                 aria-label={inlineSearchOpen ? 'Close search' : 'Search'}
                 aria-pressed={inlineSearchOpen}
                 className={cn(
-                  'flex h-9 w-9 flex-none items-center justify-center rounded-md hover:bg-muted',
+                  'flex h-9 w-9 flex-none items-center justify-center rounded-full hover:bg-muted',
                   inlineSearchOpen
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground',
@@ -315,7 +315,7 @@ export function FamilySheet({
                 aria-label="Filters"
                 aria-pressed={filterPanelOpen}
                 className={cn(
-                  'flex h-9 w-9 flex-none items-center justify-center rounded-md hover:bg-muted',
+                  'flex h-9 w-9 flex-none items-center justify-center rounded-full hover:bg-muted',
                   filtersActive
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground',

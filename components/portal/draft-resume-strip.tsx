@@ -26,7 +26,7 @@ export function DraftResumeStrip({ token, drafts }: DraftResumeStripProps) {
             <Link
               key={draft.orderId}
               href={href}
-              className="group flex min-w-[220px] shrink-0 items-center gap-3 rounded-md border bg-status-draft-bg px-3 py-2 transition-colors hover:border-primary/40 sm:min-w-0"
+              className="group flex min-w-[220px] shrink-0 items-center gap-3 rounded-xl border bg-status-draft-bg px-3 py-2 transition-colors hover:border-primary/40 sm:min-w-0"
             >
               <OrderStatusDot status="draft" />
               <div className="flex-1 text-sm">

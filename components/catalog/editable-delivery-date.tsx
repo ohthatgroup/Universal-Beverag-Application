@@ -94,7 +94,8 @@ export function EditableDeliveryDate({
               setError(null)
             }
           }}
-          className="rounded-md border bg-background px-2 py-1 text-lg font-semibold leading-tight focus:outline-none focus:ring-2 focus:ring-ring"
+          // rounded-xl per doctrine Rule 5: text-style inputs are containers, not pills.
+          className="rounded-xl border bg-background px-2 py-1 text-lg font-semibold leading-tight focus:outline-none focus:ring-2 focus:ring-ring"
         />
       ) : (
         <button

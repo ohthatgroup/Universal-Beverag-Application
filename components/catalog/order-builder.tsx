@@ -308,7 +308,7 @@ export function OrderBuilder({
       />
 
       {statusMessage && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-md bg-foreground px-3 py-1 text-xs text-background">
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-foreground px-3 py-1 text-xs text-background">
           {statusMessage}
         </div>
       )}
