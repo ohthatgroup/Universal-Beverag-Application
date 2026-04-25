@@ -65,7 +65,7 @@ export function ReviewOrderSheet({
         <DialogOverlay />
         <DialogPrimitive.Content
           className={cn(
-            'fixed z-50 flex flex-col bg-background shadow-2xl outline-none',
+            'fixed z-50 flex flex-col overflow-hidden bg-background shadow-2xl outline-none',
             // Slide-from-bottom on every breakpoint.
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',

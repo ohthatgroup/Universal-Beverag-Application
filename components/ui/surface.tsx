@@ -1,7 +1,6 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { surfaceOverlay } from '@/lib/design/surfaces'
 
 interface SurfaceHeaderProps {
   // When true, render the iOS-style drag handle on small viewports. Set to
@@ -12,16 +11,17 @@ interface SurfaceHeaderProps {
   children: React.ReactNode
 }
 
-// Glass header band for sheets, popouts, and overlays. Anchors title +
-// actions on a translucent strip that reads as the "top edge" of the
-// content beneath it.
+// Header band for sheets and dialogs. Provides the separator line at the
+// bottom edge — relies on its parent surface for the background. (Composing
+// `surfaceOverlay` here would double-tint nested in a sheet/dialog and
+// conflict with the parent's rounded clip.)
 export function SurfaceHeader({
   showDragHandle = true,
   className,
   children,
 }: SurfaceHeaderProps) {
   return (
-    <div className={cn('border-b', surfaceOverlay, className)}>
+    <div className={cn('border-b border-foreground/10', className)}>
       {showDragHandle && (
         <div className="flex justify-center pt-2 sm:hidden">
           <span
@@ -40,10 +40,11 @@ interface SurfaceFooterProps {
   children: React.ReactNode
 }
 
-// Glass footer band — paired counterpart to SurfaceHeader.
+// Footer band — paired counterpart to SurfaceHeader. Top-edge separator
+// only; relies on parent surface for background.
 export function SurfaceFooter({ className, children }: SurfaceFooterProps) {
   return (
-    <div className={cn('space-y-3 border-t px-5 py-4', surfaceOverlay, className)}>
+    <div className={cn('space-y-3 border-t border-foreground/10 px-5 py-4', className)}>
       {children}
     </div>
   )
