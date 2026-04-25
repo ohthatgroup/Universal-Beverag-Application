@@ -1,5 +1,7 @@
 # ST-9 Portal Design Theory
 
+> **Superseded 2026-04-25.** See [`docs/design-system.md`](../design-system.md) for the current doctrine. The principles in this document remain accurate as *founding theory*, but the explicit rejections of glass and multiple radii have been replaced by the codified rules in the current doctrine. This file is retained as reference for the reasoning behind the original task-first frame.
+
 Supersedes [st-9-design-directives-round-2.md](st-9-design-directives-round-2.md) for portal surfaces.
 
 ## Core identity
