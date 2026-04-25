@@ -54,11 +54,13 @@ Tap-target height is enforced by the `size` tokens (`default` is `h-10` on mobil
 
 **Backdrop:** all modals use a glass-blur overlay — `bg-foreground/30 backdrop-blur-md`. Never a dark solid.
 
-**Two shapes** (established 2026-04-17):
+**Three shapes** (third shape established 2026-04-25, see Doctrine Rule 9):
 
 1. **Creation / input modals** — `<Dialog>` / `DialogContent`. Centered on all viewports. Rounded `rounded-xl` on every corner. Side gutters of `1rem` via `w-[calc(100%-2rem)]`. Used for: sign-in, reorder, new-item forms, edit forms.
 
 2. **Confirmation modals** — `<AlertDialog>` / `AlertDialogContent`. On mobile, a bottom sheet: flush on left/right/bottom, rounded **only on the top** (`rounded-t-xl`), slides up from below. On `sm:` and above, falls back to the centered creation shape with side gutters. Used for: delete confirms, destructive yes/no prompts.
+
+3. **Panels** — `<Sheet side="bottom">` / `SheetContent`. Slides up from the bottom on every breakpoint. On mobile, edge-to-edge with rounded top corners. On desktop, contained at `max-w-3xl` with inset margins on left, right, and bottom matching the cart bar. Used for: FamilySheet, ReviewOrderSheet, FilterPanel-on-mobile.
 
 Don't override overlay or positioning per instance. If a new shape is needed, treat it as a design-system decision, not a one-off className. Files: [components/ui/dialog.tsx](../components/ui/dialog.tsx), [components/ui/alert-dialog.tsx](../components/ui/alert-dialog.tsx).
 
