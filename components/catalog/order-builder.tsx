@@ -19,8 +19,7 @@ import {
   type FamilySheetMode,
 } from '@/components/catalog/family-sheet'
 import { ProductPopout } from '@/components/catalog/product-popout'
-import { CartReviewSurface } from '@/components/catalog/cart-review-surface'
-import type { ReviewItem } from '@/components/catalog/review-order-sheet'
+import { CartReviewSurface, type ReviewItem } from '@/components/catalog/cart-review-surface'
 import { InlineSearchResults } from '@/components/catalog/inline-search-results'
 import { EditableDeliveryDate } from '@/components/catalog/editable-delivery-date'
 import { PortalPageHeader } from '@/components/portal/portal-page-header'
