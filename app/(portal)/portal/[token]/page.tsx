@@ -1,7 +1,6 @@
 import { OrdersList } from '@/components/orders/orders-list'
 import { PortalPageHeader } from '@/components/portal/portal-page-header'
-import { StartOrderHero } from '@/components/portal/start-order-hero'
-import { DraftResumeStrip } from '@/components/portal/draft-resume-strip'
+import { StartOrderFork } from '@/components/portal/start-order-fork'
 import { PastOrdersSection } from '@/components/portal/past-orders-section'
 import { AccountStatsCard } from '@/components/portal/account-stats-card'
 import {
@@ -10,7 +9,7 @@ import {
 } from '@/components/portal/announcements-stack'
 import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
-import { todayISODate } from '@/lib/utils'
+import { addDays, todayISODate } from '@/lib/utils'
 import type { Order } from '@/lib/types'
 
 // TODO: replace with real data from announcements query (see docs/handoff/homepage-redesign.md)
@@ -183,12 +182,32 @@ export default async function PortalHome({
   }
 
   const nextDeliveryDate = draftsResult.rows[0]?.delivery_date ?? today
+  // TODO: replace with cutoff-aware next-next-date utility (see docs/handoff/homepage-redesign.md)
+  const nextNextDeliveryDate = addDays(nextDeliveryDate, 7)
 
-  const draftsForStrip = draftsResult.rows.map((order) => ({
-    orderId: order.id,
-    deliveryDate: order.delivery_date,
-    itemCount: order.item_count ?? 0,
-  }))
+  const primaryDraftRow = draftsResult.rows[0] ?? null
+  const primaryDraft = primaryDraftRow
+    ? {
+        id: primaryDraftRow.id,
+        deliveryDate: primaryDraftRow.delivery_date,
+        itemCount: primaryDraftRow.item_count ?? 0,
+        updatedAt: primaryDraftRow.updated_at,
+      }
+    : null
+
+  const submittedOrders = ordersResult.rows.filter(
+    (o) => o.status === 'submitted' || o.status === 'delivered',
+  )
+  const submittedOrderCount = submittedOrders.length
+  // ordersResult is already ordered delivery_date desc, so the first row is the most recent.
+  const lastOrderRow = submittedOrders[0] ?? null
+  const lastOrder = lastOrderRow
+    ? {
+        id: lastOrderRow.id,
+        deliveryDate: lastOrderRow.delivery_date,
+        itemCount: lastOrderRow.item_count ?? 0,
+      }
+    : null
 
   const nonDraftCurrentOrders = currentOrders.filter((order) => order.status !== 'draft')
 
@@ -198,28 +217,33 @@ export default async function PortalHome({
     <div className="space-y-8">
       {greetingName ? <PortalPageHeader title={greetingName} /> : null}
 
-      <StartOrderHero token={token} initialDate={nextDeliveryDate} />
-
-      <DraftResumeStrip token={token} drafts={draftsForStrip} />
-
-      {/* TODO: replace with real account stats query */}
-      <AccountStatsCard
-        casesThisMonth={MOCK_STATS.casesThisMonth}
-        spendThisMonth={MOCK_STATS.spendThisMonth}
-        ordersThisMonth={MOCK_STATS.ordersThisMonth}
-      />
-
-      {/* TODO: replace with real announcements query */}
-      <AnnouncementsStack
-        announcements={MOCK_ANNOUNCEMENTS}
+      <StartOrderFork
         token={token}
-        primaryDraftOrderId={draftsResult.rows[0]?.id ?? null}
-        showPrices={profile.show_prices}
+        nextDeliveryDate={nextDeliveryDate}
+        nextNextDeliveryDate={nextNextDeliveryDate}
+        primaryDraft={primaryDraft}
+        submittedOrderCount={submittedOrderCount}
+        lastOrder={lastOrder}
       />
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          For you
+        </h2>
+        {/* TODO: replace with real announcements query */}
+        <AnnouncementsStack
+          announcements={MOCK_ANNOUNCEMENTS}
+          token={token}
+          primaryDraftOrderId={primaryDraftRow?.id ?? null}
+          showPrices={profile.show_prices}
+        />
+      </section>
 
       {nonDraftCurrentOrders.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-h3 text-muted-foreground">Upcoming & recent</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Recent orders
+          </h2>
           <OrdersList
             token={token}
             orders={nonDraftCurrentOrders}
@@ -233,6 +257,13 @@ export default async function PortalHome({
         token={token}
         orders={pastOrders}
         showPrices={profile.show_prices}
+      />
+
+      {/* TODO: replace with real account stats query */}
+      <AccountStatsCard
+        casesThisMonth={MOCK_STATS.casesThisMonth}
+        spendThisMonth={MOCK_STATS.spendThisMonth}
+        ordersThisMonth={MOCK_STATS.ordersThisMonth}
       />
     </div>
   )

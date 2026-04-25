@@ -20,6 +20,9 @@ a missing entry means a silently broken feature.
 | 8 | `components/admin/announcement-dialog.tsx` | plain-text `Input` for `image_url` | swap to `<ImageUploadField>` once upload bucket is wired |
 | 9 | `components/portal/announcement-card.tsx` | `ProductSpotlightCard` "Add to order" with no draft fires `window.alert` | replace with `<Panel variant="bottom-sheet">` date-picker per spec |
 | 10 | `components/portal/announcement-card.tsx` | `SpecialsGridCard` autosave is local-only | wire `useAutoSavePortal` once `primaryDraftOrderId` flow is integrated |
+| 11 | `app/(portal)/portal/[token]/page.tsx` | `nextNextDeliveryDate` mocked as `addDays(nextDeliveryDate, 7)` | cutoff-aware delivery-date utility (skip weekends/holidays/cutoffs) |
+| 12 | `components/portal/start-order-fork.tsx` | path-tap handlers fire `window.alert` | `clone_order(source, new_date)` for Reorder; "compute usuals" SQL helper for Usuals; existing draft-create endpoint for Scratch |
+| 13 | `components/portal/start-order-fork.tsx` | confirm-replace dialog only fires the same `window.alert` | atomic swap-draft-contents endpoint (e.g., `delete_order_items` + `clone_order` in one tx) |
 
 ## Entries
 
@@ -146,3 +149,53 @@ a missing entry means a silently broken feature.
   (so we have a real `unitPrice`), and `primaryDraftOrderId` being
   guaranteed non-null at the call site (or wrapped in the same date-picker
   flow as item 9).
+
+### 11. `nextNextDeliveryDate` is a 7-day add
+
+- **File:** `app/(portal)/portal/[token]/page.tsx` line ~187
+- **What the UI does now:** When a draft already occupies the next-available
+  delivery date, the StartOrderFork's "or start a new order" rows target
+  `nextDeliveryDate + 7 days`. There's no awareness of weekends, holidays,
+  or product-specific cutoff overrides.
+- **What needs to happen:** Replace with a cutoff-aware utility that knows
+  the customer's `OrderCutoff` config + `ProductCutoffOverride` rows, and
+  returns the correct *next eligible* date after the draft's date.
+- **Blocked on:** none — this is a server-side utility in `lib/server/` that
+  reads existing tables. Should be extracted from whatever logic the
+  `StartOrderHero`'s date-picker uses today (or built fresh if absent).
+
+### 12. StartOrderFork path handlers fire `window.alert`
+
+- **File:** `components/portal/start-order-fork.tsx` `runPath` line ~84
+- **What the UI does now:** Tapping "Reorder", "Order your usuals", or
+  "Start from scratch" fires a `window.alert` describing what *would*
+  happen instead of doing it.
+- **What needs to happen:**
+  - **Reorder** → call `clone_order(source_order_id, new_delivery_date)`
+    (already exists in `db/migrations/`), then redirect to the resulting
+    draft via `buildCustomerOrderDeepLink(token, draftId)`.
+  - **Usuals** → call a new `apply_usuals_to_draft(customer_id, delivery_date)`
+    SQL function (or compose: create empty draft, then bulk-insert
+    `order_items` from a "compute usuals" CTE). Redirect to the draft.
+  - **Scratch** → call existing `POST /api/portal/orders` with the picked
+    delivery date, redirect to the resulting draft (this is what
+    `StartOrderHero` does today).
+- **Blocked on:** the "compute usuals" SQL helper (Usuals path); everything
+  else exists.
+
+### 13. Confirm-replace dialog doesn't actually replace
+
+- **File:** `components/portal/start-order-fork.tsx` `ConfirmReplaceDialog`
+  + `runPath` line ~84
+- **What the UI does now:** When a draft exists at the target delivery
+  date, the dialog asks the customer to confirm replacement; on confirm
+  the code falls through to the same `window.alert` placeholder.
+- **What needs to happen:** Add an atomic "swap draft contents" mutation
+  that (1) deletes all `order_items` for the existing draft, (2) populates
+  it from the chosen path's source (clone last order / apply usuals /
+  leave empty for scratch). Should be one transaction; on failure leave
+  the draft untouched.
+- **Blocked on:** decision on whether to wrap this as a stored function
+  (analogous to `clone_order`) or as an API route that runs the steps
+  server-side. Either approach needs RLS coverage so customers can only
+  swap their own drafts.

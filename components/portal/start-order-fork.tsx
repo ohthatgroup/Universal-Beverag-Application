@@ -1,0 +1,343 @@
+'use client'
+
+import { useRef, useState } from 'react'
+import Link from 'next/link'
+import { ArrowRight, Calendar, RotateCcw, Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Panel } from '@/components/ui/panel'
+import { OrderStatusDot } from '@/components/ui/status-dot'
+import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
+import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+
+interface StartOrderForkProps {
+  token: string
+  /** The customer's next-available delivery date. */
+  nextDeliveryDate: string
+  /** The day after `nextDeliveryDate` — fork's default when a draft already occupies the next date. */
+  nextNextDeliveryDate: string
+  /** In-flight draft on or after `nextDeliveryDate`. Null means no draft. */
+  primaryDraft: {
+    id: string
+    deliveryDate: string
+    itemCount: number
+    updatedAt: string
+  } | null
+  /** Total submitted+delivered orders (drives progressive reveal). */
+  submittedOrderCount: number
+  /** Most recent submitted/delivered order. Null when `submittedOrderCount === 0`. */
+  lastOrder: {
+    id: string
+    deliveryDate: string
+    itemCount: number
+  } | null
+}
+
+type PathKind = 'reorder' | 'usuals' | 'scratch'
+
+interface PendingPath {
+  kind: PathKind
+  targetDate: string
+}
+
+export function StartOrderFork({
+  token,
+  nextDeliveryDate,
+  nextNextDeliveryDate,
+  primaryDraft,
+  submittedOrderCount,
+  lastOrder,
+}: StartOrderForkProps) {
+  // Date that the three paths will use. Advances past the draft's date when
+  // a draft already exists at the next delivery date.
+  const draftBlocksNext =
+    primaryDraft !== null && primaryDraft.deliveryDate === nextDeliveryDate
+  const initialForkDate = draftBlocksNext ? nextNextDeliveryDate : nextDeliveryDate
+
+  const [forkDate, setForkDate] = useState(initialForkDate)
+  const [pendingPath, setPendingPath] = useState<PendingPath | null>(null)
+
+  const showReorder = submittedOrderCount >= 1 && lastOrder !== null
+  const showUsuals = submittedOrderCount >= 3
+  const showFork = showReorder || showUsuals || primaryDraft !== null
+  const draftHref = primaryDraft
+    ? buildCustomerOrderDeepLink(token, primaryDraft.id) ?? '#'
+    : '#'
+
+  // When a path is tapped, decide whether the action conflicts with an
+  // existing draft at `forkDate`. In real wiring, conflict triggers the
+  // ConfirmReplace dialog; otherwise the action runs immediately.
+  const draftAtForkDate =
+    primaryDraft !== null && primaryDraft.deliveryDate === forkDate
+
+  const handlePath = (kind: PathKind) => {
+    if (draftAtForkDate) {
+      setPendingPath({ kind, targetDate: forkDate })
+      return
+    }
+    runPath(kind, forkDate)
+  }
+
+  const runPath = (kind: PathKind, targetDate: string) => {
+    // TODO: wire up real path actions — see docs/handoff/homepage-redesign.md.
+    const friendlyDate = formatDeliveryDate(targetDate)
+    if (kind === 'reorder' && lastOrder) {
+      window.alert(
+        `Reorder ${formatDeliveryDate(lastOrder.deliveryDate)} (${lastOrder.itemCount} items) — would create draft for ${friendlyDate}.`,
+      )
+    } else if (kind === 'usuals') {
+      window.alert(
+        `Order your usuals — would create a draft for ${friendlyDate} pre-filled with the customer's usuals.`,
+      )
+    } else {
+      window.alert(`Start from scratch — would create an empty draft for ${friendlyDate}.`)
+    }
+  }
+
+  const onChangeDate: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const value = e.target.value
+    if (value && value >= todayISODate()) setForkDate(value)
+  }
+
+  // When draft exists, fork date must skip past the draft's date.
+  const minForkDate =
+    primaryDraft !== null && primaryDraft.deliveryDate >= todayISODate()
+      ? addDays(primaryDraft.deliveryDate, 1)
+      : todayISODate()
+
+  // ---- Brand-new customer (no history, no draft): show single Start order CTA ----
+  if (!showFork) {
+    return (
+      <section className="space-y-3">
+        <DateLabel
+          label="Order for"
+          date={forkDate}
+          minDate={minForkDate}
+          onChange={onChangeDate}
+        />
+        <PathRow
+          label="Start order"
+          variant="accent"
+          onClick={() => handlePath('scratch')}
+        />
+      </section>
+    )
+  }
+
+  return (
+    <section className="space-y-3">
+      {primaryDraft && (
+        <Link
+          href={draftHref}
+          className={cn(
+            'group flex items-center gap-3 rounded-xl bg-accent px-4 py-3 text-accent-foreground shadow-sm transition-colors hover:bg-accent/90',
+          )}
+        >
+          <OrderStatusDot status="draft" className="bg-accent-foreground/30" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold">
+              Resume draft for {formatDeliveryDate(primaryDraft.deliveryDate)}
+            </div>
+            <div className="text-xs text-accent-foreground/80">
+              {primaryDraft.itemCount}{' '}
+              {primaryDraft.itemCount === 1 ? 'item' : 'items'}
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      )}
+
+      {primaryDraft && (
+        <div className="flex items-center gap-3 pt-2">
+          <span className="h-px flex-1 bg-foreground/10" />
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            or start a new order
+          </span>
+          <span className="h-px flex-1 bg-foreground/10" />
+        </div>
+      )}
+
+      <DateLabel
+        label={primaryDraft ? 'for delivery' : 'Order for'}
+        date={forkDate}
+        minDate={minForkDate}
+        onChange={onChangeDate}
+      />
+
+      {showReorder && lastOrder && (
+        <PathRow
+          icon={<RotateCcw className="h-4 w-4" />}
+          label={`Reorder ${formatDeliveryDate(lastOrder.deliveryDate)} (${lastOrder.itemCount} items)`}
+          variant={primaryDraft ? 'outline' : 'accent'}
+          onClick={() => handlePath('reorder')}
+        />
+      )}
+
+      {showUsuals && (
+        <PathRow
+          icon={<Sparkles className="h-4 w-4" />}
+          label="Order your usuals"
+          variant="outline"
+          onClick={() => handlePath('usuals')}
+        />
+      )}
+
+      <PathRow
+        label="Start from scratch"
+        variant="outline"
+        onClick={() => handlePath('scratch')}
+      />
+
+      <ConfirmReplaceDialog
+        pendingPath={pendingPath}
+        primaryDraft={primaryDraft}
+        lastOrder={lastOrder}
+        onCancel={() => setPendingPath(null)}
+        onConfirm={() => {
+          if (pendingPath) {
+            runPath(pendingPath.kind, pendingPath.targetDate)
+            setPendingPath(null)
+          }
+        }}
+      />
+    </section>
+  )
+}
+
+// ---- DateLabel ---------------------------------------------------------
+
+interface DateLabelProps {
+  label: string
+  date: string
+  minDate: string
+  onChange: React.ChangeEventHandler<HTMLInputElement>
+}
+
+function DateLabel({ label, date, minDate, onChange }: DateLabelProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Calendar className="h-3.5 w-3.5" aria-hidden />
+      <span>
+        {label}{' '}
+        <span className="font-medium text-foreground">
+          {formatDeliveryDate(date)}
+        </span>
+      </span>
+      <span aria-hidden>·</span>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.showPicker?.()}
+        className="relative text-sm font-medium text-primary underline-offset-2 hover:underline"
+      >
+        Change date
+        <input
+          ref={inputRef}
+          type="date"
+          className="absolute inset-0 cursor-pointer opacity-0"
+          value={date}
+          min={minDate}
+          onChange={onChange}
+          aria-label="Pick a delivery date"
+        />
+      </button>
+    </div>
+  )
+}
+
+// ---- PathRow -----------------------------------------------------------
+
+interface PathRowProps {
+  label: string
+  icon?: React.ReactNode
+  variant: 'accent' | 'outline'
+  onClick: () => void
+}
+
+function PathRow({ label, icon, variant, onClick }: PathRowProps) {
+  return (
+    <Button
+      variant={variant}
+      size="lg"
+      onClick={onClick}
+      className={cn(
+        'h-12 w-full justify-between gap-3 rounded-xl px-4',
+        variant === 'outline' && 'border bg-card hover:bg-muted/50',
+      )}
+    >
+      <span className="flex items-center gap-3 text-base font-semibold">
+        {icon}
+        {label}
+      </span>
+      <ArrowRight className="h-4 w-4" />
+    </Button>
+  )
+}
+
+// ---- ConfirmReplaceDialog ----------------------------------------------
+
+interface ConfirmReplaceDialogProps {
+  pendingPath: PendingPath | null
+  primaryDraft: StartOrderForkProps['primaryDraft']
+  lastOrder: StartOrderForkProps['lastOrder']
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+function ConfirmReplaceDialog({
+  pendingPath,
+  primaryDraft,
+  lastOrder,
+  onCancel,
+  onConfirm,
+}: ConfirmReplaceDialogProps) {
+  const open = pendingPath !== null
+  if (!primaryDraft || !pendingPath) {
+    return (
+      <Panel open={open} onOpenChange={onCancel} variant="centered" srTitle="Replace draft">
+        <Panel.Body className="px-4 py-4 text-sm">No draft to replace.</Panel.Body>
+      </Panel>
+    )
+  }
+
+  const replacementSummary =
+    pendingPath.kind === 'reorder' && lastOrder
+      ? `last week's order (${lastOrder.itemCount} items from ${formatDeliveryDate(lastOrder.deliveryDate)})`
+      : pendingPath.kind === 'usuals'
+        ? 'your usuals'
+        : 'a fresh empty draft'
+
+  return (
+    <Panel
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel()
+      }}
+      variant="centered"
+      srTitle="Replace draft"
+    >
+      <Panel.Header>
+        <h2 className="flex-1 text-base font-semibold">Replace your draft?</h2>
+      </Panel.Header>
+      <Panel.Body className="space-y-3 px-4 py-4 text-sm">
+        <p>
+          You have a draft for {formatDeliveryDate(primaryDraft.deliveryDate)}{' '}
+          with {primaryDraft.itemCount}{' '}
+          {primaryDraft.itemCount === 1 ? 'item' : 'items'}.
+        </p>
+        <p className="text-muted-foreground">
+          Replacing it with {replacementSummary} will discard your in-flight
+          changes.
+        </p>
+      </Panel.Body>
+      <Panel.Footer className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="destructive" onClick={onConfirm}>
+          Replace
+        </Button>
+      </Panel.Footer>
+    </Panel>
+  )
+}
