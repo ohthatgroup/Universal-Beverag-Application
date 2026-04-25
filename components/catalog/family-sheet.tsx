@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { ProductTile } from '@/components/catalog/product-tile'
+import { Stepper } from '@/components/ui/stepper'
 import { BrandChips, SizeChips } from '@/components/catalog/filter-chips'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { SurfaceHeader } from '@/components/ui/surface'
@@ -32,6 +33,7 @@ interface FamilySheetProps {
   products: CatalogProduct[]
   quantityFor: (product: CatalogProduct) => number
   onOpenProduct: (product: CatalogProduct) => void
+  onSetQuantity: (product: CatalogProduct, next: number) => void
 }
 
 const TILE_GRID_CLASSES = 'grid grid-cols-3 gap-1.5 md:grid-cols-5'
@@ -42,6 +44,7 @@ export function FamilySheet({
   products,
   quantityFor,
   onOpenProduct,
+  onSetQuantity,
 }: FamilySheetProps) {
   const isOpen = state.mode !== 'closed'
   const isFamilyMode = state.mode === 'family'
@@ -421,6 +424,12 @@ export function FamilySheet({
                           product={product}
                           quantity={quantityFor(product)}
                           onOpen={() => onOpenProduct(product)}
+                          overlaySlot={
+                            <Stepper
+                              quantity={quantityFor(product)}
+                              onChange={(next) => onSetQuantity(product, next)}
+                            />
+                          }
                         />
                       )),
                     )}
@@ -444,6 +453,12 @@ export function FamilySheet({
                         product={product}
                         quantity={quantityFor(product)}
                         onOpen={() => onOpenProduct(product)}
+                        overlaySlot={
+                          <Stepper
+                            quantity={quantityFor(product)}
+                            onChange={(next) => onSetQuantity(product, next)}
+                          />
+                        }
                       />
                     ))}
                   </div>
@@ -481,6 +496,12 @@ export function FamilySheet({
                         product={product}
                         quantity={quantityFor(product)}
                         onOpen={() => onOpenProduct(product)}
+                        overlaySlot={
+                          <Stepper
+                            quantity={quantityFor(product)}
+                            onChange={(next) => onSetQuantity(product, next)}
+                          />
+                        }
                       />
                     ))}
                   </div>

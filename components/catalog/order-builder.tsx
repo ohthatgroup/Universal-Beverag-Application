@@ -303,6 +303,7 @@ export function OrderBuilder({
         products={products}
         quantityFor={(product) => quantities[productKey(product.id)] ?? 0}
         onOpenProduct={(product) => setOpenProductId(product.id)}
+        onSetQuantity={setProductQuantity}
       />
 
       {statusMessage && (
