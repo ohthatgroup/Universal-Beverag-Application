@@ -1,243 +1,456 @@
-# Homepage and Navbar Redesign — Design Spec
+# Homepage Extension + Navbar Redesign — Design Spec
 
 **Status:** draft for sign-off
 **Date:** 2026-04-25
-**Builds on:** [`docs/design-system.md`](../../design-system.md), [`docs/superpowers/specs/2026-04-25-surface-system-rebuild-design.md`](./2026-04-25-surface-system-rebuild-design.md)
-**Replaces (in part):** [`docs/agent-briefs/homepage-redesign-brief.md`](../../agent-briefs/homepage-redesign-brief.md) (the brief's content zone proposal stays; its design-system rules section is now this spec's)
+**Builds on:** [`docs/design-system.md`](../../design-system.md), [`docs/agent-briefs/homepage-redesign-brief.md`](../../agent-briefs/homepage-redesign-brief.md), [`docs/superpowers/specs/2026-04-25-surface-system-rebuild-design.md`](./2026-04-25-surface-system-rebuild-design.md)
 
 ## Context
 
-The customer-portal homepage at [`app/(portal)/portal/[token]/page.tsx`](../../../app/(portal)/portal/[token]/page.tsx) is a thin RSC that renders five components in a vertical stack: `PortalPageHeader` (greeting), `StartOrderHero` (date picker + New Order button), `DraftResumeStrip` (inline draft chips), `OrdersList` (upcoming & recent), and `PastOrdersSection` (collapsed history). The page predates the portal-design doctrine and the surface-system rebuild. It works, but reads as a list of boxes with inconsistent rhythm — there's no editorial spine, no quick-glance status, no visible relationship between what the customer ordered last week and what they should order this week.
+The customer portal homepage at [`app/(portal)/portal/[token]/page.tsx`](../../../app/(portal)/portal/[token]/page.tsx) renders five components in a vertical stack — `PortalPageHeader`, `StartOrderHero`, `DraftResumeStrip`, `OrdersList`, `PastOrdersSection`. **That stack is the design and we keep it.** The homepage redesign brief at [`docs/agent-briefs/homepage-redesign-brief.md`](../../agent-briefs/homepage-redesign-brief.md) calls for **two new slots between `DraftResumeStrip` and `OrdersList`** — `AccountStatsCard` and `AnnouncementsStack` — plus a full admin-side announcements system to feed them. The five existing components stay where they are; nothing about them changes.
 
-The navbar at [`components/layout/portal-top-bar.tsx`](../../../components/layout/portal-top-bar.tsx) is 31 lines: an `h-12` `border-b bg-background` row containing a muted-text brand link on the left and a UserCircle icon button on the right. It accepts a `customerName` prop that's never rendered (flagged in the engineering handoff as cleanup). It works, but it's so minimal that on the homepage there's nothing distinguishing one page from another — every portal page reads as the same chrome plus different content.
+The navbar at [`components/layout/portal-top-bar.tsx`](../../../components/layout/portal-top-bar.tsx) is a 31-line `h-12` strip with a brand link on the left and a UserCircle icon on the right. It receives an unused `customerName` prop (flagged in the engineering handoff as cleanup). With the homepage gaining content density (stats + curated announcements + product spotlights), the navbar's role needs to be slightly more deliberate so it gives the page a sense of place without competing with the new content. Doctrine Rule 12 already codifies the navbar as page chrome (static, not sticky, account icon only) — this spec calls out the small adjustments: drop the unused prop, add a subpage mode so back-navigation reads consistently across portal pages.
 
-We're redesigning both at once because they're chrome-and-content for the same surface. Touching one without the other would look inconsistent. This spec lands ahead of the implementation chat so the design choices are made before code is written.
+This spec is the design+wireframe-rich input for an implementation chat. The brief itself is excellent on the announcements system; this spec adds the wireframes, defines the navbar half, and reconciles both with the post-rebuild design system (Panel primitive, doctrine rules 1-12, mobile viewport lock).
 
 ## Goals
 
-1. **Homepage that opens with the customer's "next order" front and center**, not behind a date picker. The first thing you see should answer "what am I doing here?" in one glance.
-2. **Visible past-week activity** — what was ordered, what was delivered, what's outstanding — without scrolling.
-3. **Clear path to the order page** — the primary CTA (Start Order / Continue Draft) is the single accent element on the homepage.
-4. **Navbar that gives the homepage a sense of place** without becoming a competing surface. Doctrine Rule 10 still holds: only one sticky surface at a time.
-5. **Consistent z-index, layout, and surface relationship across pages** so that the cart bar (when it appears on the order builder) doesn't fight the navbar.
+1. **Homepage extension:** add `<AccountStatsCard>` + `<AnnouncementsStack>` between `DraftResumeStrip` and `OrdersList`, exactly as the brief specifies, with the 600px content cap on those two slots.
+2. **AnnouncementsStack with five card types:** `text`, `image`, `image_text`, `product`, `specials_grid` — each with its own layout, all wrapped in the stack's `max-w-[600px]` container. Wireframes for each below.
+3. **Admin side:** `AnnouncementsManager` (table + reorder + toggle), `AnnouncementDialog` (2-step compose: type picker → fields), `CustomerHomepageManager` (per-customer overrides), and the two new admin pages.
+4. **Navbar redesign:** preserve the existing minimal shape; add a subpage mode that swaps the brand link for a page title; drop the unused `customerName` prop; codify against Doctrine Rule 12.
+5. **Doctrine alignment:** every new component composes Panel for modals, follows the corner-radius rules, uses the established primitives (Money, StatusChip, Button, etc.).
 
 ## Non-goals
 
-- No changes to admin pages.
-- No changes to authentication, the magic-link flow, or `resolveCustomerToken`.
-- No new routes — the homepage stays at `/portal/[token]`.
-- No new components beyond what this spec calls out.
-- No changes to the navbar on the order builder beyond what naturally follows from the new shape.
+- No removal of `StartOrderHero`, `DraftResumeStrip`, `OrdersList`, or `PastOrdersSection`. They stay.
+- No new homepage CTAs or "Continue draft / Start new order" cards beyond what those existing components already render.
+- No backend wiring (migration, API routes, real types) — design only, mock data via the brief's `MOCK_ANNOUNCEMENTS` and `MOCK_STATS`.
+- No changes to `lib/types.ts` — `Announcement` is locally declared in the new component files.
+- No changes to admin pages outside `/admin/announcements` and `/admin/customers/[id]/homepage`.
+- No new global routes; no auth changes.
 
-## The redesign — Homepage
+## Wireframes — Homepage
 
-### Layout (post-rebuild)
+### Mobile (375 × 812)
 
 ```
-┌────────────────────────────────────────┐ ← <PortalTopBar> (redesigned, see Navbar below)
-│                                        │
+┌────────────────────────────────────────┐
+│ Universal Beverages          [👤]     │ ← <PortalTopBar> (homepage mode, unchanged)
 ├────────────────────────────────────────┤
 │                                        │
-│  Good morning, Maya 👋                 │ ← <PortalPageHeader> (greeting, lighter weight)
-│                                        │
+│  Maya — Corner Deli                    │ ← <PortalPageHeader title=greeting/>
+│                                        │   (already exists — unchanged)
 │  ┌──────────────────────────────────┐ │
-│  │ Order for Thursday, May 1        │ │ ← <NextOrderCard> (NEW; primary CTA)
-│  │                                  │ │
-│  │ Last delivery: 3 days ago        │ │
-│  │ 18 items · $402.50               │ │
-│  │                                  │ │
-│  │  [Continue draft →]   or         │ │
-│  │  [Start new order →]             │ │
+│  │  Order for [Thu, May 1] [▾]      │ │ ← <StartOrderHero>
+│  │                  [Start order →] │ │   (already exists — unchanged)
 │  └──────────────────────────────────┘ │
 │                                        │
-│  Recent activity                       │ ← <RecentActivity> section (NEW grouping)
-│  ─────────────────────────────────     │
-│  • Apr 25 · Delivered · 24 items       │
-│  • Apr 22 · Submitted · 18 items       │
-│  • Apr 18 · Delivered · 32 items       │
-│  [See all orders →]                    │
+│  ┌──────────────────────────────────┐ │
+│  │ ● Draft for Apr 28 · 4 items   → │ │ ← <DraftResumeStrip>
+│  └──────────────────────────────────┘ │   (already exists — unchanged)
+│                                        │
+│  ╔══════════════════════════════════╗ │ ← NEW: <AccountStatsCard>
+│  ║ Your account · April 2026        ║ │   max-w-[600px] mx-auto
+│  ║                                  ║ │
+│  ║   48 cases ordered               ║ │   text-sm tabular-nums
+│  ║   $1,240.00 total spend          ║ │   <Money/> for currency
+│  ║   3 orders placed                ║ │
+│  ╚══════════════════════════════════╝ │   bg-muted/50 rounded-xl px-4 py-4
+│                                        │
+│  ╔══════════════════════════════════╗ │ ← NEW: <AnnouncementsStack>
+│  ║                                  ║ │   wraps in max-w-[600px] mx-auto
+│  ║  ┌────────────────────────────┐ ║ │
+│  ║  │ May Promotion              │ ║ │   AnnouncementCard (text)
+│  ║  │ Free delivery on orders    │ ║ │
+│  ║  │ over $200 this month.      │ ║ │
+│  ║  │              [Learn more]  │ ║ │
+│  ║  └────────────────────────────┘ ║ │
+│  ║                                  ║ │
+│  ║  ┌────────────────────────────┐ ║ │
+│  ║  │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│ ║ │   AnnouncementCard (image)
+│  ║  │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│ ║ │   16:7 hero image
+│  ║  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│ ║ │   gradient overlay
+│  ║  │ Summer Launch  [Shop now]  │ ║ │
+│  ║  └────────────────────────────┘ ║ │
+│  ║                                  ║ │
+│  ║  ┌────────────────────────────┐ ║ │
+│  ║  │ ★ FEATURED PRODUCT         │ ║ │   AnnouncementCard (product)
+│  ║  │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ ║ │   border-2 border-accent/30
+│  ║  │ ▓▓ Cherry Coke 24/12oz ▓▓ │ ║ │
+│  ║  │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ ║ │
+│  ║  │ Cherry Coke 24/12oz        │ ║ │
+│  ║  │ $32.99               [Add] │ ║ │   QuantitySelector or
+│  ║  └────────────────────────────┘ ║ │   "Add to order" button
+│  ║                                  ║ │
+│  ║  ┌────────────────────────────┐ ║ │
+│  ║  │ ★ Specials this week       │ ║ │   AnnouncementCard (specials_grid)
+│  ║  │ ┌────┐┌────┐┌────┐         │ ║ │   bg-accent/5 border-accent/20
+│  ║  │ │NEW ││SALE││    │         │ ║ │   3-col mobile, 4-col md+
+│  ║  │ │img ││img ││img │         │ ║ │   ProductTile inside
+│  ║  │ └────┘└────┘└────┘         │ ║ │
+│  ║  └────────────────────────────┘ ║ │
+│  ╚══════════════════════════════════╝ │
+│                                        │
+│  ── Upcoming & recent ─────────────    │ ← <OrdersList>
+│  Apr 28 · Submitted · 24 items     →   │   (already exists — unchanged)
+│  Apr 25 · Delivered · 18 items     →   │
+│                                        │
+│  ── Past orders ──────────────────     │ ← <PastOrdersSection>
+│  [collapsed list, expandable]          │   (already exists — unchanged)
 │                                        │
 └────────────────────────────────────────┘
 ```
 
-### Component map
-
-The homepage page (`app/(portal)/portal/[token]/page.tsx`) renders, in order:
-
-1. **`<PortalTopBar>`** — rendered by the layout, not the page. See Navbar section.
-2. **`<PortalPageHeader>`** — greeting only. Drop the back-arrow on the homepage (there's nowhere to go back to).
-3. **`<NextOrderCard>`** (new) — the load-bearing CTA. Subsumes `<StartOrderHero>` + `<DraftResumeStrip>`'s primary draft. See below.
-4. **`<RecentActivity>`** (new) — replaces the separate `<OrdersList>` (current) + `<PastOrdersSection>` (past). One condensed list with status chips, capped at ~5 rows, with a "See all orders" link. See below.
-
-`<StartOrderHero>`, `<DraftResumeStrip>`, `<OrdersList>` (on the homepage), `<PastOrdersSection>` are deleted from the homepage. They may still be used in `/portal/[token]/orders` (the dedicated history page); confirm during implementation. If `<DraftResumeStrip>` has no other consumers, delete it entirely.
-
-### `<NextOrderCard>` shape
-
-```tsx
-<div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
-  <div className="space-y-0.5">
-    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-      Order for
-    </div>
-    <h2 className="text-h1 font-semibold">
-      {formatDeliveryDate(nextDeliveryDate)}
-    </h2>
-  </div>
-
-  {hasMostRecentDelivery && (
-    <div className="text-sm text-muted-foreground">
-      Last delivery {timeSince(lastDelivery.date)} · {lastDelivery.itemCount} items · {formatCurrency(lastDelivery.total)}
-    </div>
-  )}
-
-  <div className="flex flex-col gap-2 pt-2">
-    {hasDraft ? (
-      <Button variant="accent" size="lg" asChild>
-        <Link href={draftHref}>Continue draft <ArrowRight className="ml-1.5 h-4 w-4" /></Link>
-      </Button>
-    ) : (
-      <Button variant="accent" size="lg" asChild>
-        <Link href={newOrderHref}>Start new order <ArrowRight className="ml-1.5 h-4 w-4" /></Link>
-      </Button>
-    )}
-    {hasDraft && (
-      <Button variant="outline" asChild>
-        <Link href={newOrderHref}>Or start new order for a different date</Link>
-      </Button>
-    )}
-  </div>
-</div>
-```
-
-Doctrine compliance:
-- `rounded-xl` (Rule 5).
-- Single `accent` button per region (Rule 6).
-- Hover signals via Button's built-in styles (Rule 8).
-- No glass treatment — the homepage isn't a floating surface (Rule 2).
-
-### `<RecentActivity>` shape
-
-A condensed, status-aware list. Uses existing `<StatusChip>` primitive.
-
-```tsx
-<section className="space-y-3">
-  <div className="flex items-baseline justify-between">
-    <h2 className="text-h2 font-semibold">Recent activity</h2>
-    <Link href={`${basePath}/orders`} className="text-sm text-muted-foreground hover:text-foreground">
-      See all
-    </Link>
-  </div>
-
-  {activity.length > 0 ? (
-    <ul className="divide-y rounded-xl border bg-card">
-      {activity.slice(0, 5).map((order) => (
-        <li key={order.id} className="flex items-center justify-between gap-3 px-4 py-3">
-          <div className="min-w-0">
-            <div className="text-sm font-medium">
-              {formatDeliveryDate(order.delivery_date)}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {order.item_count} items · {formatCurrency(order.total)}
-            </div>
-          </div>
-          <StatusChip status={order.status} />
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <EmptyState
-      title="No orders yet"
-      description="Your recent orders will appear here."
-    />
-  )}
-</section>
-```
-
-Doctrine compliance:
-- `rounded-xl` container (Rule 5).
-- `divide-y` for row separation — no per-row borders (Rule 5 spirit).
-- StatusChip is the existing primitive (no per-instance styling).
-
-### Data queries
-
-The page already runs two parallel queries (drafts + all orders). One small change:
-
-- Add a `lastDeliveryQuery` that fetches the most-recent `delivered` order's date / item_count / total. Used by `<NextOrderCard>` to render the "Last delivery 3 days ago · X items" line.
-- Cap the homepage's orders fetch to 10 most-recent (currently fetches all). The `/portal/[token]/orders` page does the full fetch.
-
-### Cart bar on the homepage
-
-`<CartReviewSurface>` is **not rendered on the homepage**. It only renders on the order builder where there's an active order context. The homepage is fixed-bottom-clear; no `pb-28` needed on this page's root.
-
-If the customer has a draft and the doctrine wants to show a sticky "Continue draft" affordance, it lives inside `<NextOrderCard>` (which is part of the scroll content, not fixed) — not as a duplicate floating bar.
-
-### Desktop content cap
-
-The portal layout already constrains content to `max-w-3xl`. The `<NextOrderCard>` and `<RecentActivity>` look fine at 768px. **No homepage-specific cap.** (The homepage-redesign-brief proposed a 600px cap for the announcement zone — we're not building that announcement zone in this redesign; it's deferred.)
-
-## The redesign — Navbar
-
-### Layout (post-rebuild)
-
-The navbar stays minimal but gains intentional shape. Three states:
-
-**Homepage** (`/portal/[token]`):
+### Desktop (≥ 768px, layout column = max-w-3xl ≈ 768px)
 
 ```
-┌────────────────────────────────────────┐
-│ Universal Beverages          [👤]     │
-└────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ Universal Beverages                                          [👤]   │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────────── max-w-3xl content column ──────────────────────┐ │
+│  │                                                                │ │
+│  │  Maya — Corner Deli                                            │ │
+│  │                                                                │ │
+│  │  ┌────────────────────────────────────────────────────────┐   │ │
+│  │  │  Order for Thu, May 1 [▾]              [Start →]       │   │ │
+│  │  └────────────────────────────────────────────────────────┘   │ │
+│  │                                                                │ │
+│  │  ┌────────────────────────────────────────────────────────┐   │ │
+│  │  │ ● Draft for Apr 28 · 4 items                       →   │   │ │
+│  │  └────────────────────────────────────────────────────────┘   │ │
+│  │                                                                │ │
+│  │       ┌──────── max-w-[600px] mx-auto ───────────┐             │ │
+│  │       │                                          │             │ │
+│  │       │  ╔════════════════════════════════════╗  │             │ │
+│  │       │  ║ Your account · April 2026          ║  │             │ │   ← AccountStatsCard
+│  │       │  ║   48 cases · $1,240.00 · 3 orders  ║  │             │ │     centered, 600px max
+│  │       │  ╚════════════════════════════════════╝  │             │ │
+│  │       │                                          │             │ │
+│  │       │  ╔════════════════════════════════════╗  │             │ │   ← AnnouncementsStack
+│  │       │  ║ TextCard — May Promotion           ║  │             │ │     also 600px max
+│  │       │  ╚════════════════════════════════════╝  │             │ │
+│  │       │                                          │             │ │
+│  │       │  ╔════════════════════════════════════╗  │             │ │
+│  │       │  ║ ┌──── img ────┐ Title               ║  │             │ │   ← ImageTextCard
+│  │       │  ║ │  40% width  │ Body                ║  │             │ │     md:flex-row
+│  │       │  ║ │  square     │ [CTA]               ║  │             │ │
+│  │       │  ║ └─────────────┘                     ║  │             │ │
+│  │       │  ╚════════════════════════════════════╝  │             │ │
+│  │       │                                          │             │ │
+│  │       │  ╔════════════════════════════════════╗  │             │ │
+│  │       │  ║ ★ Specials  ┌──┐┌──┐┌──┐┌──┐       ║  │             │ │   ← SpecialsGridCard
+│  │       │  ║             │NW││SL││  ││  │       ║  │             │ │     md:grid-cols-4
+│  │       │  ║             └──┘└──┘└──┘└──┘       ║  │             │ │
+│  │       │  ╚════════════════════════════════════╝  │             │ │
+│  │       │                                          │             │ │
+│  │       └──────────────────────────────────────────┘             │ │
+│  │                                                                │ │
+│  │  ── Upcoming & recent ───────────────────────────              │ │
+│  │  Apr 28 · Submitted · 24 items                          →      │ │
+│  │  Apr 25 · Delivered · 18 items                          →      │ │
+│  │                                                                │ │
+│  │  ── Past orders ────────────────────────────────                │ │
+│  │  [collapsed list, expandable]                                  │ │
+│  │                                                                │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Brand text on the left (clickable, but already on home — re-renders the page). Account icon on the right. Same as today, just with refined typography (see Doctrine Rule 12 wording below).
+The page-level layout column stays `max-w-3xl mx-auto p-4 md:p-6` (already in `app/(portal)/portal/[token]/layout.tsx`). The new content zone (stats + announcements) is wrapped at `max-w-[600px] mx-auto` so it reads as a centered editorial spine, narrower than the order list above and below it. That visual narrowing is intentional — the content zone is curated content, not data; it shouldn't sprawl edge-to-edge in the page column.
 
-**Subpage** (`/portal/[token]/order/...`, `/portal/[token]/orders`, `/portal/[token]/account`):
+## Wireframes — five announcement card types
+
+The brief defines five card types. Wireframes for each at the 600px container width:
+
+### TextCard
 
 ```
-┌────────────────────────────────────────┐
-│ ←  {Page title}              [👤]     │
-└────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ May Promotion                                        │ ← title — text-base font-semibold
+│ Free delivery on all orders over $200 this month.    │ ← body — text-sm text-muted-foreground
+│ No code needed.                                      │
+│                                       [Learn more]   │ ← CTA — Button variant=outline size=sm
+└──────────────────────────────────────────────────────┘
+  rounded-xl border bg-card px-4 py-4
 ```
 
-Back-arrow on the left. The back-arrow returns to `/portal/[token]` always (not browser-back) — the portal isn't a deep stack; one level back is always home. The page title is mid-weight, replacing the brand link (avoids two competing labels).
+CTA row only renders when `cta_label` is non-null. CTA opens `cta_url` in a new tab (`target="_blank" rel="noreferrer"`).
 
-This is a navbar-level back-arrow, not the in-content `<PortalPageHeader>` back-arrow. The `<PortalPageHeader>` becomes a content-level header (the day's delivery date on the order page; the orders-list page title on `/orders`; etc.) without a duplicate back affordance.
+### ImageBannerCard
 
-### Behavior
+```
+┌──────────────────────────────────────────────────────┐
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ ← <img> aspect-[16/7] object-cover
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │
+│▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│ ← gradient: black/70 → black/20 → transparent
+│ Summer Launch                          [Shop now]    │ ← title text-white | CTA white border
+└──────────────────────────────────────────────────────┘
+  relative rounded-xl overflow-hidden
+```
 
-- **Static, not sticky.** `border-b bg-background` with no `position: fixed`. Per Rule 10, the cart bar is the only sticky surface on the order builder. The navbar scrolls with the page. The reduced visual chrome on scroll is acceptable; the topbar is an entry-point affordance, not a persistent control.
-- **`h-12` height** (unchanged).
-- **`max-w-3xl mx-auto` inner container** so it aligns with the page content column.
-- **Account icon** uses `<Button variant="ghost" size="icon">` with `aria-label="Account"`. Tapping navigates to `/portal/[token]/account`.
-- **Brand text vs page title** — homepage uses `text-sm font-medium text-muted-foreground` brand link; subpages replace it with `text-sm font-medium text-foreground` page title (no link). The page title is determined by the route, NOT by a prop passed from each page (avoids prop drilling).
+If `image_url` is null, render an `aspect-[16/7] bg-muted` placeholder with the gradient + title still visible. CTA gets `text-white border-white/50 hover:bg-white/10`.
 
-### Z-index relationship with `<CartReviewSurface>`
+### ImageTextCard
 
-- Navbar: no z-index assignment (default stacking, scrolls with page).
-- Cart bar (closed): `fixed bottom-0 z-30`.
-- Review drawer (open): `fixed bottom-0 z-50` (Radix Dialog Content).
-- Page content: default.
+**Mobile (default):**
 
-Because the navbar isn't `fixed`, there's no z-fight. When the review drawer opens and dims the page with its overlay (z-40), the navbar dims along with the content. That's intended.
+```
+┌──────────────────────────────────────────────────────┐
+│ ┌──────────────────────────────────────────────────┐ │ ← <img> aspect-[16/9] rounded-lg
+│ │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ │   object-cover
+│ │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ │
+│ └──────────────────────────────────────────────────┘ │
+│ Title                                                │
+│ Body text wraps below.                               │
+│ [CTA]                                                │
+└──────────────────────────────────────────────────────┘
+  flex flex-col gap-4 rounded-xl border bg-card p-4
+```
 
-### Account icon convention
+**Desktop (md+):**
 
-The UserCircle icon is the only persistent navbar affordance. Doctrine convention:
-- No badge/dot indicators on the icon (the homepage's `<NextOrderCard>` carries the actionable state).
-- No dropdown menu — tapping navigates to the account page.
-- Aria-label "Account."
+```
+┌──────────────────────────────────────────────────────┐
+│ ┌──────────────┐ Title                               │
+│ │  ▓▓▓ 40% ▓▓▓ │ Body text wraps below the title.    │
+│ │  ▓▓▓ wide ▓▓ │ Multiple lines if needed.           │
+│ │  ▓▓ square ▓ │ [CTA]                               │
+│ └──────────────┘                                     │
+└──────────────────────────────────────────────────────┘
+  md:flex-row md:items-center
+  image: md:w-[40%] aspect-square
+```
 
-## Doctrine additions (to be lifted into design-system.md after the implementation lands)
+### ProductSpotlightCard
 
-### Proposed Rule 12 (already in design-system.md)
+```
+┌──────────────────────────────────────────────────────┐
+│ ★ FEATURED PRODUCT                                   │ ← text-[10px] uppercase tracking-widest
+│                                                      │   text-accent
+│ ┌──────────────────────────────────────────────────┐ │
+│ │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ │ ← <img> aspect-square
+│ │  ▓▓▓▓▓▓▓▓ Cherry Coke 24/12oz ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ │   object-contain on white bg
+│ │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ │
+│ └──────────────────────────────────────────────────┘ │
+│ Cherry Coke 24/12oz                                  │ ← product name
+│ 24/12oz · $38.99                                     │ ← pack/price (Money component)
+│ Optional salesman note from announcement.body.       │
+│                                          [Add →]     │ ← if no draft: "Add to order" button
+└──────────────────────────────────────────────────────┘   if has draft + qty>0: <Stepper>
+  border-2 border-accent/30 rounded-xl bg-card p-4
+```
 
-> **12. Navbar is page chrome, not a competing surface.** The `<PortalTopBar>` (`components/layout/portal-top-bar.tsx`) is part of the static page above the scroll content — `border-b bg-background`, no `fixed` positioning, no glass treatment. It does not compete with `<CartReviewSurface>` for sticky-surface attention (Rule 10). Account icon is the only persistent affordance; brand link demotes to muted text. A back-arrow lives in the topbar on subpages and returns to `/portal/[token]` (one level up, always). Anti-pattern: a sticky topbar layered over the cart bar; account dropdowns or search bars in the topbar; primary CTAs in the topbar.
+**Qty interaction:** when `primaryDraftOrderId` is null, show a single accent button "Add to order" that opens a `<Panel variant="bottom-sheet">` date-picker (or in mock mode, fires a placeholder alert). When `primaryDraftOrderId` is non-null, render `<Stepper>` directly. The Stepper writes via `useAutoSavePortal` against the draft.
 
-(The Rule 12 text in `docs/design-system.md` mentions back-arrow in `<PortalPageHeader>` instead of the topbar. After implementation lands, update Rule 12 in design-system.md to match what shipped — exact location of the back-arrow is the implementation chat's call.)
+**Mock mode placeholder:** when `product` is null, render the card with a gray `aspect-square bg-muted` image area and "Product not found" text in the name slot. Layout still tests.
 
-### Proposed Page-level layouts section (already in design-system.md)
+### SpecialsGridCard
 
-The Page-level layouts section already in `docs/design-system.md` covers the body padding / max-w-3xl alignment / CartReviewSurface-only-on-order-builder decisions. No additions needed.
+```
+┌──────────────────────────────────────────────────────┐
+│ ★ Specials this week                                 │ ← text-sm font-semibold text-accent mb-2
+│                                                      │
+│ ┌──────┐ ┌──────┐ ┌──────┐                           │ ← grid-cols-3 gap-2 (mobile)
+│ │ NEW  │ │ SALE │ │      │                           │   md:grid-cols-4
+│ │      │ │      │ │      │                           │
+│ │ img  │ │ img  │ │ img  │                           │   <ProductTile> per item
+│ └──────┘ └──────┘ └──────┘                           │
+└──────────────────────────────────────────────────────┘
+  rounded-xl border border-accent/20 bg-accent/5 p-3
+```
+
+The badge (`NEW` / `SALE`) is a per-product override stored in `announcement.badge_overrides[product.id]`. Renders as `absolute top-1 left-1 z-10 text-[9px] font-bold bg-accent text-white rounded px-1`. Tile click opens `<ProductPopout>` (existing component).
+
+**Mock mode:** when `products` is empty, render 3-4 `aspect-square rounded-lg bg-muted animate-pulse` placeholder tiles in the grid. Layout tests without product data.
+
+## Wireframes — Admin
+
+### `/admin/announcements` (AnnouncementsManager)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Announcements                              [+ New announcement]│ ← page header (top-right CTA)
+├──────────────────────────────────────────────────────────────┤
+│ [ Live ]  [ Scheduled ]                                       │ ← Tabs (components/ui/tabs.tsx)
+├──────────────────────────────────────────────────────────────┤
+│ ↕  Title           Type    Audience    Dates       Status    │ ← table header row
+├──────────────────────────────────────────────────────────────┤
+│ ↑↓ Summer Launch   image   All         May–        ● Live   …│   actions menu (Edit/Delete)
+│ ↑↓ May Promo       text    [whlsl]     May 1-31    ● Live   …│
+│ ↑↓ Cherry Coke     product All         —           ◯ Off    …│
+│ ↑↓ Specials grid   grid    All         May 1-15    ● Live   …│
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Reorder:** ↑/↓ arrow buttons per row using `reorderByDrag` from `lib/reorder.ts`. After reorder, PATCH (in mock mode, just update local state with a `// TODO: wire up PATCH` comment).
+
+**Toggle Active:** `Switch` component in the Status cell, optimistic update.
+
+**Actions menu:** Edit (opens `AnnouncementDialog` with the row pre-filled), Delete (`window.confirm` for now).
+
+**Tabs:**
+- **Live** — `is_active === true && (starts_at == null || starts_at <= now) && (ends_at == null || ends_at > now)`
+- **Scheduled** — `is_active === false || (starts_at != null && starts_at > now)`
+
+### `AnnouncementDialog` — step 1 (type picker)
+
+```
+╔══════════════════════════════════════════════╗ ← <Panel variant="centered">
+║  New announcement                       [×]  ║   max-w-md p-4
+║  ─────────────────────────────────────────   ║
+║                                              ║
+║  Choose a content type:                      ║
+║                                              ║
+║  ┌──────────┐ ┌──────────┐ ┌──────────┐     ║   grid-cols-3 gap-2
+║  │   Aā     │ │   ▓+Aā   │ │   ▓▓▓▓   │     ║   each card:
+║  │  Text    │ │ Image+   │ │  Image   │     ║   rounded-xl border bg-card
+║  │  card    │ │  text    │ │  banner  │     ║   p-3 text-center
+║  └──────────┘ └──────────┘ └──────────┘     ║   hover:bg-muted/50
+║                                              ║
+║  ┌──────────┐ ┌──────────┐                  ║
+║  │  ★ img   │ │  ★ ⊞⊞⊞  │                  ║
+║  │ Product  │ │ Specials │                  ║
+║  │ spotlight│ │  grid    │                  ║
+║  └──────────┘ └──────────┘                  ║
+║                                              ║
+╚══════════════════════════════════════════════╝
+```
+
+Tap a card → advances to step 2 with `content_type` set.
+
+### `AnnouncementDialog` — step 2 (fields)
+
+```
+╔══════════════════════════════════════════════╗
+║  ←  New announcement: Image+text       [×]  ║   ← back arrow only when creating
+║  ─────────────────────────────────────────   ║
+║                                              ║
+║  Image*       [ImageUploadField]             ║
+║  Title*       [Input              ]          ║
+║  Body         [Textarea           ]          ║
+║  CTA label    [Input              ]          ║
+║  CTA URL      [Input              ]          ║
+║                                              ║
+║  ─────────────────────────────────────────   ║
+║                                              ║
+║  Audience     [TagChipInput       ]          ║
+║  Go live      [Input type=date    ]          ║
+║  Expires      [Input type=date    ]          ║
+║                                              ║
+║  Active       [Switch  on/off]               ║
+║                                              ║
+║  ─────────────────────────────────────────   ║
+║                          [Cancel]  [Save]    ║
+╚══════════════════════════════════════════════╝
+```
+
+Fields shown depend on `content_type`. Common fields (audience, dates, active toggle) always visible at the bottom. Type-specific fields above the divider.
+
+| content_type | Type-specific fields |
+|---|---|
+| `text` | Title*, Body, CTA label, CTA URL |
+| `image` | Image*, Title, CTA label, CTA URL |
+| `image_text` | Image*, Title*, Body, CTA label, CTA URL |
+| `product` | Product ID*, Body (note), CTA label |
+| `specials_grid` | Title, Product IDs (comma-sep), Badge overrides |
+
+`*` = required for save. No Zod in mock mode — just non-empty checks.
+
+The dialog is `<Panel variant="centered">` with `max-w-md` — when forms get long, the body scrolls within the panel (Panel inherits `overflow-hidden` and the body slot gets `overflow-y-auto`).
+
+### `/admin/customers/[id]/homepage` (CustomerHomepageManager)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Customers / Acme Deli / Homepage                              │ ← breadcrumb
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  DEALS                                                       │
+│  Active pallet deals visible to all customers:               │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ deal title · $89.99 · Save $12   [Hide for this customer]│ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  Pinned deal for this customer only:                         │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ [+ Pin a specific deal]                                │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  ─────────────────────────────────────────────────────       │
+│                                                              │
+│  ANNOUNCEMENTS                                               │
+│  Showing to this customer (tag match or all):                │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Summer Launch                              [read-only]  │ │
+│  │ May Promo                                  [read-only]  │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  Created just for this customer:                             │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Acme exclusive promo                  [Edit] [Delete]   │ │
+│  └────────────────────────────────────────────────────────┘ │
+│  [+ Add announcement for this customer]                      │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+In mock mode, both lists carry hardcoded placeholder rows. The "Add announcement for this customer" button opens `AnnouncementDialog` with `audience_tags` pre-filled to `[customerId]` (or a per-customer marker — implementation detail).
+
+## Wireframes — Navbar
+
+The current navbar:
+
+```
+┌────────────────────────────────────────────────────────┐
+│ Universal Beverages                              [👤] │
+└────────────────────────────────────────────────────────┘
+  border-b bg-background  h-12
+  inner: max-w-3xl mx-auto px-4 md:px-6
+```
+
+This is correct for the homepage and meets Doctrine Rule 12. **Two adjustments for this design pass:**
+
+### Adjustment 1 — drop the unused `customerName` prop
+
+The `customerName` prop is computed in the layout, passed in, and never rendered. Remove it. The layout's `resolveCustomerToken` call still happens (it's the token-validation gate); just don't pass the result into the topbar.
+
+### Adjustment 2 — subpage mode
+
+On subpages (`/portal/[token]/order/...`, `/portal/[token]/orders`, `/portal/[token]/account`), the brand link is replaced by the page title and a back-arrow. Keeps the navbar's role (page chrome + account icon) without making it more complex.
+
+**Subpage navbar:**
+
+```
+┌────────────────────────────────────────────────────────┐
+│ ← Order for Thu, May 1                          [👤] │ ← back arrow + page title
+└────────────────────────────────────────────────────────┘
+  border-b bg-background  h-12
+```
+
+**Implementation note:** `<PortalPageHeader>` already renders an in-content back button (`back={{ href }}` or `'history'`). The navbar's back-arrow on subpages is **redundant** if the page already renders `<PortalPageHeader>` with a back prop. Implementation chat decides:
+- (A) Keep navbar minimal (homepage shape only); rely on `<PortalPageHeader>` for back-navigation on subpages. **Recommended.** Lowest risk; no per-route navbar logic. The navbar stays a 31-line component.
+- (B) Make the navbar route-aware (read `usePathname()`, switch to subpage mode on non-homepage routes). Requires marking `PortalTopBar` `'use client'`.
+
+This spec recommends **(A)** — leave the navbar as-is shape-wise, drop the unused prop, and codify against Rule 12. The subpage back-navigation is already solved by `<PortalPageHeader>`. If user testing later shows confusion, revisit.
+
+### Doctrine Rule 12 compliance checklist
+
+The current navbar already:
+- [x] `border-b bg-background` (page chrome, not glass).
+- [x] No `fixed` positioning (static, scrolls with page).
+- [x] Account icon as the only persistent affordance (right side).
+- [x] Brand link demotes to muted text.
+- [x] No primary CTAs in the topbar.
+- [x] No account dropdown.
+
+Post-this-spec it adds:
+- [x] No unused props (drop `customerName`).
+- [x] No glass treatment (already the case — confirmed against Rule 12).
+
+The navbar redesign is therefore a **minimal cleanup**: drop one prop. The "redesign" framing is mostly codification — the existing shape is the right shape; this spec makes that explicit and points future agents at Rule 12 to keep them from over-building.
 
 ## Code-change list
 
@@ -245,27 +458,56 @@ The Page-level layouts section already in `docs/design-system.md` covers the bod
 
 | Path | Change |
 |---|---|
-| `app/(portal)/portal/[token]/page.tsx` | Replace the existing 5-component vertical stack with `<PortalPageHeader>` (greeting only, no back arrow) + `<NextOrderCard>` + `<RecentActivity>`. Delete `<StartOrderHero>` / `<DraftResumeStrip>` / `<OrdersList>` / `<PastOrdersSection>` invocations from this page. Adjust queries to add `lastDeliveryQuery`. |
-| `components/layout/portal-top-bar.tsx` | Add a `currentPath` (or `mode: 'home' \| 'subpage'`) prop. When subpage, render a back-arrow + page title instead of the brand link. Drop the unused `customerName` prop. |
-| `app/(portal)/portal/[token]/layout.tsx` | Pass the route segment / page title hint into `<PortalTopBar>` so it can render the right state. (Mechanism is the implementation chat's call — could be `usePathname` in a client component, or a server-side segment-aware prop.) |
-| `components/portal/portal-page-header.tsx` | Drop the back-arrow from this component on the homepage (or accept a `showBack` prop and have the homepage pass `showBack={false}`). |
+| `app/(portal)/portal/[token]/page.tsx` | Slot in `<AccountStatsCard>` after `<DraftResumeStrip>` and `<AnnouncementsStack>` after that, both wrapped in `max-w-[600px] mx-auto`. Pass `MOCK_STATS` and `MOCK_ANNOUNCEMENTS` (declared in-page) until backend wiring lands. The existing five components stay where they are. |
+| `app/(portal)/portal/[token]/layout.tsx` | Drop the `customerName` calculation and the `customerName` prop passed to `<PortalTopBar>`. Keep `resolveCustomerToken` for its side-effect (404 if invalid). |
+| `components/layout/portal-top-bar.tsx` | Remove the `customerName` prop. Component shape unchanged. |
+| `components/admin/admin-nav.tsx` | Add `Announcements` link in the dropdown after `Reports` (per the brief). |
 
 ### Create
 
+**Customer-portal components:**
+
 | Path | What |
 |---|---|
-| `components/portal/next-order-card.tsx` | The new primary CTA card. Props: `nextDeliveryDate`, `lastDelivery: { date, itemCount, total } \| null`, `draft: { orderId, deliveryDate } \| null`, `token`. |
-| `components/portal/recent-activity.tsx` | The condensed activity list. Props: `orders: Order[]`, `token`, `showPrices`. Caps at 5 rows. Renders `<StatusChip>` per row. Renders `<EmptyState>` if `orders.length === 0`. |
+| `components/portal/announcements-stack.tsx` | Server component. Wraps a list of `<AnnouncementCard>` in `mx-auto w-full max-w-[600px] space-y-4`. Returns `null` when `announcements.length === 0`. Type `Announcement` declared locally. |
+| `components/portal/announcement-card.tsx` | Client component. Switches on `content_type` and renders one of five sub-renderers (`TextCard`, `ImageBannerCard`, `ImageTextCard`, `ProductSpotlightCard`, `SpecialsGridCard`) — all defined locally inside this file, not exported. |
+| `components/portal/account-stats-card.tsx` | Server component. Renders the stats panel. Returns `null` when all three counts are zero (new customer). Wraps in `max-w-[600px] mx-auto`. |
 
-### Delete (verify no other consumers first)
+**Admin components:**
 
-| Path | Reason |
+| Path | What |
 |---|---|
-| `components/portal/start-order-hero.tsx` | Subsumed by `<NextOrderCard>`. |
-| `components/portal/draft-resume-strip.tsx` | Subsumed by `<NextOrderCard>`. |
-| `components/portal/past-orders-section.tsx` | Subsumed by `<RecentActivity>` (with the dedicated `/orders` page handling deep history). |
+| `components/admin/announcements-manager.tsx` | Client component. Tabs (Live / Scheduled), table with reorder arrows, Active switch, Edit/Delete actions, "+ New announcement" button that opens `<AnnouncementDialog>`. In mock mode, all state mutations are local-only with `// TODO: wire up PATCH` comments. |
+| `components/admin/announcement-dialog.tsx` | Client component. 2-step `<Panel variant="centered">`: type picker → fields. When editing, opens directly to step 2. |
+| `components/admin/customer-homepage-manager.tsx` | Client component. Per-customer overrides UI (deals + announcements). Mock mode populates both sections with hardcoded placeholders. |
 
-(Confirm during implementation that `<OrdersList>` is still used on `/portal/[token]/orders` before removing it from anywhere.)
+**Admin pages:**
+
+| Path | What |
+|---|---|
+| `app/(admin)/admin/announcements/page.tsx` | RSC. Calls `requirePageAuth(['salesman'])`. Renders `<AnnouncementsManager initialAnnouncements={MOCK_ANNOUNCEMENTS} />`. |
+| `app/(admin)/admin/customers/[id]/homepage/page.tsx` | RSC. Calls `requirePageAuth(['salesman'])`. Renders breadcrumb + `<CustomerHomepageManager customerId={id} customerName="…" />`. |
+
+**Doc:**
+
+| Path | What |
+|---|---|
+| `docs/handoff/homepage-redesign.md` | Engineering handoff log per the brief's REQUIRED section. Summary table at top, one entry per `MOCK_*` / `// TODO` introduced. Pre-existing lib paths are reused unchanged. |
+
+### Delete
+
+None. The existing five components stay. The `customerName` prop drop is a modification, not a deletion of any file.
+
+## Doctrine compliance
+
+This change must respect every rule in [`docs/design-system.md`](../../design-system.md). Specific checks:
+
+- **Rule 2 (glass is for floating surfaces):** No glass on the new homepage cards. `<AccountStatsCard>` is `bg-muted/50`. `<AnnouncementCard>` variants use `bg-card`, `bg-accent/5`, or image+overlay — all non-glass. The cart bar is the only glass-like surface (and it's not on the homepage).
+- **Rule 5 (corner radii):** All cards `rounded-xl`. Image children inside ImageTextCard use `rounded-lg` (slightly smaller for nested elements is acceptable per the doctrine spirit; if agents want strict `rounded-xl` everywhere, that's also fine — pick during implementation).
+- **Rule 6 (one accent per region):** The announcement zone has multiple amber-accent signals (the `★ FEATURED PRODUCT` label, the SpecialsGrid border, the per-card CTAs). This needs care — at most one accent per visible region within a card. ProductSpotlightCard's "Add to order" button is the accent; the `★` label is muted text-accent without filled background. SpecialsGridCard's border is the accent; per-tile badges are NOT accent — they're solid `bg-accent` solid white-text labels (a different accent role per the brief). The implementation chat should keep an eye on this — if the ProductSpotlight CTA AND the `★` label both look like CTAs at a glance, demote the label.
+- **Rule 8 (hover and focus signals):** All clickable cards/buttons need hover. The `Button` primitive handles its own. The type-picker cards in `<AnnouncementDialog>` step 1 use `hover:bg-muted/50` per the brief.
+- **Rule 9 (Panel variants):** `<AnnouncementDialog>` uses `<Panel variant="centered">`. The brief mentions a "date-picker sheet in ProductSpotlight" — that's `<Panel variant="bottom-sheet">`. No ad-hoc DialogContent overrides.
+- **Rule 12 (navbar):** Already covered — the navbar redesign is a prop drop + codification.
 
 ## Verification
 
@@ -278,59 +520,76 @@ npm run test
 npm run build
 ```
 
-All four must pass. Pre-existing warnings unrelated to this work are acceptable.
+All four must pass. Pre-existing lint warnings unrelated to this work are acceptable.
 
 ### Touch checklist (mobile + desktop)
 
-- [ ] Homepage opens to a clear "next order" CTA at the top — the page answers "what am I doing here?" in one glance.
-- [ ] If the customer has a draft for the next delivery date, the primary button reads "Continue draft" (accent). If not, it reads "Start new order" (accent).
-- [ ] The `<NextOrderCard>` shows the most-recent delivery's date / item count / total (when applicable).
-- [ ] `<RecentActivity>` shows up to 5 recent orders with status chips. Tapping "See all" navigates to `/portal/[token]/orders`.
-- [ ] On the homepage, the navbar shows brand text + account icon. No back-arrow.
-- [ ] On a subpage (e.g. order builder), the navbar shows back-arrow + page title + account icon. Tapping the back-arrow returns to the homepage (not browser-back).
-- [ ] The navbar is NOT sticky. It scrolls with the page.
-- [ ] On the order builder, `<CartReviewSurface>` (closed state, the cart bar) is the only fixed-bottom surface. The navbar doesn't fight it.
-- [ ] On the homepage, no cart bar appears (the homepage doesn't render `<CartReviewSurface>`).
-- [ ] The `<NextOrderCard>` accent CTA hovers correctly (focus ring visible) and is the only accent-tinted affordance in its visible region.
-- [ ] On desktop, the homepage content fits within `max-w-3xl mx-auto`. The `<NextOrderCard>` looks intentional at 768px+.
+- [ ] Homepage renders the existing five components plus two new slots in the order: PageHeader, StartOrderHero, DraftResumeStrip, **AccountStatsCard**, **AnnouncementsStack**, OrdersList, PastOrdersSection.
+- [ ] AccountStatsCard appears with mock stats (48 cases / $1,240 / 3 orders); month label reads "April 2026" or current month.
+- [ ] AccountStatsCard renders `null` when all three values are zero.
+- [ ] AnnouncementsStack renders one card per announcement type from the mock array.
+- [ ] TextCard shows title + body + CTA outline button.
+- [ ] ImageBannerCard shows image with gradient overlay + title + white-bordered CTA.
+- [ ] ImageTextCard is `flex-col` on mobile, `md:flex-row md:items-center` on desktop.
+- [ ] ProductSpotlightCard renders with `border-2 border-accent/30`; in mock mode shows "Product not found" placeholder.
+- [ ] SpecialsGridCard renders with `border-accent/20 bg-accent/5`; in mock mode shows 4 placeholder tiles.
+- [ ] Both new slots are capped at `max-w-[600px]` on desktop (centered, narrower than the page column above and below).
+- [ ] On mobile (375px), both slots fill the page column edge-to-edge.
+- [ ] Navbar still shows brand link + account icon. The `customerName` prop is gone from `<PortalTopBar>`'s signature.
+- [ ] `<PortalPageHeader>` continues to render the back-arrow on subpages (Order, Orders, Account) — the navbar doesn't.
+- [ ] `/admin/announcements` shows the `<AnnouncementsManager>` with mock rows; tabs (Live/Scheduled) filter correctly.
+- [ ] "+ New announcement" opens `<AnnouncementDialog>` step 1 (type picker, 5 cards).
+- [ ] Tapping a type advances to step 2 with the right type-specific fields visible.
+- [ ] Step 2 "Back" returns to step 1 (creating only).
+- [ ] `<AnnouncementDialog>` is centered, `<Panel variant="centered">` shape, glass-blur overlay.
+- [ ] Reorder arrows in `<AnnouncementsManager>` update local sort order; toast or no-op confirms.
+- [ ] Active switch updates local state.
+- [ ] `/admin/customers/[id]/homepage` loads with `<CustomerHomepageManager>` showing both sections (deals + announcements) populated with mock placeholders.
+- [ ] Admin nav has "Announcements" in the dropdown after "Reports".
+- [ ] `docs/handoff/homepage-redesign.md` exists with a summary table and at least one entry per `MOCK_*` and per `// TODO` comment introduced.
 
 ### Doctrine cross-check
 
-- [ ] Rule 1 (one figure per screen): The `<NextOrderCard>` is the figure on the homepage. `<RecentActivity>` is supporting context, not a competing region.
-- [ ] Rule 5 (corner radii): Only `rounded-xl` on cards / containers; only `rounded-full` on pill controls.
-- [ ] Rule 6 (accent reserved for committing): Exactly one accent button visible per region. The homepage has one. The navbar has zero.
-- [ ] Rule 8 (hover/focus): Every clickable element on the homepage signals hover.
-- [ ] Rule 10 (one sticky surface): On the homepage, none. On the order builder, only the cart bar. Navbar is static everywhere.
-- [ ] Rule 12 (navbar): Static, not sticky. Account icon only. Back-arrow on subpages returns to home.
+- [ ] No new uses of deleted tokens (`surfaceOverlay`, `surfaceFloating`, `surfaceOverlayPrimary`).
+- [ ] No new `<DialogContent>` ad-hoc overrides — every modal uses `<Panel variant="…">`.
+- [ ] No `rounded-md` / `rounded-2xl` / `rounded-3xl` on customer-surface containers (Rule 5).
+- [ ] At most one accent-tinted button visible per card (Rule 6).
+- [ ] All buttons have hover/focus signals (Rule 8 — handled by `<Button>`).
 
 ## Risks and mitigations
 
-- **The back-arrow on the navbar duplicates browser back-button behavior.** Mitigation: it's intentional — most customers come in via magic link and won't have a meaningful browser history. The in-app back-arrow gives them a reliable way home.
-- **Deleting `<StartOrderHero>` / `<DraftResumeStrip>` / `<PastOrdersSection>` could break other pages that use them.** Mitigation: grep for consumers before deletion. If the `/orders` page uses any of them, leave them in place and only remove from the homepage.
-- **`<NextOrderCard>` shows "Last delivery N days ago" — if the customer has never had a delivery, that line should hide gracefully.** Mitigation: render the line only when `lastDelivery` is non-null; the card still works without it.
-- **The route-aware navbar (knows which page it's on) could become a tangle.** Mitigation: a single `usePathname()` call in a client-component PortalTopBar is cleanest. If we go server-side (passing path from layout), keep the prop signature minimal — `currentPath: string` or `mode: 'home' | 'subpage'`, not a hash of every possible state.
-- **The "See all orders" link on `<RecentActivity>` points at `/portal/[token]/orders`.** Confirm that route still renders the full history; if it was inadvertently broken in the rebuild, fix it in the same PR.
+- **Five card-type variants in one file.** `<AnnouncementCard>` will be ~300+ lines if all five sub-renderers live inside. The brief says they should — keeps the switch explicit and the file's responsibility cohesive. Mitigation: if it gets unmanageable in implementation, the agent can extract sub-renderers to private files in a `components/portal/announcement-cards/` folder, but only with a comment justifying the split.
+- **600px content cap on a 768px+ page column.** Looks deliberately narrow on the homepage. That's intended — it makes the editorial content read as curated, not data. If user testing shows it looks broken/centered-and-floating, the implementation chat can revisit (raising to 720px or full-bleed). No code consequence for this spec.
+- **ProductSpotlightCard with no draft.** When `primaryDraftOrderId` is null, the card needs a way to start an order so the customer can add the product. Brief says "open a date-picker sheet" — that's `<Panel variant="bottom-sheet">`. In mock mode, a placeholder alert is fine. Real wiring is a backend task. Don't over-engineer in this design pass.
+- **Multiple curated badges (`NEW`, `SALE`) in the same SpecialsGrid.** The badge is per-product via `announcement.badge_overrides`. Doctrine Rule 6 allows multiple in the same region because the badges are NOT primary CTAs — they're labels. Keep them visually distinct from the CTA Button (smaller, no shadow, no hover state).
+- **Admin-side breadcrumb on `/admin/customers/[id]/homepage`.** The brief uses inline breadcrumb markup, not a shared `<Breadcrumb>` primitive. Acceptable for design phase. If the admin design system has a breadcrumb primitive, prefer it; otherwise inline is fine.
+- **Mock data leaks into prod.** The `MOCK_ANNOUNCEMENTS` and `MOCK_STATS` constants live in the page RSCs. They MUST be removed before backend wiring lands. The handoff log is the safety net.
 
 ## Out of scope
 
-- The announcement zone proposed in `docs/agent-briefs/homepage-redesign-brief.md` (admin-curated content cards). Defer to a follow-up.
-- The `AccountStatsCard` proposed in the homepage brief. Defer.
-- Any change to the `/portal/[token]/orders` history page. It stays as-is.
-- Any change to the order builder beyond what naturally follows from the navbar shape change.
-- Push notifications, email reminders, or any growth-loop wiring.
+- Backend: Postgres migration for the `announcements` table, GET/POST/PATCH/DELETE API routes, Zod schemas in `lib/server/schemas.ts`, type updates in `lib/types.ts`. All deferred to a separate backend task. The handoff log is the contract.
+- Real account stats query (cases/spend/orders this month) — backend task.
+- Searchable product select inside `<AnnouncementDialog>` for `product_id` and `product_ids` fields — plain-text Input is fine for design phase.
+- Per-customer pallet pinning (the "Pinned deal for this customer only" affordance in `<CustomerHomepageManager>`) — UI shell is enough; backend wiring deferred.
+- Drag-and-drop reorder in `<AnnouncementsManager>` — up/down arrows are fine.
+- Image upload validation, size limits, CDN routing — `<ImageUploadField>` already exists; reuse.
+- Analytics: tracking which announcements get clicked. Defer.
 
 ## Plan format (next step)
 
-Once approved, the implementation plan will follow the same pattern as the surface-system rebuild and the doctrine pass: numbered tasks with full code blocks, each one a self-contained commit. Estimated 6–9 tasks across:
+Once approved, the implementation plan will follow the same pattern as the surface rebuild and doctrine pass: numbered tasks with full code blocks, each one a self-contained commit. Estimated 9-12 tasks across:
 
-1. Build `<NextOrderCard>` (pure presentational, no data wiring yet).
-2. Build `<RecentActivity>` (pure presentational).
-3. Refactor `<PortalTopBar>` to support home + subpage modes.
-4. Update `app/(portal)/portal/[token]/layout.tsx` to pass route info to `<PortalTopBar>`.
-5. Update `<PortalPageHeader>` to optionally hide the back-arrow.
-6. Rewrite `app/(portal)/portal/[token]/page.tsx` to use `<NextOrderCard>` + `<RecentActivity>`; add `lastDeliveryQuery`.
-7. Delete `<StartOrderHero>`, `<DraftResumeStrip>`, `<PastOrdersSection>` (after grep).
-8. Update `docs/design-system.md` Rule 12 wording to match shipped (exact back-arrow location).
-9. Final verification + Workers deploy.
+1. Build `<AccountStatsCard>` (pure presentational, mock data).
+2. Build `<AnnouncementsStack>` wrapper (just the layout container).
+3. Build `<AnnouncementCard>` with the five sub-renderers (TextCard, ImageBannerCard, ImageTextCard, ProductSpotlightCard, SpecialsGridCard).
+4. Wire `<AccountStatsCard>` + `<AnnouncementsStack>` into `app/(portal)/portal/[token]/page.tsx` with `MOCK_*` constants.
+5. Drop the unused `customerName` prop from `<PortalTopBar>` and the layout.
+6. Build `<AnnouncementDialog>` (2-step: type picker → fields).
+7. Build `<AnnouncementsManager>` (table + tabs + reorder + actions).
+8. Build `/admin/announcements/page.tsx`.
+9. Build `<CustomerHomepageManager>`.
+10. Build `/admin/customers/[id]/homepage/page.tsx`.
+11. Add the Announcements link to `<AdminNav>`.
+12. Write `docs/handoff/homepage-redesign.md`. Final verification + Workers deploy.
 
 That's the plan when you say go.
