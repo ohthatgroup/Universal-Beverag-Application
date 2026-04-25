@@ -121,3 +121,31 @@ Path: [`components/ui/surface.tsx`](../components/ui/surface.tsx).
 Glass header/footer bands for sheets. Both use `surfaceOverlay` plus a `border-b` / `border-t`. Consumed by `<FamilySheet>` and `<ReviewOrderSheet>`. Contents are slotted via children.
 
 Anti-pattern: ad-hoc header chrome (custom drag-handle, custom border) in a sheet component. Use `SurfaceHeader` so chrome stays consistent across sheet types.
+
+---
+
+## Doctrine rules (customer portal surface)
+
+These rules are derived from `docs/superpowers/specs/2026-04-25-portal-design-doctrine-update-design.md`. Each carries a code-pointer footnote where applicable. The doctrine supersedes [`docs/archive/st-9-portal-design-theory.md`](archive/st-9-portal-design-theory.md).
+
+**1. Object-first, form-grade, one figure per screen.** Usuals dominate; browse is the escape hatch. Rows, steppers, inline edits — no heroes, no marketing rails. Exactly one region competes for attention. Anti-pattern: a "deals carousel" or "featured products" rail on the order page.
+
+**2. Glass material is reserved for surfaces that float over content.** Page itself is solid `bg-background`. Glass appears only on sheet overlays, the cart bar pill on desktop, the popout capsule, dug-in steppers, and floating overlays on tiles. Glass is always semantic. Anti-pattern: `backdrop-blur` on a section heading; gradients on the page background.
+
+**3. The dug-in pill is the canonical control surface.** Single component (`<Stepper>`) used everywhere a product can be added — popout body and floating overlay on every product tile. Anti-pattern: custom outline-button stepper, reusing the dug-in pill for non-quantity inputs.
+
+**4. Steppers on product tiles overlay the image as a floating glass pill.** Image fills the tile; the Stepper pill floats centered at the bottom (`inset-x-3 bottom-3`); tile does not grow vertically. See `<ProductTile overlaySlot={…}>`. Anti-pattern: a separate stepper bar that grows the tile height.
+
+**5. Two corner-radius rules.** `rounded-xl` (12px) for containers; `rounded-full` for pill controls. No `rounded-md`, no `rounded-2xl`, no `rounded-3xl`. Text-style inputs (date, search) classed as containers for radius purposes. Anti-pattern: per-instance radius overrides.
+
+**6. Accent reserved for committing.** Amber `accent` = Review, Submit. Primary navy = active state (qty badges, active filter chip). Within a single visible region, **at most one** affordance is tinted. The cart bar uses neutral `surfaceOverlay`; the accent Review button is the single signal. Anti-pattern: multiple primary-tinted affordances visible in the same region.
+
+**7. Active state is single-weight.** `border-primary` (full opacity, 1px) on an active tile — no ring, no shadow stack. Anti-pattern: `border-primary/60 ring-1 ring-primary/40` (the previous double-weight pattern).
+
+**8. Hover and focus signals are mandatory on every interactive surface.** Every clickable surface signals hover via `hover:bg-*` / `hover:border-*`. Every focusable surface uses `focus:outline-none focus:ring-2 focus:ring-ring`. Disabled elements: `disabled:opacity-40 disabled:cursor-not-allowed`. Anti-pattern: tap-to-discover affordances; pencil icons that signal interactivity without the underlying control also signaling it.
+
+**9. Three modal shapes, no fourth.** `<Dialog>` for centered creation/input forms (sign-in, popout). `<AlertDialog>` for confirmations (delete prompts). `<Sheet side="bottom">` for panels (FamilySheet, ReviewOrderSheet). A new shape requires updating this doctrine. Anti-pattern: a custom-positioned `<Dialog>` overriding the shared shape.
+
+**10. One simultaneous sticky surface.** At most one fixed-position element on top of the scroll content (the cart bar). When a sheet opens, the cart bar remains fixed underneath because it's still relevant. Anti-pattern: a sticky page header on top of the cart bar.
+
+**11. Autosave or commit, never both.** Quantity changes autosave (300ms debounce via `useAutoSavePortal`). The order itself commits explicitly via Submit. The delivery date commits inline on Enter/blur — the same model. No "Save" button on the order page; no dirty-state banner.
