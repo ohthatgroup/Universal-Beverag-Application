@@ -89,3 +89,35 @@ Material tokens for glass surfaces. Defined in [`lib/design/surfaces.ts`](../lib
 **`surfaceOverlayPrimary`** — _Deprecated 2026-04-25_ for customer-surface use. Previously the cart-bar tint; per doctrine Rule 6 (one primary-tinted affordance per region), the cart bar now uses `surfaceOverlay`. Do not adopt for new customer-surface chrome.
 
 Every glass surface picks one of the three active tokens. Anti-pattern: ad-hoc `bg-*/N backdrop-blur-*` declarations on individual components — that's how the four-recipe drift happened.
+
+---
+
+## Primitives (post Plan-C)
+
+These primitives were introduced after the original "Domain components" section was written. They live in `components/ui/` and are consumed across the customer surface.
+
+### `<Stepper quantity onChange min? max? size? ariaLabel? />`
+
+Path: [`components/ui/stepper.tsx`](../components/ui/stepper.tsx).
+
+Canonical quantity stepper. A single dug-in pill with `−`, an editable numeric input, and `+`. Tap `+` / `−` to nudge by one; tap the number to type a value. Defaults: `min = 0`, `max = 999`, `size = 'sm'` (h-9). Use `size = 'md'` (h-10) inside the popout. Always renders the `surfaceFloatingRecessed` material.
+
+Use everywhere a product can be added or modified — usuals tiles (as overlay), FamilySheet tiles (as overlay), inline-search-results tiles (as overlay), the popout body, the review-sheet line items.
+
+Anti-pattern: building a custom `−/+` stepper with outline buttons. The legacy `<QuantitySelector>` alias delegates to `<Stepper>`; new code imports `Stepper` directly.
+
+### `<FilterChip active? onClick? variant? />` and `<FilterChipRow label? />`
+
+Path: [`components/ui/filter-chip.tsx`](../components/ui/filter-chip.tsx).
+
+Pill chip for filter state. `active` uses primary fill (one weight per Rule 7); `variant="ghost"` for neutral chips like the FamilySheet pill switcher's brand/size filter rows. Wrap in `<FilterChipRow label="Brand">` for the labeled-row layout.
+
+Anti-pattern: hand-rolled chip styles in feature code. If a chip behaves differently, extend `FilterChip` rather than fork.
+
+### `<SurfaceHeader>` and `<SurfaceFooter>`
+
+Path: [`components/ui/surface.tsx`](../components/ui/surface.tsx).
+
+Glass header/footer bands for sheets. Both use `surfaceOverlay` plus a `border-b` / `border-t`. Consumed by `<FamilySheet>` and `<ReviewOrderSheet>`. Contents are slotted via children.
+
+Anti-pattern: ad-hoc header chrome (custom drag-handle, custom border) in a sheet component. Use `SurfaceHeader` so chrome stays consistent across sheet types.
