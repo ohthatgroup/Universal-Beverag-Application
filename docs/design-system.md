@@ -43,7 +43,7 @@ Buttons size to content by default — generous padding from the `size` tokens, 
 
 **`w-full` is reserved for three cases. Do not use it elsewhere:**
 1. The action row inside a bottom-sheet confirmation (Delete / Cancel stacked on mobile).
-2. A single primary submit at the bottom of a mobile form where the button is the entire row.
+2. A single primary submit at the bottom of a mobile form where the button is the entire row. Example: the `<ReviewOrderSheet>` Submit button is `w-full` on mobile under this case (Plan C, Cluster 4). The review sheet is a form (review + submit), not a navigation surface.
 3. Never on desktop. Never on hero CTAs. Never on primary actions in a card.
 
 Tap-target height is enforced by the `size` tokens (`default` is `h-10` on mobile). Don't solve that with width.
