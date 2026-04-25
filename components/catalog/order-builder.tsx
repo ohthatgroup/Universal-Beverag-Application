@@ -223,7 +223,7 @@ export function OrderBuilder({
             results grid. Clearing returns to the default page. */}
         <div
           className={cn(
-            'flex items-center gap-2 rounded-full px-4 py-2.5 shadow-sm',
+            'flex items-center gap-2 rounded-full px-4 py-2.5 shadow-sm transition-colors hover:bg-background/80',
             surfaceFloating,
           )}
         >
