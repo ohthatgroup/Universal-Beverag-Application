@@ -73,3 +73,19 @@ Don't override overlay or positioning per instance. If a new shape is needed, tr
 - **Colors** — no hardcoded hex. Use tokens (`bg-primary`, `text-status-submitted`).
 - **Spacing** — no arbitrary values (`p-[13px]`). Use the 4px scale.
 - **Modals** — center + glass blur per above. Do not reintroduce `bg-black/80`.
+
+---
+
+## Material tokens
+
+Material tokens for glass surfaces. Defined in [`lib/design/surfaces.ts`](../lib/design/surfaces.ts). Composed by every glass-style component as its base; tweaks (corner radius, padding, ring) live on the component, not the recipe.
+
+**`surfaceOverlay`** — `bg-background/80 backdrop-blur-md border border-foreground/10`. Anchored full-width chrome: cart bar, sheet headers/footers, top nav. Lives "on the page," lighter blur, semi-opaque so content reads through but the bar still feels solid.
+
+**`surfaceFloating`** — `bg-background/60 backdrop-blur-2xl border border-white/40 shadow-2xl`. Detached focused object: popout capsule, search-trigger pill. Lifts off the page; heavier blur, subtle border highlight, soft drop shadow.
+
+**`surfaceFloatingRecessed`** — `bg-foreground/10` plus an inset shadow recipe. Controls dug into a parent surface (the Stepper). Reads as a slot in the parent material.
+
+**`surfaceOverlayPrimary`** — _Deprecated 2026-04-25_ for customer-surface use. Previously the cart-bar tint; per doctrine Rule 6 (one primary-tinted affordance per region), the cart bar now uses `surfaceOverlay`. Do not adopt for new customer-surface chrome.
+
+Every glass surface picks one of the three active tokens. Anti-pattern: ad-hoc `bg-*/N backdrop-blur-*` declarations on individual components — that's how the four-recipe drift happened.
