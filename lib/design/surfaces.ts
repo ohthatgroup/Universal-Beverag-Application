@@ -26,6 +26,13 @@
 export const surfaceOverlay =
   'bg-background/80 backdrop-blur-md border border-foreground/10'
 
+/**
+ * @deprecated for customer-surface use as of 2026-04-25.
+ * The cart bar previously used this token; per doctrine Rule 6 (one
+ * primary-tinted affordance per region), the cart bar now uses
+ * `surfaceOverlay` and the accent Review button is the single signal.
+ * Do not adopt this token for new customer-surface chrome.
+ */
 export const surfaceOverlayPrimary =
   'bg-primary/10 backdrop-blur-md border border-primary/20'
 
