@@ -126,6 +126,9 @@ const config: Config = {
       spacing: {
         "safe-bottom": "env(safe-area-inset-bottom)",
       },
+      transitionTimingFunction: {
+        "ios-sheet": "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
