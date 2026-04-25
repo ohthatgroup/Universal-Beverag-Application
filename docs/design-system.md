@@ -52,17 +52,23 @@ Tap-target height is enforced by the `size` tokens (`default` is `h-10` on mobil
 
 ## Modals
 
-**Backdrop:** all modals use a glass-blur overlay — `bg-foreground/30 backdrop-blur-md`. Never a dark solid.
+**Backdrop:** `<Panel>` and `<AlertDialog>` both use a glass-blur overlay — `bg-foreground/30 backdrop-blur-md`. Never a dark solid.
 
-**Three shapes** (third shape established 2026-04-25, see Doctrine Rule 9):
+**One primitive, three variants** (established 2026-04-25 in the surface system rebuild):
 
-1. **Creation / input modals** — `<Dialog>` / `DialogContent`. Centered on all viewports. Rounded `rounded-xl` on every corner. Side gutters of `1rem` via `w-[calc(100%-2rem)]`. Used for: sign-in, reorder, new-item forms, edit forms.
+`<Panel variant="centered">` — creation / input forms (sign-in, edit forms, the product popout). Centered on viewport. Rounded `rounded-xl`. Side gutters of `1.5rem` via `w-[calc(100vw-1.5rem)]`. Default max-width `max-w-md`; override via `contentClassName`.
 
-2. **Confirmation modals** — `<AlertDialog>` / `AlertDialogContent`. On mobile, a bottom sheet: flush on left/right/bottom, rounded **only on the top** (`rounded-t-xl`), slides up from below. On `sm:` and above, falls back to the centered creation shape with side gutters. Used for: delete confirms, destructive yes/no prompts.
+`<Panel variant="bottom-sheet" width="content">` — panels anchored to the bottom of the page. Slides up from the bottom with iOS-sheet easing (`ease-ios-sheet`, ~280ms). On mobile, edge-to-edge with rounded top corners. On desktop, contained to body width (`max-w-3xl`, `mx-auto`). Optional iOS-style drag handle on mobile. Used for: `<FamilySheet>`, the open state of `<CartReviewSurface>`.
 
-3. **Panels** — `<Sheet side="bottom">` / `SheetContent`. Slides up from the bottom on every breakpoint. On mobile, edge-to-edge with rounded top corners. On desktop, contained at `max-w-3xl` with inset margins on left, right, and bottom matching the cart bar. Used for: FamilySheet, ReviewOrderSheet, FilterPanel-on-mobile.
+`<Panel variant="side-sheet">` — secondary panels stacked over a bottom-sheet. Slides in from the right edge. `w-[85vw] max-w-sm` on mobile, `w-96` on desktop. Used for: the family-sheet filter panel.
 
-Don't override overlay or positioning per instance. If a new shape is needed, treat it as a design-system decision, not a one-off className. Files: [components/ui/dialog.tsx](../components/ui/dialog.tsx), [components/ui/alert-dialog.tsx](../components/ui/alert-dialog.tsx).
+`<AlertDialog>` is unchanged — a different DOM contract for confirmations (yes/no destructive prompts), not a panel. See [components/ui/alert-dialog.tsx](../components/ui/alert-dialog.tsx).
+
+Don't override overlay or positioning per instance. If a new shape is needed, treat it as a design-system decision, not a one-off className.
+
+**The cart-review continuum:** `<CartReviewSurface>` is the one place the panel system breaks shape — it has both an "ambient" closed state (the cart bar) and an "open" state (the review drawer using bottom-sheet shape). The two states share footer-row content (item count + accent CTA → total + Submit) so opening reads as the bar lifting into the panel rather than two surfaces stacking. See [components/catalog/cart-review-surface.tsx](../components/catalog/cart-review-surface.tsx).
+
+Files: [components/ui/panel.tsx](../components/ui/panel.tsx), [components/ui/dialog.tsx](../components/ui/dialog.tsx), [components/ui/alert-dialog.tsx](../components/ui/alert-dialog.tsx).
 
 ---
 
@@ -80,17 +86,11 @@ Don't override overlay or positioning per instance. If a new shape is needed, tr
 
 ## Material tokens
 
-Material tokens for glass surfaces. Defined in [`lib/design/surfaces.ts`](../lib/design/surfaces.ts). Composed by every glass-style component as its base; tweaks (corner radius, padding, ring) live on the component, not the recipe.
+Material tokens for the customer surface. Defined in [`lib/design/surfaces.ts`](../lib/design/surfaces.ts).
 
-**`surfaceOverlay`** — `bg-background/80 backdrop-blur-md border border-foreground/10`. Anchored full-width chrome: cart bar, sheet headers/footers, top nav. Lives "on the page," lighter blur, semi-opaque so content reads through but the bar still feels solid.
+**`surfaceFloatingRecessed`** — `bg-foreground/10` plus an inset shadow recipe. Used by the canonical `<Stepper>` to render as a slot dug into its parent surface.
 
-**`surfaceFloating`** — `bg-background/60 backdrop-blur-2xl border border-white/40 shadow-2xl`. Detached focused object: popout capsule, search-trigger pill. Lifts off the page; heavier blur, subtle border highlight, soft drop shadow.
-
-**`surfaceFloatingRecessed`** — `bg-foreground/10` plus an inset shadow recipe. Controls dug into a parent surface (the Stepper). Reads as a slot in the parent material.
-
-**`surfaceOverlayPrimary`** — _Deprecated 2026-04-25_ for customer-surface use. Previously the cart-bar tint; per doctrine Rule 6 (one primary-tinted affordance per region), the cart bar now uses `surfaceOverlay`. Do not adopt for new customer-surface chrome.
-
-Every glass surface picks one of the three active tokens. Anti-pattern: ad-hoc `bg-*/N backdrop-blur-*` declarations on individual components — that's how the four-recipe drift happened.
+Panels (popouts, bottom sheets, side sheets) own their own surface via the `<Panel>` primitive — see Modals below. The previous four-token system (`surfaceOverlay`, `surfaceOverlayPrimary`, `surfaceFloating`) was retired 2026-04-25 in favor of the unified Panel primitive.
 
 ---
 
@@ -116,13 +116,13 @@ Pill chip for filter state. `active` uses primary fill (one weight per Rule 7); 
 
 Anti-pattern: hand-rolled chip styles in feature code. If a chip behaves differently, extend `FilterChip` rather than fork.
 
-### `<SurfaceHeader>` and `<SurfaceFooter>`
+### `<Panel variant onOpenChange ... />`
 
-Path: [`components/ui/surface.tsx`](../components/ui/surface.tsx).
+Path: [`components/ui/panel.tsx`](../components/ui/panel.tsx).
 
-Glass header/footer bands for sheets. Both use `surfaceOverlay` plus a `border-b` / `border-t`. Consumed by `<FamilySheet>` and `<ReviewOrderSheet>`. Contents are slotted via children.
+Single primitive for every modal-like surface. Three variants — `centered`, `bottom-sheet`, `side-sheet`. Composes Radix Dialog primitives under the hood (focus trap, Escape, overlay click). Owns the panel surface (`bg-background`, `rounded-xl`, `overflow-hidden`, `border`, `shadow-2xl`).
 
-Anti-pattern: ad-hoc header chrome (custom drag-handle, custom border) in a sheet component. Use `SurfaceHeader` so chrome stays consistent across sheet types.
+Use anywhere a panel-style surface is needed. Anti-pattern: ad-hoc `<DialogContent>` with custom positioning className. If a new shape is needed, extend Panel rather than fork.
 
 ---
 
@@ -146,7 +146,7 @@ These rules are derived from `docs/superpowers/specs/2026-04-25-portal-design-do
 
 **8. Hover and focus signals are mandatory on every interactive surface.** Every clickable surface signals hover via `hover:bg-*` / `hover:border-*`. Every focusable surface uses `focus:outline-none focus:ring-2 focus:ring-ring`. Disabled elements: `disabled:opacity-40 disabled:cursor-not-allowed`. Anti-pattern: tap-to-discover affordances; pencil icons that signal interactivity without the underlying control also signaling it.
 
-**9. Three modal shapes, no fourth.** `<Dialog>` for centered creation/input forms (sign-in, popout). `<AlertDialog>` for confirmations (delete prompts). `<Sheet side="bottom">` for panels (FamilySheet, ReviewOrderSheet). A new shape requires updating this doctrine. Anti-pattern: a custom-positioned `<Dialog>` overriding the shared shape.
+**9. Three panel shapes plus AlertDialog, no fourth.** `<Panel variant="centered">` for creation/input forms. `<Panel variant="bottom-sheet">` for panels anchored to the bottom (the FamilySheet, the open state of CartReviewSurface). `<Panel variant="side-sheet">` for secondary panels (the filter sheet stacked over FamilySheet). `<AlertDialog>` for destructive confirmations. A new shape requires updating this doctrine and the Panel primitive. Anti-pattern: a custom-positioned `<DialogContent>` overriding the shared shape.
 
 **10. One simultaneous sticky surface.** At most one fixed-position element on top of the scroll content (the cart bar). When a sheet opens, the cart bar remains fixed underneath because it's still relevant. Anti-pattern: a sticky page header on top of the cart bar.
 
