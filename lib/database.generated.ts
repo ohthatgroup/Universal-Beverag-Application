@@ -12,6 +12,44 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      announcement_overrides: {
+        Row: {
+          announcement_id: string
+          scope: string
+          scope_id: string
+          is_hidden: boolean | null
+          sort_order: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          announcement_id: string
+          scope: string
+          scope_id: string
+          is_hidden?: boolean | null
+          sort_order?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          announcement_id?: string
+          scope?: string
+          scope_id?: string
+          is_hidden?: boolean | null
+          sort_order?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'announcement_overrides_announcement_id_fkey'
+            columns: ['announcement_id']
+            isOneToOne: false
+            referencedRelation: 'announcements'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       announcements: {
         Row: {
           id: string
@@ -127,48 +165,6 @@ export type Database = {
         Relationships: [
         ]
       }
-      customer_announcements: {
-        Row: {
-          customer_id: string
-          announcement_id: string
-          is_hidden: boolean
-          pin_sort_order: number | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          customer_id: string
-          announcement_id: string
-          is_hidden?: boolean
-          pin_sort_order?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          customer_id?: string
-          announcement_id?: string
-          is_hidden?: boolean
-          pin_sort_order?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'customer_announcements_announcement_id_fkey'
-            columns: ['announcement_id']
-            isOneToOne: false
-            referencedRelation: 'announcements'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'customer_announcements_customer_id_fkey'
-            columns: ['customer_id']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          },
-        ]
-      }
       customer_brands: {
         Row: {
           customer_id: string
@@ -203,6 +199,34 @@ export type Database = {
             referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
+        ]
+      }
+      customer_groups: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
         ]
       }
       customer_products: {
@@ -750,6 +774,7 @@ export type Database = {
           location_lng: number | null
           office_email: string | null
           created_by: string | null
+          customer_group_id: string | null
         }
         Insert: {
           id?: string
@@ -776,6 +801,7 @@ export type Database = {
           location_lng?: number | null
           office_email?: string | null
           created_by?: string | null
+          customer_group_id?: string | null
         }
         Update: {
           id?: string
@@ -802,6 +828,7 @@ export type Database = {
           location_lng?: number | null
           office_email?: string | null
           created_by?: string | null
+          customer_group_id?: string | null
         }
         Relationships: [
           {
@@ -809,6 +836,13 @@ export type Database = {
             columns: ['created_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profiles_customer_group_id_fkey'
+            columns: ['customer_group_id']
+            isOneToOne: false
+            referencedRelation: 'customer_groups'
             referencedColumns: ['id']
           },
         ]

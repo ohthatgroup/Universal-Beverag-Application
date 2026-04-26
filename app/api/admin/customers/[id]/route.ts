@@ -41,6 +41,7 @@ const updateCustomerSchema = z.object({
   showPrices: z.boolean().optional(),
   customPricing: z.boolean().optional(),
   defaultGroup: z.enum(['brand', 'size']).optional(),
+  customerGroupId: z.string().uuid().nullable().optional(),
 })
 
 export async function PATCH(
@@ -69,9 +70,10 @@ export async function PATCH(
       show_prices: boolean
       custom_pricing: boolean
       default_group: string
+      customer_group_id: string | null
     }>(
       `select id, business_name, contact_name, email, phone, address, city, state, zip,
-              tags, location, show_prices, custom_pricing, default_group
+              tags, location, show_prices, custom_pricing, default_group, customer_group_id
        from profiles where id = $1 and role = 'customer' limit 1`,
       [id]
     )
@@ -92,6 +94,10 @@ export async function PATCH(
       show_prices: payload.showPrices ?? current.show_prices,
       custom_pricing: payload.customPricing ?? current.custom_pricing,
       default_group: payload.defaultGroup ?? current.default_group,
+      customer_group_id:
+        'customerGroupId' in payload
+          ? payload.customerGroupId ?? null
+          : current.customer_group_id,
     }
 
     // Distinguish "caller sent null to clear" from "caller omitted field".
@@ -127,6 +133,7 @@ export async function PATCH(
            show_prices = $12,
            custom_pricing = $13,
            default_group = $14,
+           customer_group_id = $15,
            updated_at = now()
        where id = $1 and role = 'customer'
        returning id, show_prices, custom_pricing, default_group`,
@@ -145,6 +152,7 @@ export async function PATCH(
         next.show_prices,
         next.custom_pricing,
         next.default_group,
+        next.customer_group_id,
       ]
     )
     const updated = rows[0]

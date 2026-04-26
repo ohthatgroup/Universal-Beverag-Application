@@ -38,8 +38,12 @@ interface AnnouncementRow {
 }
 
 interface AnnouncementWithOverrideRow extends AnnouncementRow {
-  is_hidden: boolean | null
-  pin_sort_order: number | null
+  // Resolved values from the override cascade: customer overrides win,
+  // then group, then the announcement's own column. Selected as
+  // `effective_*` from the SQL so the rowToAnnouncement mapper just
+  // overlays them.
+  effective_is_hidden: boolean | null
+  effective_sort_order: number | null
 }
 
 function toIsoString(value: string | Date | null): string {
@@ -131,9 +135,21 @@ const ANNOUNCEMENT_COLUMNS_A_PREFIXED = `
 `
 
 /**
- * Homepage query — applies the active-window filter, the audience-tag
- * filter, and the per-customer override join. Returns announcements ordered
- * by `coalesce(pin_sort_order, sort_order)`.
+ * Homepage query — resolves the announcement cascade for a single
+ * customer. Cascade order (most-specific wins per column):
+ *
+ *   1. customer override — `announcement_overrides` where scope='customer'
+ *      and scope_id = customer_id
+ *   2. group override    — `announcement_overrides` where scope='group'
+ *      and scope_id = the customer's profiles.customer_group_id
+ *   3. global default    — announcements.is_active / .sort_order
+ *
+ * `is_hidden` and `sort_order` cascade independently. A customer can
+ * inherit a group's pinned order while overriding only visibility, etc.
+ *
+ * Audience-tag filter still applies on top — a hidden override is
+ * unnecessary when the announcement doesn't match the customer's tags
+ * at all.
  */
 export async function fetchHomepageAnnouncements(
   db: DbFacade,
@@ -142,17 +158,30 @@ export async function fetchHomepageAnnouncements(
 ): Promise<Announcement[]> {
   const { rows } = await db.query<AnnouncementWithOverrideRow>(
     `select ${ANNOUNCEMENT_COLUMNS_A_PREFIXED},
-            ca.is_hidden,
-            ca.pin_sort_order
+            -- Resolved is_hidden: customer wins, then group, then false.
+            coalesce(co.is_hidden, go.is_hidden, false) as effective_is_hidden,
+            -- Resolved sort_order: customer wins, then group, then announcement.
+            coalesce(co.sort_order, go.sort_order, a.sort_order) as effective_sort_order
        from announcements a
-       left join customer_announcements ca
-         on ca.announcement_id = a.id and ca.customer_id = $1
+       -- Resolve the customer's group once, then left-join overrides at
+       -- both scopes for this announcement.
+       left join profiles p on p.id = $1
+       left join announcement_overrides co
+         on co.announcement_id = a.id
+        and co.scope = 'customer'
+        and co.scope_id = $1
+       left join announcement_overrides go
+         on go.announcement_id = a.id
+        and go.scope = 'group'
+        and go.scope_id = p.customer_group_id
       where a.is_active
         and (a.starts_at is null or a.starts_at <= now())
         and (a.ends_at   is null or a.ends_at   >= now())
         and (a.audience_tags = '{}' or a.audience_tags && $2::text[])
-        and coalesce(ca.is_hidden, false) = false
-      order by coalesce(ca.pin_sort_order, a.sort_order) asc, a.created_at asc`,
+        and coalesce(co.is_hidden, go.is_hidden, false) = false
+      order by
+        coalesce(co.sort_order, go.sort_order, a.sort_order) asc,
+        a.created_at asc`,
     [customerId, audienceTags],
   )
   return rows.map(rowToAnnouncement)
