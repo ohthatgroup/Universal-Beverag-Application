@@ -504,6 +504,103 @@ explicit divider line — the tone shift is enough.
 | 12–16 | Good afternoon |
 | 17–23 | Good evening |
 
+## Iteration 4 (atmospheric hero)
+
+After iteration 3 the structure was right but the page still didn't read
+as *impressive* — it read as well-organized text on a white background.
+Customer feedback:
+
+> "It's not pretty and it looks bad on desktop. Make it impressive."
+
+Three "impressive" candidates were considered: editorial magazine,
+atmospheric hero with imagery, minimal Apple/Linear. The customer
+picked atmospheric hero.
+
+### What changed
+
+- `<HomepageGreeting>` is replaced by `<HomepageHero>`. Same
+  time-aware greeting logic but now lives inside an atmospheric
+  panel.
+- The panel: `rounded-2xl` (intentionally larger radius than the
+  rest of the page — it's a hero), navy gradient
+  (`from-primary via-primary to-primary/85`), amber radial glow
+  pinned to the top-right corner (`bg-accent/40 blur-3xl`), and a
+  faint white wash bottom-left for depth. White display typography
+  (`text-3xl md:text-4xl tracking-tight`) for the greeting; muted
+  white (`text-white/70`) for the time line.
+- The Resume Draft block moves out of `<StartOrderFork>` and into
+  the hero, restyled as a glass-blur card layered over the gradient:
+  `bg-white/15 backdrop-blur-md border border-white/20 text-white`.
+- The "or start a new order" divider in the fork is removed — the
+  visual zone change between hero and fork now does that work
+  implicitly.
+- The `<StartOrderFork>` no longer needs the `token` prop — it never
+  rendered the draft link itself, only the draft existence drove
+  conflict detection. The draft itself is now linked from the hero.
+
+### Layout
+
+```
+┌─────────────── max-w-[600px] mx-auto ──────────────┐
+│ ╔═════════════════════════════════════════════╗   │
+│ ║ ▓▓▓▓ navy gradient + amber glow ▓▓▓▓        ║   │
+│ ║                                              ║   │
+│ ║   Good evening, Maya                         ║   │
+│ ║   Today is Saturday, April 25 · It's 8:46 PM ║   │
+│ ║                                              ║   │
+│ ║   What can we get for Maya Deli today?       ║   │
+│ ║                                              ║   │
+│ ║  ┌─────────────────────────────────────────┐║   │
+│ ║  │ ●  Resume draft for Apr 25       →     │║   │ ← glass card
+│ ║  │     3 items                            │║   │   over gradient
+│ ║  └─────────────────────────────────────────┘║   │
+│ ╚═════════════════════════════════════════════╝   │
+│                                                    │
+│  for delivery May 2 · Change date                  │ ← fork on
+│  REORDER A RECENT ORDER                            │   page background
+│  [list rows]                                       │
+│  OR                                                │
+│  [Order your usuals] [Start from scratch]          │
+│                                                    │
+├──── border-t  bg-muted/30 ────────────────────────┤  ← below-fold band
+│ FOR YOU                                            │
+│ RECENT ORDERS                                      │
+│ PAST ORDERS                                        │
+│ Account stats                                      │
+└────────────────────────────────────────────────────┘
+```
+
+### Hero responsiveness
+
+The hero stretches to its content height (no fixed aspect ratio).
+On mobile (375px) the padding is `px-5 py-7`; on desktop (≥768px)
+it's `px-8 py-10`. Greeting and question typography both step up
+one size on `md:` (`text-3xl → text-4xl`, `text-base → text-lg`).
+This produces a hero that reads ~280px tall on mobile with a draft,
+~340px on desktop with a draft — comfortable above-the-fold without
+pushing the fork too far down.
+
+The amber glow is positioned with negative offsets so half of it
+falls outside the panel; this gives the illusion of light bleeding
+in from off-canvas, which reads more atmospheric than a bordered
+gradient.
+
+### What's deliberately not added
+
+- **No actual product photography.** Real imagery is a follow-up;
+  the gradient + glow alone is sufficient for the design phase. A
+  background photo would be layered with `object-cover` + low
+  opacity behind the gradient when assets land.
+- **No animation.** The hero is calm. Adding a parallax glow or
+  hover-shift on the resume card would feel showy. If we want
+  motion later, the place to add it is on first hydration — a
+  one-time fade-in of the greeting copy.
+- **No additional accent affordances on the hero.** Doctrine Rule 6
+  says one accent per region; the resume-draft glass card uses the
+  amber dot for status, but the card itself is white-on-gradient
+  rather than amber-tinted. The accent affordance below the fold
+  (the topmost reorder row) is in a different region.
+
 ## Plan format
 
 This is a single-PR change. The implementation is one new component + one page rewrite + handoff doc update. No multi-step plan needed.

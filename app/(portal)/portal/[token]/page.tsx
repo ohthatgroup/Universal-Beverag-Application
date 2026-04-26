@@ -1,5 +1,5 @@
 import { OrdersList } from '@/components/orders/orders-list'
-import { HomepageGreeting } from '@/components/portal/homepage-greeting'
+import { HomepageHero } from '@/components/portal/homepage-hero'
 import { StartOrderFork } from '@/components/portal/start-order-fork'
 import { PastOrdersSection } from '@/components/portal/past-orders-section'
 import { AccountStatsCard } from '@/components/portal/account-stats-card'
@@ -211,70 +211,77 @@ export default async function PortalHome({
   const nonDraftCurrentOrders = currentOrders.filter((order) => order.status !== 'draft')
 
   return (
-    <div className="-mx-4 md:-mx-6">
-      {/* Above the fold — welcome moment + start-order surface, on the page background. */}
-      <div className="mx-auto w-full max-w-[600px] space-y-6 px-4 pb-8 md:px-6">
-        <HomepageGreeting
+    <div className="mx-auto w-full max-w-[600px] space-y-8">
+      {/* Above the fold — atmospheric hero + start-order surface. */}
+      <section className="space-y-6 pt-2">
+        <HomepageHero
           contactName={profile.contact_name}
           businessName={profile.business_name}
+          token={token}
+          primaryDraft={
+            primaryDraft
+              ? {
+                  id: primaryDraft.id,
+                  deliveryDate: primaryDraft.deliveryDate,
+                  itemCount: primaryDraft.itemCount,
+                }
+              : null
+          }
         />
 
         <StartOrderFork
-          token={token}
           nextDeliveryDate={nextDeliveryDate}
           nextNextDeliveryDate={nextNextDeliveryDate}
           primaryDraft={primaryDraft}
           submittedOrderCount={submittedOrderCount}
           recentOrders={recentOrders}
         />
-      </div>
+      </section>
 
-      {/* Below the fold — curated content + history + reference data, on a
-          subtly tinted surface. The tone shift signals a different zone:
-          the salesman side of the page. */}
-      <div className="border-t border-foreground/5 bg-muted/30">
-        <div className="mx-auto w-full max-w-[600px] space-y-8 px-4 py-8 md:px-6">
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              For you
-            </h2>
-            {/* TODO: replace with real announcements query */}
-            <AnnouncementsStack
-              announcements={MOCK_ANNOUNCEMENTS}
-              token={token}
-              primaryDraftOrderId={primaryDraftRow?.id ?? null}
-              showPrices={profile.show_prices}
-            />
-          </section>
-
-          {nonDraftCurrentOrders.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Recent orders
-              </h2>
-              <OrdersList
-                token={token}
-                orders={nonDraftCurrentOrders}
-                variant="current"
-                showPrices={profile.show_prices}
-              />
-            </section>
-          )}
-
-          <PastOrdersSection
+      {/* Below-the-fold zone — curated content + history + reference data,
+          contained inside a subtly tinted rounded panel so it reads as a
+          distinct zone without breaking out of the layout column. */}
+      <section className="space-y-8 rounded-2xl border border-foreground/5 bg-muted/30 px-4 py-6 md:px-6 md:py-8">
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            For you
+          </h2>
+          {/* TODO: replace with real announcements query */}
+          <AnnouncementsStack
+            announcements={MOCK_ANNOUNCEMENTS}
             token={token}
-            orders={pastOrders}
+            primaryDraftOrderId={primaryDraftRow?.id ?? null}
             showPrices={profile.show_prices}
           />
-
-          {/* TODO: replace with real account stats query */}
-          <AccountStatsCard
-            casesThisMonth={MOCK_STATS.casesThisMonth}
-            spendThisMonth={MOCK_STATS.spendThisMonth}
-            ordersThisMonth={MOCK_STATS.ordersThisMonth}
-          />
         </div>
-      </div>
+
+        {nonDraftCurrentOrders.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Recent orders
+            </h2>
+            <OrdersList
+              token={token}
+              orders={nonDraftCurrentOrders}
+              variant="current"
+              showPrices={profile.show_prices}
+            />
+          </div>
+        )}
+
+        <PastOrdersSection
+          token={token}
+          orders={pastOrders}
+          showPrices={profile.show_prices}
+        />
+
+        {/* TODO: replace with real account stats query */}
+        <AccountStatsCard
+          casesThisMonth={MOCK_STATS.casesThisMonth}
+          spendThisMonth={MOCK_STATS.spendThisMonth}
+          ordersThisMonth={MOCK_STATS.ordersThisMonth}
+        />
+      </section>
     </div>
   )
 }

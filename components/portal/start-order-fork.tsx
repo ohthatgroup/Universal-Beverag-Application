@@ -1,23 +1,23 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import Link from 'next/link'
 import { ArrowRight, Calendar, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Panel } from '@/components/ui/panel'
-import { OrderStatusDot } from '@/components/ui/status-dot'
 import { ReorderList, type ReorderableOrder } from '@/components/portal/reorder-list'
-import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 interface StartOrderForkProps {
-  token: string
   /** The customer's next-available delivery date. */
   nextDeliveryDate: string
   /** The day after `nextDeliveryDate` — fork's default when a draft already occupies the next date. */
   nextNextDeliveryDate: string
-  /** In-flight draft on or after `nextDeliveryDate`. Null means no draft. */
+  /**
+   * In-flight draft on or after `nextDeliveryDate`. Used only for conflict
+   * detection — the draft itself is rendered as a glass card inside
+   * `<HomepageHero>`, not here.
+   */
   primaryDraft: {
     id: string
     deliveryDate: string
@@ -43,7 +43,6 @@ interface PendingPath {
 }
 
 export function StartOrderFork({
-  token,
   nextDeliveryDate,
   nextNextDeliveryDate,
   primaryDraft,
@@ -60,10 +59,6 @@ export function StartOrderFork({
   const showReorder = submittedOrderCount >= 1 && recentOrders.length > 0
   const showUsuals = submittedOrderCount >= 3
   const showFork = showReorder || showUsuals || primaryDraft !== null
-
-  const draftHref = primaryDraft
-    ? buildCustomerOrderDeepLink(token, primaryDraft.id) ?? '#'
-    : '#'
 
   const draftAtForkDate =
     primaryDraft !== null && primaryDraft.deliveryDate === forkDate
@@ -132,35 +127,6 @@ export function StartOrderFork({
 
   return (
     <section className="space-y-4">
-      {primaryDraft && (
-        <Link
-          href={draftHref}
-          className="group flex items-center gap-3 rounded-xl bg-accent px-4 py-3 text-accent-foreground shadow-sm transition-colors hover:bg-accent/90"
-        >
-          <OrderStatusDot status="draft" className="bg-accent-foreground/30" />
-          <div className="flex-1 text-sm">
-            <div className="font-semibold">
-              Resume draft for {formatDeliveryDate(primaryDraft.deliveryDate)}
-            </div>
-            <div className="text-xs text-accent-foreground/80">
-              {primaryDraft.itemCount}{' '}
-              {primaryDraft.itemCount === 1 ? 'item' : 'items'}
-            </div>
-          </div>
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      )}
-
-      {primaryDraft && (
-        <div className="flex items-center gap-3 pt-1">
-          <span className="h-px flex-1 bg-foreground/10" />
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            or start a new order
-          </span>
-          <span className="h-px flex-1 bg-foreground/10" />
-        </div>
-      )}
-
       <DateLabel
         label={primaryDraft ? 'for delivery' : 'Order for'}
         date={forkDate}
