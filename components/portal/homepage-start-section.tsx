@@ -1,6 +1,10 @@
+'use client'
+
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ShoppingBag } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { OrderStatusDot } from '@/components/ui/status-dot'
+import { useStartOrderDrawer } from '@/components/portal/start-order-drawer-context'
 import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import { formatDeliveryDate } from '@/lib/utils'
 
@@ -10,24 +14,47 @@ export interface DraftForStrip {
   itemCount: number
 }
 
-interface HomepageDraftStripProps {
+interface HomepageStartSectionProps {
   token: string
   drafts: DraftForStrip[]
 }
 
 /**
- * Slim resume strip on the homepage. Renders the primary draft (soonest
- * delivery date) as an accent block, then any additional drafts as quiet
- * rows under a small "Other drafts" subheading.
+ * Above-the-fold start-order section on the homepage. Three shapes:
  *
- * Returns null when there are no drafts. New-order entry points all live
- * in the navbar's Start order drawer.
+ * 1. No drafts → big "Start an order" accent button (the figure).
+ * 2. One draft → Resume block + small "Or start a new order" link.
+ * 3. Multiple drafts → primary draft + Other drafts list +
+ *    "Or start a new order" link.
+ *
+ * All start-new actions open the layout-owned <StartOrderDrawer> via
+ * the context's `open()`.
  */
-export function HomepageDraftStrip({
+export function HomepageStartSection({
   token,
   drafts,
-}: HomepageDraftStripProps) {
-  if (drafts.length === 0) return null
+}: HomepageStartSectionProps) {
+  const drawer = useStartOrderDrawer()
+
+  if (drafts.length === 0) {
+    return (
+      <section>
+        <Button
+          type="button"
+          variant="accent"
+          size="lg"
+          onClick={drawer.open}
+          className="h-14 w-full justify-between gap-3 rounded-2xl px-5 text-base font-semibold sm:w-auto sm:justify-start"
+        >
+          <span className="flex items-center gap-3">
+            <ShoppingBag className="h-5 w-5" />
+            Start an order
+          </span>
+          <ArrowRight className="h-5 w-5 sm:ml-3" />
+        </Button>
+      </section>
+    )
+  }
 
   // Drafts are pre-sorted by delivery_date asc (soonest first).
   const [primary, ...others] = drafts
@@ -84,6 +111,14 @@ export function HomepageDraftStrip({
           </ul>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={drawer.open}
+        className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+      >
+        Or start a new order →
+      </button>
     </section>
   )
 }

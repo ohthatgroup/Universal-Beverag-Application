@@ -1,5 +1,5 @@
 import { HomepageWelcome } from '@/components/portal/homepage-welcome'
-import { HomepageDraftStrip, type DraftForStrip } from '@/components/portal/homepage-draft-strip'
+import { HomepageStartSection, type DraftForStrip } from '@/components/portal/homepage-start-section'
 import { AccountStatsCard } from '@/components/portal/account-stats-card'
 import {
   AnnouncementsStack,
@@ -155,7 +155,7 @@ export default async function PortalHome({
           businessName={profile.business_name}
         />
 
-        <HomepageDraftStrip token={token} drafts={drafts} />
+        <HomepageStartSection token={token} drafts={drafts} />
       </section>
 
       <section className="space-y-8 rounded-2xl border border-foreground/5 bg-muted/30 px-4 py-6 md:px-6 md:py-8">

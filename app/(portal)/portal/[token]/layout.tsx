@@ -2,6 +2,7 @@ import type { Viewport } from 'next'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { getRequestDb } from '@/lib/server/db'
 import { PortalTopBar } from '@/components/layout/portal-top-bar'
+import { StartOrderDrawerProvider } from '@/components/portal/start-order-drawer-context'
 import { addDays, todayISODate } from '@/lib/utils'
 import type { RecentOrderForDrawer } from '@/components/portal/start-order-drawer'
 
@@ -89,20 +90,24 @@ export default async function PortalLayout({
   )
 
   return (
-    <div className="min-h-screen bg-background">
-      <PortalTopBar
-        token={token}
-        nextDeliveryDate={nextDeliveryDate}
-        nextNextDeliveryDate={nextNextDeliveryDate}
-        primaryDraft={primaryDraft}
-        recentOrders={recentOrders}
-        usualsCount={MOCK_USUALS_COUNT}
-      />
-      <main>
-        <div className="mx-auto max-w-3xl p-4 md:p-6">
-          {children}
-        </div>
-      </main>
-    </div>
+    <StartOrderDrawerProvider
+      data={{
+        token,
+        nextDeliveryDate,
+        nextNextDeliveryDate,
+        primaryDraft,
+        recentOrders,
+        usualsCount: MOCK_USUALS_COUNT,
+      }}
+    >
+      <div className="min-h-screen bg-background">
+        <PortalTopBar token={token} />
+        <main>
+          <div className="mx-auto max-w-3xl p-4 md:p-6">
+            {children}
+          </div>
+        </main>
+      </div>
+    </StartOrderDrawerProvider>
   )
 }

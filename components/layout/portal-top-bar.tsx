@@ -6,42 +6,23 @@ import { usePathname } from 'next/navigation'
 import { History, ListChecks, Menu, ShoppingBag, UserCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Panel } from '@/components/ui/panel'
-import {
-  StartOrderDrawer,
-  type RecentOrderForDrawer,
-} from '@/components/portal/start-order-drawer'
+import { useStartOrderDrawer } from '@/components/portal/start-order-drawer-context'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import { cn } from '@/lib/utils'
 
 interface PortalTopBarProps {
   token: string
-  nextDeliveryDate: string
-  nextNextDeliveryDate: string
-  primaryDraft: {
-    id: string
-    deliveryDate: string
-    itemCount: number
-  } | null
-  recentOrders: RecentOrderForDrawer[]
-  usualsCount: number
 }
 
-export function PortalTopBar({
-  token,
-  nextDeliveryDate,
-  nextNextDeliveryDate,
-  primaryDraft,
-  recentOrders,
-  usualsCount,
-}: PortalTopBarProps) {
+export function PortalTopBar({ token }: PortalTopBarProps) {
   const pathname = usePathname()
   const base = buildCustomerPortalBasePath(token) ?? '/portal'
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const drawer = useStartOrderDrawer()
 
   const openDrawer = () => {
     setMenuOpen(false)
-    setDrawerOpen(true)
+    drawer.open()
   }
 
   const links = [
@@ -103,28 +84,17 @@ export function PortalTopBar({
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* Desktop: explicit Start order button */}
+            {/* Start order — labeled on both mobile and desktop now,
+                so it never reads as a passive icon. */}
             <Button
               type="button"
               variant="accent"
               size="sm"
               onClick={openDrawer}
-              className="hidden md:inline-flex"
+              className="h-8"
             >
               <ShoppingBag className="h-4 w-4" />
               Start order
-            </Button>
-
-            {/* Mobile: compact icon-only Start order button */}
-            <Button
-              type="button"
-              variant="accent"
-              size="icon"
-              onClick={openDrawer}
-              className="h-8 w-8 md:hidden"
-              aria-label="Start order"
-            >
-              <ShoppingBag className="h-4 w-4" />
             </Button>
 
             <Button
@@ -202,17 +172,6 @@ export function PortalTopBar({
           </Link>
         </Panel.Body>
       </Panel>
-
-      <StartOrderDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        token={token}
-        nextDeliveryDate={nextDeliveryDate}
-        nextNextDeliveryDate={nextNextDeliveryDate}
-        primaryDraft={primaryDraft}
-        recentOrders={recentOrders}
-        usualsCount={usualsCount}
-      />
     </>
   )
 }
