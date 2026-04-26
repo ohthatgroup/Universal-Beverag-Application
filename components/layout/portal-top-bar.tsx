@@ -13,11 +13,13 @@ interface PortalTopBarProps {
   token: string
   /**
    * The salesman who created this customer's account. Phone is the
-   * tel:-formatted number; name is the rep's display name.
+   * tel:-formatted number; name is the rep's display name. When phone
+   * is null (no salesman linked, or the linked salesman has no phone),
+   * the Call button is hidden.
    */
   salesman: {
     name: string
-    phone: string
+    phone: string | null
   }
 }
 
@@ -40,9 +42,12 @@ export function PortalTopBar({ token, salesman }: PortalTopBarProps) {
   const base = buildCustomerPortalBasePath(token) ?? '/portal'
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const callHref = `tel:${salesman.phone.replace(/[^\d+]/g, '')}`
+  const phone = salesman.phone
+  const callHref = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : null
   const callLabel = `Call ${salesman.name.split(' ')[0]}`
-  const callTitle = `Call ${salesman.name} · ${formatPhoneNumber(salesman.phone)}`
+  const callTitle = phone
+    ? `Call ${salesman.name} · ${formatPhoneNumber(phone)}`
+    : salesman.name
 
   const links = [
     {
@@ -105,13 +110,17 @@ export function PortalTopBar({ token, salesman }: PortalTopBarProps) {
           <div className="ml-auto flex items-center gap-2">
             {/* Call salesman — primary affordance, since the rep
                 relationship IS the product in wholesale. tel: link
-                triggers the device's dialer. */}
-            <Button asChild variant="accent" size="sm" className="h-8">
-              <a href={callHref} title={callTitle}>
-                <Phone className="h-4 w-4" />
-                {callLabel}
-              </a>
-            </Button>
+                triggers the device's dialer. Hidden when no phone is
+                available (no `created_by` link, or salesman has no
+                phone on file). */}
+            {callHref ? (
+              <Button asChild variant="accent" size="sm" className="h-8">
+                <a href={callHref} title={callTitle}>
+                  <Phone className="h-4 w-4" />
+                  {callLabel}
+                </a>
+              </Button>
+            ) : null}
 
             <Button
               asChild

@@ -31,6 +31,12 @@ interface PromoProductGridProps {
    */
   primaryDraftDate?: string | null
   showPrices: boolean
+  /**
+   * Whether some of the announcement's referenced product UUIDs failed to
+   * resolve (deleted/discontinued products). When true, the grid renders a
+   * one-line muted notice above itself.
+   */
+  hasMissingProducts?: boolean
 }
 
 /**
@@ -46,6 +52,7 @@ export function PromoProductGrid({
   initialQuantities,
   primaryDraftId: serverDraftId,
   showPrices,
+  hasMissingProducts = false,
 }: PromoProductGridProps) {
   const router = useRouter()
   const [orderId, setOrderId] = useState<string | null>(serverDraftId)
@@ -105,6 +112,12 @@ export function PromoProductGrid({
   return (
     <div className="space-y-4">
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {hasMissingProducts && (
+        <p className="text-sm text-muted-foreground">
+          Some products in this promo are no longer available.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {products.map((product) => {

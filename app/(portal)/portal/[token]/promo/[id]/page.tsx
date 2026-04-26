@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation'
 import { PortalPageHeader } from '@/components/portal/portal-page-header'
 import { PromoProductGrid } from '@/components/portal/promo-product-grid'
 import {
-  getHydratedMockAnnouncements,
+  fetchAnnouncementById,
   resolvePromoProductIds,
-} from '@/lib/mock/announcements'
+} from '@/lib/server/announcements'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { getRequestDb } from '@/lib/server/db'
 import { getProductPackLabel, todayISODate } from '@/lib/utils'
@@ -20,9 +20,7 @@ export default async function PromoPage({
   const db = await getRequestDb()
   const today = todayISODate()
 
-  // TODO: real announcements query. For now hydrate the shared mocks.
-  const announcements = await getHydratedMockAnnouncements(db)
-  const announcement = announcements.find((a) => a.id === id) ?? null
+  const announcement = await fetchAnnouncementById(db, id)
   if (!announcement) {
     notFound()
   }
@@ -104,6 +102,11 @@ export default async function PromoPage({
       }
     })
 
+  // Some product UUIDs in the announcement may no longer exist in `products`
+  // (deleted, discontinued, etc.). Surface a one-line muted notice rather
+  // than 404'ing the page — render whatever does still resolve.
+  const hasMissingProducts = products.length < productIds.length
+
   // Primary draft = first one by delivery date (matches homepage logic).
   const draftRows = draftResult.rows
   const primaryDraftId = draftRows[0]?.id ?? null
@@ -138,6 +141,7 @@ export default async function PromoPage({
         primaryDraftId={primaryDraftId}
         primaryDraftDate={primaryDraftDate}
         showPrices={profile.show_prices}
+        hasMissingProducts={hasMissingProducts}
       />
     </div>
   )

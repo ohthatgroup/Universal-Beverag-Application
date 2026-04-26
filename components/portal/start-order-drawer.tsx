@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowRight,
   Calendar,
@@ -15,6 +16,7 @@ import { OrderStatusDot } from '@/components/ui/status-dot'
 import { Panel } from '@/components/ui/panel'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 
 export interface RecentOrderForDrawer {
   id: string
@@ -72,12 +74,15 @@ export function StartOrderDrawer({
   recentOrders,
   usualsCount,
 }: StartOrderDrawerProps) {
+  const router = useRouter()
   const draftBlocksNext =
     primaryDraft !== null && primaryDraft.deliveryDate === nextDeliveryDate
   const initialDate = draftBlocksNext ? nextNextDeliveryDate : nextDeliveryDate
 
   const [pickedDate, setPickedDate] = useState(initialDate)
   const [pendingPath, setPendingPath] = useState<PendingPath | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   // Reset when drawer reopens (so the date is fresh per session)
@@ -89,6 +94,8 @@ export function StartOrderDrawer({
           : nextDeliveryDate,
       )
       setPendingPath(null)
+      setError(null)
+      setIsSubmitting(false)
     }
   }, [open, primaryDraft, nextDeliveryDate, nextNextDeliveryDate])
 
@@ -106,37 +113,125 @@ export function StartOrderDrawer({
   }
 
   const handlePath = (kind: PathKind, reorderSourceId?: string) => {
+    if (isSubmitting) return
     if (draftAtPickedDate) {
       setPendingPath({ kind, targetDate: pickedDate, reorderSourceId })
       return
     }
-    runPath(kind, pickedDate, reorderSourceId)
+    void runPath(kind, pickedDate, reorderSourceId, false)
   }
 
-  const runPath = (
+  const runPath = async (
     kind: PathKind,
     targetDate: string,
-    reorderSourceId?: string,
+    reorderSourceId: string | undefined,
+    replace: boolean,
   ) => {
-    // TODO: wire up real path actions — see docs/handoff/homepage-redesign.md.
-    const friendlyDate = formatDeliveryDate(targetDate)
-    if (kind === 'reorder') {
-      const source = recentOrders.find((o) => o.id === reorderSourceId)
-      if (source) {
-        window.alert(
-          `Reorder ${formatDeliveryDate(source.deliveryDate)} (${source.itemCount} items) — would clone into a draft for ${friendlyDate}.`,
-        )
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      let newOrderId: string | null = null
+
+      if (kind === 'reorder') {
+        if (!reorderSourceId) throw new Error('Missing reorder source order')
+        const url = `/api/portal/orders/${reorderSourceId}/clone${replace ? '?replace=true' : ''}`
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Customer-Token': token,
+          },
+          body: JSON.stringify({ deliveryDate: targetDate }),
+        })
+        const payload = (await response.json().catch(() => null)) as
+          | { data?: { order?: { id: string } } }
+          | { error?: { message?: string } }
+          | null
+        if (!response.ok) {
+          throw new Error(
+            (payload && 'error' in payload && payload.error?.message) ||
+              'Failed to clone order',
+          )
+        }
+        newOrderId =
+          (payload && 'data' in payload && payload.data?.order?.id) || null
+      } else if (kind === 'usuals') {
+        const response = await fetch('/api/portal/orders/apply-usuals', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Customer-Token': token,
+          },
+          body: JSON.stringify({ deliveryDate: targetDate, replace }),
+        })
+        const payload = (await response.json().catch(() => null)) as
+          | { data?: { orderId: string } }
+          | { error?: { message?: string } }
+          | null
+        if (!response.ok) {
+          throw new Error(
+            (payload && 'error' in payload && payload.error?.message) ||
+              'Failed to apply usuals',
+          )
+        }
+        newOrderId =
+          (payload && 'data' in payload && payload.data?.orderId) || null
+      } else {
+        // scratch: empty draft. If replacing, wipe items on the existing
+        // draft first; the POST below then short-circuits to that draft.
+        if (replace && primaryDraft) {
+          const wipe = await fetch(
+            `/api/portal/orders/${primaryDraft.id}/items/all`,
+            {
+              method: 'DELETE',
+              headers: { 'X-Customer-Token': token },
+            },
+          )
+          if (!wipe.ok) {
+            const body = (await wipe.json().catch(() => null)) as
+              | { error?: { message?: string } }
+              | null
+            throw new Error(
+              body?.error?.message ?? 'Failed to clear existing draft',
+            )
+          }
+        }
+        const response = await fetch('/api/portal/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Customer-Token': token,
+          },
+          body: JSON.stringify({ deliveryDate: targetDate }),
+        })
+        const payload = (await response.json().catch(() => null)) as
+          | { data?: { order?: { id: string } } }
+          | { error?: { message?: string } }
+          | null
+        if (!response.ok) {
+          throw new Error(
+            (payload && 'error' in payload && payload.error?.message) ||
+              'Failed to create draft',
+          )
+        }
+        newOrderId =
+          (payload && 'data' in payload && payload.data?.order?.id) || null
       }
-    } else if (kind === 'usuals') {
-      window.alert(
-        `Add ${usualsCount} usuals — would create a draft for ${friendlyDate} pre-filled with the customer's usuals.`,
-      )
-    } else {
-      window.alert(
-        `Start empty — would create a draft for ${friendlyDate} and drop into the order builder.`,
-      )
+
+      if (!newOrderId) {
+        throw new Error('Server did not return an order id')
+      }
+
+      const href = buildCustomerOrderDeepLink(token, newOrderId)
+      if (!href) throw new Error('Could not build order link')
+
+      onOpenChange(false)
+      router.push(href)
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setIsSubmitting(false)
     }
-    onOpenChange(false)
   }
 
   return (
@@ -152,6 +247,15 @@ export function StartOrderDrawer({
       </Panel.Header>
 
       <Panel.Body className="space-y-6 px-5 py-5">
+        {error && (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        )}
+
         {/* 1. Delivery date */}
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -193,9 +297,11 @@ export function StartOrderDrawer({
                   <button
                     type="button"
                     onClick={() => handlePath('reorder', order.id)}
+                    disabled={isSubmitting}
                     className={cn(
                       'group flex w-full items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left',
                       'transition-colors hover:bg-muted/40',
+                      'disabled:cursor-not-allowed disabled:opacity-60',
                     )}
                   >
                     <OrderStatusDot status={order.status} className="shrink-0" />
@@ -226,7 +332,7 @@ export function StartOrderDrawer({
             variant="accent"
             size="lg"
             onClick={() => handlePath('usuals')}
-            disabled={usualsCount === 0}
+            disabled={usualsCount === 0 || isSubmitting}
             className="h-12 w-full justify-between gap-3 rounded-xl px-4 sm:w-auto sm:justify-start"
           >
             <span className="flex items-center gap-3 text-base font-semibold">
@@ -252,6 +358,7 @@ export function StartOrderDrawer({
             variant="outline"
             size="lg"
             onClick={() => handlePath('scratch')}
+            disabled={isSubmitting}
             className="h-12 w-full justify-between gap-3 rounded-xl border bg-card px-4 hover:bg-muted/50 sm:w-auto sm:justify-start"
           >
             <span className="flex items-center gap-3 text-base font-semibold">
@@ -270,12 +377,14 @@ export function StartOrderDrawer({
         onCancel={() => setPendingPath(null)}
         onConfirm={() => {
           if (pendingPath) {
-            runPath(
-              pendingPath.kind,
-              pendingPath.targetDate,
-              pendingPath.reorderSourceId,
-            )
+            const path = pendingPath
             setPendingPath(null)
+            void runPath(
+              path.kind,
+              path.targetDate,
+              path.reorderSourceId,
+              true,
+            )
           }
         }}
       />

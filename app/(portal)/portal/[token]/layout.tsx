@@ -3,6 +3,7 @@ import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { getRequestDb } from '@/lib/server/db'
 import { PortalTopBar } from '@/components/layout/portal-top-bar'
 import { StartOrderDrawerProvider } from '@/components/portal/start-order-drawer-context'
+import { FALLBACK_SALESMAN } from '@/lib/config/salesman'
 import { addDays, todayISODate } from '@/lib/utils'
 import type { RecentOrderForDrawer } from '@/components/portal/start-order-drawer'
 
@@ -34,53 +35,61 @@ export default async function PortalLayout({
 
   // Fetch the navbar drawer's data alongside the token resolution so the
   // Start-order drawer is ready to open from any page in the portal.
-  const [draftsResult, recentOrdersResult, usualsCountResult] = await Promise.all([
-    db.query<{ id: string; delivery_date: string; item_count: number | null }>(
-      `select id, delivery_date::text, item_count
-       from orders
-       where customer_id = $1
-         and status = 'draft'
-         and delivery_date >= $2
-       order by delivery_date asc
-       limit 1`,
-      [customerId, today]
-    ),
-    db.query<{
-      id: string
-      delivery_date: string
-      item_count: number | null
-      total: number | null
-      status: 'submitted' | 'delivered'
-    }>(
-      `select id, delivery_date::text, item_count, total, status
-       from orders
-       where customer_id = $1
-         and status in ('submitted', 'delivered')
-       order by delivery_date desc
-       limit 5`,
-      [customerId]
-    ),
-    db.query<{ count: string }>(
-      `select count(*)::text as count
-         from customer_products cp
-         join products p on p.id = cp.product_id
-        where cp.customer_id = $1
-          and cp.is_usual = true
-          and cp.excluded = false
-          and p.is_discontinued = false`,
-      [customerId]
-    ),
-  ])
+  const [draftsResult, recentOrdersResult, usualsCountResult, salesmanResult] =
+    await Promise.all([
+      db.query<{ id: string; delivery_date: string; item_count: number | null }>(
+        `select id, delivery_date::text, item_count
+         from orders
+         where customer_id = $1
+           and status = 'draft'
+           and delivery_date >= $2
+         order by delivery_date asc
+         limit 1`,
+        [customerId, today]
+      ),
+      db.query<{
+        id: string
+        delivery_date: string
+        item_count: number | null
+        total: number | null
+        status: 'submitted' | 'delivered'
+      }>(
+        `select id, delivery_date::text, item_count, total, status
+         from orders
+         where customer_id = $1
+           and status in ('submitted', 'delivered')
+         order by delivery_date desc
+         limit 5`,
+        [customerId]
+      ),
+      db.query<{ count: string }>(
+        `select count(*)::text as count
+           from customer_products cp
+           join products p on p.id = cp.product_id
+          where cp.customer_id = $1
+            and cp.is_usual = true
+            and cp.excluded = false
+            and p.is_discontinued = false`,
+        [customerId]
+      ),
+      db.query<{ contact_name: string | null; phone: string | null }>(
+        `select p2.contact_name, p2.phone
+           from profiles p2
+          where p2.id = (select created_by from profiles where id = $1)`,
+        [customerId]
+      ),
+    ])
 
   const usualsCount = Number(usualsCountResult.rows[0]?.count ?? 0)
 
-  // TODO: salesman is the staff member who created this customer's profile.
-  // Schema doesn't yet carry that link; add `profiles.created_by` (uuid,
-  // references profiles(id)) and join here. Until then, mock it.
-  // See docs/handoff/homepage-redesign.md entry 20.
+  // Resolve the salesman who created this customer (W1's `profiles.created_by`).
+  // When the link is null, or the salesman has no contact_name/phone,
+  // fall back to a generic so the surface stays non-breaking. The Call
+  // button in `<PortalTopBar>` hides itself when phone is null.
+  const salesmanRow = salesmanResult.rows[0]
   const salesman = {
-    name: 'Dave Garcia',
-    phone: '+15551234567',
+    name: salesmanRow?.contact_name ?? FALLBACK_SALESMAN.name,
+    phone: salesmanRow?.phone ?? FALLBACK_SALESMAN.phone,
   }
 
   const primaryDraftRow = draftsResult.rows[0] ?? null

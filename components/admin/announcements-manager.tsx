@@ -21,6 +21,14 @@ interface AnnouncementsManagerProps {
   pickerProducts: PickerProduct[]
 }
 
+// Strip nullable date strings to YYYY-MM-DD so the API's date column accepts
+// them. Server-side timestamps come back as ISO strings; the API expects the
+// shorter form on update.
+function dateOnly(value: string | null | undefined): string | null {
+  if (!value) return null
+  return value.length > 10 ? value.slice(0, 10) : value
+}
+
 const TYPE_LABELS: Record<Announcement['content_type'], string> = {
   text: 'Text',
   image: 'Image',
@@ -60,35 +68,103 @@ export function AnnouncementsManager({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] =
     useState<Announcement | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const now = useMemo(() => new Date(), [])
   const liveRows = rows.filter((a) => isLive(a, now))
   const scheduledRows = rows.filter((a) => !isLive(a, now))
 
-  const moveRow = (id: string, direction: 'up' | 'down') => {
-    setRows((prev) => {
-      const index = prev.findIndex((r) => r.id === id)
-      if (index < 0) return prev
-      const swap = direction === 'up' ? index - 1 : index + 1
-      if (swap < 0 || swap >= prev.length) return prev
-      const next = [...prev]
-      ;[next[index], next[swap]] = [next[swap], next[index]]
-      // TODO: wire up PATCH to /api/admin/announcements/[id] with new sort_order
-      return next
-    })
+  // Surface fetch errors as a plain message above the table; cleared on the
+  // next successful mutation.
+  const handleApiError = async (response: Response, fallback: string) => {
+    let message = fallback
+    try {
+      const payload = (await response.json()) as
+        | { error?: { message?: string } }
+        | null
+      message = payload?.error?.message ?? fallback
+    } catch {
+      /* response wasn't JSON, use fallback */
+    }
+    setError(message)
   }
 
-  const toggleActive = (id: string, isActive: boolean) => {
+  const moveRow = async (id: string, direction: 'up' | 'down') => {
+    const index = rows.findIndex((r) => r.id === id)
+    if (index < 0) return
+    const swap = direction === 'up' ? index - 1 : index + 1
+    if (swap < 0 || swap >= rows.length) return
+
+    const previous = rows
+    const next = [...rows]
+    ;[next[index], next[swap]] = [next[swap], next[index]]
+    // Recompute sort_order so the visible order matches the persisted one.
+    const reordered = next.map((row, i) => ({ ...row, sort_order: i }))
+    setRows(reordered)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/admin/announcements/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updates: reordered.map((row) => ({
+            id: row.id,
+            sort_order: row.sort_order,
+          })),
+        }),
+      })
+      if (!response.ok) {
+        setRows(previous)
+        await handleApiError(response, 'Failed to reorder announcements.')
+      }
+    } catch {
+      setRows(previous)
+      setError('Failed to reorder announcements.')
+    }
+  }
+
+  const toggleActive = async (id: string, isActive: boolean) => {
+    const previous = rows
     setRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, is_active: isActive } : r)),
     )
-    // TODO: wire up PATCH to /api/admin/announcements/[id] with is_active
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/admin/announcements/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: isActive }),
+      })
+      if (!response.ok) {
+        setRows(previous)
+        await handleApiError(response, 'Failed to update announcement.')
+      }
+    } catch {
+      setRows(previous)
+      setError('Failed to update announcement.')
+    }
   }
 
-  const removeRow = (id: string) => {
+  const removeRow = async (id: string) => {
     if (!window.confirm('Delete this announcement?')) return
+    const previous = rows
     setRows((prev) => prev.filter((r) => r.id !== id))
-    // TODO: wire up DELETE /api/admin/announcements/[id]
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/admin/announcements/${id}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        setRows(previous)
+        await handleApiError(response, 'Failed to delete announcement.')
+      }
+    } catch {
+      setRows(previous)
+      setError('Failed to delete announcement.')
+    }
   }
 
   const openCreate = () => {
@@ -101,39 +177,72 @@ export function AnnouncementsManager({
     setDialogOpen(true)
   }
 
-  const handleSave = (data: Partial<Announcement>) => {
-    setRows((prev) => {
-      if (editingAnnouncement) {
-        return prev.map((r) =>
-          r.id === editingAnnouncement.id ? { ...r, ...data } : r,
+  const handleSave = async (data: Partial<Announcement>) => {
+    setError(null)
+    const editing = editingAnnouncement
+    const body = {
+      content_type: data.content_type ?? 'text',
+      title: data.title ?? null,
+      body: data.body ?? null,
+      image_url: data.image_url ?? null,
+      cta_label: data.cta_label ?? null,
+      cta_target_kind: data.cta_target_kind ?? null,
+      cta_target_url: data.cta_target_url ?? null,
+      cta_target_product_id: data.cta_target_product_id ?? null,
+      cta_target_product_ids: data.cta_target_product_ids ?? [],
+      product_id: data.product_id ?? null,
+      product_ids: data.product_ids ?? [],
+      badge_overrides: data.badge_overrides ?? {},
+      audience_tags: data.audience_tags ?? [],
+      starts_at: dateOnly(data.starts_at),
+      ends_at: dateOnly(data.ends_at),
+      is_active: data.is_active ?? true,
+    }
+
+    try {
+      const response = editing
+        ? await fetch(`/api/admin/announcements/${editing.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        : await fetch('/api/admin/announcements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+
+      if (!response.ok) {
+        await handleApiError(
+          response,
+          editing
+            ? 'Failed to update announcement.'
+            : 'Failed to create announcement.',
         )
+        return
       }
-      const nextId = `local-${Date.now()}`
-      const created: Announcement = {
-        id: nextId,
-        content_type: data.content_type ?? 'text',
-        title: data.title ?? null,
-        body: data.body ?? null,
-        image_url: data.image_url ?? null,
-        cta_label: data.cta_label ?? null,
-        cta_target_kind: data.cta_target_kind ?? null,
-        cta_target_url: data.cta_target_url ?? null,
-        cta_target_product_id: data.cta_target_product_id ?? null,
-        cta_target_product_ids: data.cta_target_product_ids ?? [],
-        product_id: data.product_id ?? null,
-        product_ids: data.product_ids ?? [],
-        badge_overrides: data.badge_overrides ?? {},
-        audience_tags: data.audience_tags ?? [],
-        starts_at: data.starts_at ?? null,
-        ends_at: data.ends_at ?? null,
-        is_active: data.is_active ?? true,
-        sort_order: prev.length,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+
+      const payload = (await response.json()) as {
+        data?: { announcement?: Announcement }
       }
-      return [...prev, created]
-    })
-    // TODO: wire up POST/PATCH /api/admin/announcements
+      const saved = payload.data?.announcement
+      if (!saved) {
+        setError('Saved, but the server returned no row. Refresh to see it.')
+        return
+      }
+
+      setRows((prev) =>
+        editing
+          ? prev.map((r) => (r.id === editing.id ? saved : r))
+          : [...prev, saved].sort((a, b) => a.sort_order - b.sort_order),
+      )
+    } catch {
+      setError(
+        editing
+          ? 'Failed to update announcement.'
+          : 'Failed to create announcement.',
+      )
+    }
   }
 
   return (
@@ -145,6 +254,15 @@ export function AnnouncementsManager({
           New announcement
         </Button>
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
 
       <Tabs defaultValue="live">
         <TabsList>

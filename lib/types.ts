@@ -20,6 +20,7 @@ export interface Profile {
   show_prices: boolean
   default_group: GroupByOption
   custom_pricing: boolean
+  tags: string[]
   // Legacy portal token kept in app types until the portal/auth runtime is replaced.
   access_token: string | null
   disabled_at?: string | null

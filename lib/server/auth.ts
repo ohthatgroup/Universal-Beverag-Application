@@ -160,6 +160,7 @@ export function normalizeProfile(profile: ProfileRow): Profile {
     show_prices: profile.show_prices ?? true,
     custom_pricing: profile.custom_pricing ?? false,
     default_group: profile.default_group === 'size' ? 'size' : 'brand',
+    tags: Array.isArray(profile.tags) ? profile.tags : [],
     access_token: profile.access_token ?? null,
     disabled_at: profile.disabled_at ?? null,
     created_at: profile.created_at ?? new Date(0).toISOString(),

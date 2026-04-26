@@ -21,6 +21,11 @@ export const cloneOrderSchema = z.object({
   deliveryDate: isoDateSchema,
 })
 
+export const applyUsualsSchema = z.object({
+  deliveryDate: isoDateSchema,
+  replace: z.boolean().optional().default(false),
+})
+
 export const updateDeliveryDateSchema = z.object({
   deliveryDate: isoDateSchema,
 })
@@ -289,3 +294,60 @@ export function getVisibleFieldsForFamily(family: ProductFamily): ProductMetaFie
     .filter(([, applies]) => applies)
     .map(([field]) => field)
 }
+
+// ---- Announcements ------------------------------------------------------
+// Schema for /api/admin/announcements POST/PATCH/reorder. Maps 1:1 to the
+// `announcements` table columns; the TypeScript `Announcement` interface in
+// `components/portal/announcements-stack.tsx` is the runtime shape.
+
+export const announcementContentTypeEnum = z.enum([
+  'text',
+  'image',
+  'image_text',
+  'product',
+  'specials_grid',
+])
+
+export const announcementCtaTargetKindEnum = z.enum(['products', 'product', 'url'])
+
+const announcementFields = {
+  content_type: announcementContentTypeEnum,
+  title: z.string().max(300).nullable(),
+  body: z.string().max(2000).nullable(),
+  image_url: z.string().max(2000).nullable(),
+  cta_label: z.string().max(120).nullable(),
+  cta_target_kind: announcementCtaTargetKindEnum.nullable(),
+  cta_target_url: z.string().max(2000).nullable(),
+  cta_target_product_id: uuidSchema.nullable(),
+  cta_target_product_ids: z.array(uuidSchema),
+  product_id: uuidSchema.nullable(),
+  product_ids: z.array(uuidSchema),
+  badge_overrides: z.record(z.string(), z.string()),
+  audience_tags: z.array(z.string().max(80)),
+  starts_at: isoDateSchema.nullable(),
+  ends_at: isoDateSchema.nullable(),
+  is_active: z.boolean(),
+  sort_order: z.number().int(),
+}
+
+// Create — every field optional with sensible defaults applied server-side
+// (the dialog sends a partial; the route fills in the rest).
+export const announcementCreateSchema = z.object(announcementFields).partial()
+
+// Update — partial PATCH. Routes write only what's set.
+export const announcementUpdateSchema = z.object(announcementFields).partial()
+
+export const announcementReorderSchema = z.object({
+  updates: z
+    .array(
+      z.object({
+        id: uuidSchema,
+        sort_order: z.number().int(),
+      }),
+    )
+    .min(1),
+})
+
+export type AnnouncementCreateInput = z.infer<typeof announcementCreateSchema>
+export type AnnouncementUpdateInput = z.infer<typeof announcementUpdateSchema>
+export type AnnouncementReorderInput = z.infer<typeof announcementReorderSchema>

@@ -1,4 +1,5 @@
 import { AnnouncementCard } from '@/components/portal/announcement-card'
+import type { CatalogProduct } from '@/lib/types'
 
 export type AnnouncementContentType =
   | 'text'
@@ -47,6 +48,16 @@ interface AnnouncementsStackProps {
   token: string
   primaryDraftOrderId: string | null
   showPrices: boolean
+  /**
+   * Pre-resolved per-card products keyed by announcement id. Spotlight cards
+   * pull their single product from `product`; specials-grid cards pull their
+   * tile list from `products`. Editorial cards (text/image/image_text) ignore
+   * both — their CTAs route to `<PromoSheet>` which resolves on the client.
+   */
+  resolvedProductsByAnnouncement?: Record<
+    string,
+    { product: CatalogProduct | null; products: CatalogProduct[] }
+  >
 }
 
 export async function AnnouncementsStack({
@@ -54,20 +65,26 @@ export async function AnnouncementsStack({
   token,
   primaryDraftOrderId,
   showPrices,
+  resolvedProductsByAnnouncement,
 }: AnnouncementsStackProps) {
   if (announcements.length === 0) return null
 
   return (
     <div className="mx-auto w-full max-w-[600px] space-y-4">
-      {announcements.map((a) => (
-        <AnnouncementCard
-          key={a.id}
-          announcement={a}
-          token={token}
-          primaryDraftOrderId={primaryDraftOrderId}
-          showPrices={showPrices}
-        />
-      ))}
+      {announcements.map((a) => {
+        const resolved = resolvedProductsByAnnouncement?.[a.id]
+        return (
+          <AnnouncementCard
+            key={a.id}
+            announcement={a}
+            token={token}
+            primaryDraftOrderId={primaryDraftOrderId}
+            showPrices={showPrices}
+            resolvedProduct={resolved?.product ?? null}
+            resolvedProducts={resolved?.products}
+          />
+        )
+      })}
     </div>
   )
 }

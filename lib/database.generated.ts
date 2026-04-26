@@ -12,6 +12,90 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          id: string
+          content_type: string
+          title: string | null
+          body: string | null
+          image_url: string | null
+          cta_label: string | null
+          cta_target_kind: string | null
+          cta_target_url: string | null
+          cta_target_product_id: string | null
+          cta_target_product_ids: string[]
+          product_id: string | null
+          product_ids: string[]
+          badge_overrides: Json
+          audience_tags: string[]
+          starts_at: string | null
+          ends_at: string | null
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          content_type: string
+          title?: string | null
+          body?: string | null
+          image_url?: string | null
+          cta_label?: string | null
+          cta_target_kind?: string | null
+          cta_target_url?: string | null
+          cta_target_product_id?: string | null
+          cta_target_product_ids?: string[]
+          product_id?: string | null
+          product_ids?: string[]
+          badge_overrides?: Json
+          audience_tags?: string[]
+          starts_at?: string | null
+          ends_at?: string | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          content_type?: string
+          title?: string | null
+          body?: string | null
+          image_url?: string | null
+          cta_label?: string | null
+          cta_target_kind?: string | null
+          cta_target_url?: string | null
+          cta_target_product_id?: string | null
+          cta_target_product_ids?: string[]
+          product_id?: string | null
+          product_ids?: string[]
+          badge_overrides?: Json
+          audience_tags?: string[]
+          starts_at?: string | null
+          ends_at?: string | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'announcements_cta_target_product_id_fkey'
+            columns: ['cta_target_product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'announcements_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       brands: {
         Row: {
           id: string
@@ -35,6 +119,48 @@ export type Database = {
           created_at?: string
         }
         Relationships: [
+        ]
+      }
+      customer_announcements: {
+        Row: {
+          customer_id: string
+          announcement_id: string
+          is_hidden: boolean
+          pin_sort_order: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          customer_id: string
+          announcement_id: string
+          is_hidden?: boolean
+          pin_sort_order?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          customer_id?: string
+          announcement_id?: string
+          is_hidden?: boolean
+          pin_sort_order?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'customer_announcements_announcement_id_fkey'
+            columns: ['announcement_id']
+            isOneToOne: false
+            referencedRelation: 'announcements'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_announcements_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
         ]
       }
       customer_brands: {
@@ -703,6 +829,7 @@ export type Database = {
           location_lat: number | null
           location_lng: number | null
           office_email: string | null
+          created_by: string | null
         }
         Insert: {
           id?: string
@@ -728,6 +855,7 @@ export type Database = {
           location_lat?: number | null
           location_lng?: number | null
           office_email?: string | null
+          created_by?: string | null
         }
         Update: {
           id?: string
@@ -753,8 +881,16 @@ export type Database = {
           location_lat?: number | null
           location_lng?: number | null
           office_email?: string | null
+          created_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'profiles_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
         ]
       }
       schema_migrations: {
@@ -833,6 +969,10 @@ export type Database = {
     }
     Views: Record<PropertyKey, never>
     Functions: {
+      apply_usuals_to_draft: {
+        Args: { p_customer_id: string; p_delivery_date: string; p_replace: boolean }
+        Returns: string
+      }
       clone_order: {
         Args: { source_order_id: string; new_delivery_date: string }
         Returns: string

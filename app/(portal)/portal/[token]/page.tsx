@@ -1,10 +1,15 @@
 import { HomepageWelcome } from '@/components/portal/homepage-welcome'
 import { HomepageStartSection, type DraftForStrip } from '@/components/portal/homepage-start-section'
 import { AnnouncementsStack } from '@/components/portal/announcements-stack'
-import { getHydratedMockAnnouncements } from '@/lib/mock/announcements'
+import {
+  fetchHomepageAnnouncements,
+  fetchInlineAnnouncementProducts,
+  pickResolvedProducts,
+} from '@/lib/server/announcements'
 import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { todayISODate } from '@/lib/utils'
+import type { CatalogProduct } from '@/lib/types'
 
 export default async function PortalHome({
   params,
@@ -38,7 +43,27 @@ export default async function PortalHome({
     itemCount: row.item_count ?? 0,
   }))
 
-  const announcements = await getHydratedMockAnnouncements(db)
+  const announcements = await fetchHomepageAnnouncements(
+    db,
+    customerId,
+    profile.tags ?? [],
+  )
+
+  // Resolve products for inline cards (spotlight + specials_grid). Editorial
+  // cards don't need this — their CTAs route to <PromoSheet> which resolves
+  // on the client.
+  const productMap = await fetchInlineAnnouncementProducts(
+    db,
+    announcements,
+    customerId,
+  )
+  const resolvedProductsByAnnouncement: Record<
+    string,
+    { product: CatalogProduct | null; products: CatalogProduct[] }
+  > = {}
+  for (const a of announcements) {
+    resolvedProductsByAnnouncement[a.id] = pickResolvedProducts(a, productMap)
+  }
 
   return (
     <div className="mx-auto w-full max-w-[600px] space-y-8">
@@ -55,12 +80,12 @@ export default async function PortalHome({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           For you
         </h2>
-        {/* TODO: replace with real announcements query */}
         <AnnouncementsStack
           announcements={announcements}
           token={token}
           primaryDraftOrderId={drafts[0]?.id ?? null}
           showPrices={profile.show_prices}
+          resolvedProductsByAnnouncement={resolvedProductsByAnnouncement}
         />
       </section>
     </div>

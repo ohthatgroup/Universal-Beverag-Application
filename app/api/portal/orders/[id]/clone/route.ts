@@ -6,6 +6,12 @@ import { cloneOrderSchema } from '@/lib/server/schemas'
 /**
  * POST /api/portal/orders/[id]/clone
  * Clone an order to a new delivery date.
+ *
+ * If a draft already exists at that date and `?replace=true` is set, the
+ * existing draft's items are wiped and the source order's items are copied
+ * in. Without the flag, the existing draft is returned untouched (idempotent
+ * for the C5 "I already started a draft for that day" case).
+ *
  * Auth: X-Customer-Token header
  */
 export async function POST(
@@ -18,6 +24,8 @@ export async function POST(
     const { id } = await routeContext.params
     const { order, customerId } = await requirePortalOrderAccess(id, token)
     const payload = await parseBody(request, cloneOrderSchema)
+    const url = new URL(request.url)
+    const replace = url.searchParams.get('replace') === 'true'
     const db = await getRequestDb()
 
     const { rows: existingDraftRows } = await db.query(
@@ -28,8 +36,33 @@ export async function POST(
       [customerId, payload.deliveryDate]
     )
 
-    if (existingDraftRows[0]) {
+    const existingDraft = existingDraftRows[0] as { id: string } | undefined
+
+    if (existingDraft && !replace) {
       return apiOk({ order: existingDraftRows[0], created: false }, 200, requestId)
+    }
+
+    if (existingDraft && replace) {
+      // Replace flow: wipe the in-flight draft's items and copy in the
+      // source order's items. Skips clone_order (which would raise on
+      // duplicate draft).
+      await db.query('delete from order_items where order_id = $1', [existingDraft.id])
+      await db.query(
+        `insert into order_items (order_id, product_id, pallet_deal_id, quantity, unit_price)
+         select $1, product_id, pallet_deal_id, quantity, unit_price
+         from order_items
+         where order_id = $2 and quantity > 0`,
+        [existingDraft.id, order.id]
+      )
+
+      const { rows: refreshedRows } = await db.query(
+        `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text
+         from orders
+         where id = $1
+         limit 1`,
+        [existingDraft.id]
+      )
+      return apiOk({ order: refreshedRows[0], created: false }, 200, requestId)
     }
 
     const { rows: cloneRows } = await db.query<{ clone_order: string | null }>(
