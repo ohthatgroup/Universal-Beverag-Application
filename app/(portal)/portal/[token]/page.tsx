@@ -1,111 +1,10 @@
 import { HomepageWelcome } from '@/components/portal/homepage-welcome'
 import { HomepageStartSection, type DraftForStrip } from '@/components/portal/homepage-start-section'
-import {
-  AnnouncementsStack,
-  type Announcement,
-} from '@/components/portal/announcements-stack'
+import { AnnouncementsStack } from '@/components/portal/announcements-stack'
+import { getHydratedMockAnnouncements } from '@/lib/mock/announcements'
 import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
 import { todayISODate } from '@/lib/utils'
-
-// TODO: replace with real data from announcements query (see docs/handoff/homepage-redesign.md)
-const MOCK_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: '1',
-    content_type: 'text',
-    title: 'May Promotion',
-    body: 'Free delivery on all orders over $200 this month. No code needed.',
-    cta_label: 'Learn more',
-    cta_url: '#',
-    image_url: null,
-    product_id: null,
-    product_ids: [],
-    badge_overrides: {},
-    audience_tags: [],
-    starts_at: null,
-    ends_at: null,
-    is_active: true,
-    sort_order: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    content_type: 'image',
-    title: 'Summer Launch',
-    body: null,
-    cta_label: 'Shop now',
-    cta_url: '#',
-    image_url: 'https://placehold.co/1200x525',
-    product_id: null,
-    product_ids: [],
-    badge_overrides: {},
-    audience_tags: [],
-    starts_at: null,
-    ends_at: null,
-    is_active: true,
-    sort_order: 1,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    content_type: 'image_text',
-    title: 'New seasonal lineup',
-    body: 'Our spring delivery just landed. Browse the new flavors and sizes added to your catalog this week.',
-    cta_label: 'See what’s new',
-    cta_url: '#',
-    image_url: 'https://placehold.co/600x600',
-    product_id: null,
-    product_ids: [],
-    badge_overrides: {},
-    audience_tags: [],
-    starts_at: null,
-    ends_at: null,
-    is_active: true,
-    sort_order: 2,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    content_type: 'product',
-    title: null,
-    body: 'Hand-picked by your salesman this week.',
-    cta_label: 'Add to order',
-    cta_url: null,
-    image_url: null,
-    product_id: 'mock-product-id',
-    product_ids: [],
-    badge_overrides: {},
-    audience_tags: [],
-    starts_at: null,
-    ends_at: null,
-    is_active: true,
-    sort_order: 3,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '5',
-    content_type: 'specials_grid',
-    title: 'Specials this week',
-    body: null,
-    cta_label: null,
-    cta_url: null,
-    image_url: null,
-    product_id: null,
-    product_ids: [],
-    badge_overrides: {},
-    audience_tags: [],
-    starts_at: null,
-    ends_at: null,
-    is_active: true,
-    sort_order: 4,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
 
 export default async function PortalHome({
   params,
@@ -139,6 +38,8 @@ export default async function PortalHome({
     itemCount: row.item_count ?? 0,
   }))
 
+  const announcements = await getHydratedMockAnnouncements(db)
+
   return (
     <div className="mx-auto w-full max-w-[600px] space-y-8">
       <section className="space-y-6 pt-2">
@@ -156,7 +57,7 @@ export default async function PortalHome({
         </h2>
         {/* TODO: replace with real announcements query */}
         <AnnouncementsStack
-          announcements={MOCK_ANNOUNCEMENTS}
+          announcements={announcements}
           token={token}
           primaryDraftOrderId={drafts[0]?.id ?? null}
           showPrices={profile.show_prices}

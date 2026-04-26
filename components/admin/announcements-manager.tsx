@@ -13,10 +13,12 @@ import { RowReorderArrows } from '@/components/admin/row-actions'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AnnouncementDialog } from '@/components/admin/announcement-dialog'
+import type { PickerProduct } from '@/components/admin/product-picker'
 import type { Announcement } from '@/components/portal/announcements-stack'
 
 interface AnnouncementsManagerProps {
   initialAnnouncements: Announcement[]
+  pickerProducts: PickerProduct[]
 }
 
 const TYPE_LABELS: Record<Announcement['content_type'], string> = {
@@ -52,6 +54,7 @@ function formatAudience(tags: string[]): string {
 
 export function AnnouncementsManager({
   initialAnnouncements,
+  pickerProducts,
 }: AnnouncementsManagerProps) {
   const [rows, setRows] = useState<Announcement[]>(initialAnnouncements)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -113,7 +116,10 @@ export function AnnouncementsManager({
         body: data.body ?? null,
         image_url: data.image_url ?? null,
         cta_label: data.cta_label ?? null,
-        cta_url: data.cta_url ?? null,
+        cta_target_kind: data.cta_target_kind ?? null,
+        cta_target_url: data.cta_target_url ?? null,
+        cta_target_product_id: data.cta_target_product_id ?? null,
+        cta_target_product_ids: data.cta_target_product_ids ?? [],
         product_id: data.product_id ?? null,
         product_ids: data.product_ids ?? [],
         badge_overrides: data.badge_overrides ?? {},
@@ -176,6 +182,7 @@ export function AnnouncementsManager({
         onOpenChange={setDialogOpen}
         initialAnnouncement={editingAnnouncement}
         onSave={handleSave}
+        pickerProducts={pickerProducts}
       />
     </div>
   )

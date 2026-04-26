@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Money } from '@/components/ui/money'
 import { ProductTile } from '@/components/catalog/product-tile'
@@ -9,6 +10,48 @@ import { Stepper } from '@/components/ui/stepper'
 import type { Announcement } from '@/components/portal/announcements-stack'
 import type { CatalogProduct } from '@/lib/types'
 import { cn, getProductPackLabel } from '@/lib/utils'
+
+/**
+ * Wrap CTA content in the right link element for the announcement's
+ * destination kind:
+ *   - 'products' / 'product' → Next <Link> to /portal/[token]/promo/[id]
+ *   - 'url'                  → external <a target="_blank">
+ *   - null                   → no CTA renders (caller already gates on this)
+ */
+function CtaLink({
+  announcement,
+  token,
+  className,
+  children,
+}: {
+  announcement: Announcement
+  token: string
+  className?: string
+  children: ReactNode
+}) {
+  const kind = announcement.cta_target_kind
+  if (kind === 'products' || kind === 'product') {
+    return (
+      <Link
+        href={`/portal/${token}/promo/${announcement.id}`}
+        className={className}
+      >
+        {children}
+      </Link>
+    )
+  }
+  // url (or null/legacy) — fall through to external anchor.
+  return (
+    <a
+      href={announcement.cta_target_url ?? '#'}
+      target="_blank"
+      rel="noreferrer"
+      className={className}
+    >
+      {children}
+    </a>
+  )
+}
 
 interface AnnouncementCardProps {
   announcement: Announcement
@@ -29,11 +72,11 @@ export function AnnouncementCard({
 }: AnnouncementCardProps) {
   switch (announcement.content_type) {
     case 'text':
-      return <TextCard a={announcement} />
+      return <TextCard a={announcement} token={token} />
     case 'image':
-      return <ImageBannerCard a={announcement} />
+      return <ImageBannerCard a={announcement} token={token} />
     case 'image_text':
-      return <ImageTextCard a={announcement} />
+      return <ImageTextCard a={announcement} token={token} />
     case 'product':
       return (
         <ProductSpotlightCard
@@ -58,20 +101,20 @@ export function AnnouncementCard({
 
 // ---- TextCard -----------------------------------------------------------
 
-function TextCard({ a }: { a: Announcement }) {
+function TextCard({ a, token }: { a: Announcement; token: string }) {
   return (
     <div className="rounded-xl border bg-card px-4 py-4">
       {a.title && <p className="text-base font-semibold">{a.title}</p>}
       {a.body && (
         <p className="mt-1 text-sm text-muted-foreground">{a.body}</p>
       )}
-      {a.cta_label && (
+      {a.cta_label && a.cta_target_kind && (
         <div className="mt-3 flex justify-end">
-          <a href={a.cta_url ?? '#'} target="_blank" rel="noreferrer">
+          <CtaLink announcement={a} token={token}>
             <Button variant="outline" size="sm">
               {a.cta_label}
             </Button>
-          </a>
+          </CtaLink>
         </div>
       )}
     </div>
@@ -80,7 +123,7 @@ function TextCard({ a }: { a: Announcement }) {
 
 // ---- ImageBannerCard ----------------------------------------------------
 
-function ImageBannerCard({ a }: { a: Announcement }) {
+function ImageBannerCard({ a, token }: { a: Announcement; token: string }) {
   return (
     <div className="relative overflow-hidden rounded-xl">
       {a.image_url ? (
@@ -97,13 +140,8 @@ function ImageBannerCard({ a }: { a: Announcement }) {
         {a.title && (
           <span className="text-base font-semibold text-white">{a.title}</span>
         )}
-        {a.cta_label && (
-          <a
-            href={a.cta_url ?? '#'}
-            target="_blank"
-            rel="noreferrer"
-            className="shrink-0"
-          >
+        {a.cta_label && a.cta_target_kind && (
+          <CtaLink announcement={a} token={token} className="shrink-0">
             <Button
               variant="outline"
               size="sm"
@@ -111,7 +149,7 @@ function ImageBannerCard({ a }: { a: Announcement }) {
             >
               {a.cta_label}
             </Button>
-          </a>
+          </CtaLink>
         )}
       </div>
     </div>
@@ -120,7 +158,7 @@ function ImageBannerCard({ a }: { a: Announcement }) {
 
 // ---- ImageTextCard ------------------------------------------------------
 
-function ImageTextCard({ a }: { a: Announcement }) {
+function ImageTextCard({ a, token }: { a: Announcement; token: string }) {
   return (
     <div className="flex flex-col gap-4 overflow-hidden rounded-xl border bg-card p-4 md:flex-row md:items-center">
       <div className="shrink-0 md:w-[40%]">
@@ -140,17 +178,16 @@ function ImageTextCard({ a }: { a: Announcement }) {
         {a.body && (
           <p className="text-sm text-muted-foreground">{a.body}</p>
         )}
-        {a.cta_label && (
-          <a
-            href={a.cta_url ?? '#'}
-            target="_blank"
-            rel="noreferrer"
+        {a.cta_label && a.cta_target_kind && (
+          <CtaLink
+            announcement={a}
+            token={token}
             className="mt-1 self-start"
           >
             <Button variant="outline" size="sm">
               {a.cta_label}
             </Button>
-          </a>
+          </CtaLink>
         )}
       </div>
     </div>

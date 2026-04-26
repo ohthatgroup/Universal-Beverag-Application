@@ -8,9 +8,14 @@ import { Label } from '@/components/ui/label'
 import { Panel } from '@/components/ui/panel'
 import { Switch } from '@/components/ui/switch'
 import { TagChipInput } from '@/components/ui/tag-chip-input'
+import {
+  ProductPicker,
+  type PickerProduct,
+} from '@/components/admin/product-picker'
 import type {
   Announcement,
   AnnouncementContentType,
+  CtaTargetKind,
 } from '@/components/portal/announcements-stack'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +24,12 @@ interface AnnouncementDialogProps {
   onOpenChange: (open: boolean) => void
   initialAnnouncement?: Announcement | null
   onSave: (data: Partial<Announcement>) => void
+  /**
+   * Products to feed the search-as-you-type picker. Empty array hides the
+   * picker results — the Customer-Homepage manager stub passes nothing
+   * because it doesn't have an RSC parent that fetches them yet.
+   */
+  pickerProducts?: PickerProduct[]
 }
 
 interface TypeOption {
@@ -42,9 +53,15 @@ interface FormState {
   body: string
   image_url: string
   cta_label: string
-  cta_url: string
-  product_id: string
-  product_ids: string
+  /** When the editorial card has a CTA, where does it go? */
+  cta_target_kind: CtaTargetKind | null
+  cta_target_url: string
+  cta_target_product_id: string | null
+  cta_target_product_ids: string[]
+  /** Product spotlight subject (independent of CTA destination). */
+  product_id: string | null
+  /** Specials grid contents (independent of CTA destination). */
+  product_ids: string[]
   audience_tags: string[]
   starts_at: string
   ends_at: string
@@ -57,9 +74,12 @@ const EMPTY_FORM: FormState = {
   body: '',
   image_url: '',
   cta_label: '',
-  cta_url: '',
-  product_id: '',
-  product_ids: '',
+  cta_target_kind: null,
+  cta_target_url: '',
+  cta_target_product_id: null,
+  cta_target_product_ids: [],
+  product_id: null,
+  product_ids: [],
   audience_tags: [],
   starts_at: '',
   ends_at: '',
@@ -73,9 +93,12 @@ function announcementToForm(a: Announcement): FormState {
     body: a.body ?? '',
     image_url: a.image_url ?? '',
     cta_label: a.cta_label ?? '',
-    cta_url: a.cta_url ?? '',
-    product_id: a.product_id ?? '',
-    product_ids: a.product_ids.join(', '),
+    cta_target_kind: a.cta_target_kind,
+    cta_target_url: a.cta_target_url ?? '',
+    cta_target_product_id: a.cta_target_product_id,
+    cta_target_product_ids: a.cta_target_product_ids,
+    product_id: a.product_id,
+    product_ids: a.product_ids,
     audience_tags: a.audience_tags,
     starts_at: a.starts_at ? a.starts_at.slice(0, 10) : '',
     ends_at: a.ends_at ? a.ends_at.slice(0, 10) : '',
@@ -88,6 +111,7 @@ export function AnnouncementDialog({
   onOpenChange,
   initialAnnouncement = null,
   onSave,
+  pickerProducts = [],
 }: AnnouncementDialogProps) {
   const isEditing = initialAnnouncement !== null
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -123,19 +147,53 @@ export function AnnouncementDialog({
       return
     }
 
-    // Required-field checks per type
-    const required: Array<keyof FormState> = []
-    if (type === 'text') required.push('title')
-    if (type === 'image') required.push('image_url')
-    if (type === 'image_text') required.push('image_url', 'title')
-    if (type === 'product') required.push('product_id')
+    // Required-field checks per type.
+    if ((type === 'text' || type === 'image_text') && !form.title.trim()) {
+      setError('Title is required.')
+      return
+    }
+    if ((type === 'image' || type === 'image_text') && !form.image_url.trim()) {
+      setError('Image URL is required.')
+      return
+    }
+    if (type === 'product' && !form.product_id) {
+      setError('Pick a featured product.')
+      return
+    }
+    if (type === 'specials_grid' && form.product_ids.length === 0) {
+      setError('Pick at least one product for the grid.')
+      return
+    }
 
-    for (const field of required) {
-      const value = form[field]
-      if (typeof value === 'string' && value.trim() === '') {
-        setError(`${field.replace('_', ' ')} is required.`)
+    // CTA target validation for editorial cards (only if cta_label given).
+    const isEditorial = type === 'text' || type === 'image' || type === 'image_text'
+    let ctaTargetKind = form.cta_target_kind
+    let ctaTargetUrl: string | null = form.cta_target_url.trim() || null
+    let ctaTargetProductId = form.cta_target_product_id
+    let ctaTargetProductIds = form.cta_target_product_ids
+    if (isEditorial && form.cta_label.trim()) {
+      if (!ctaTargetKind) {
+        setError('Pick a destination for the CTA, or remove the CTA label.')
         return
       }
+      if (ctaTargetKind === 'url' && !ctaTargetUrl) {
+        setError('Enter a URL for the CTA destination.')
+        return
+      }
+      if (ctaTargetKind === 'product' && !ctaTargetProductId) {
+        setError('Pick a product for the CTA destination.')
+        return
+      }
+      if (ctaTargetKind === 'products' && ctaTargetProductIds.length === 0) {
+        setError('Pick at least one product for the CTA destination.')
+        return
+      }
+    } else if (!isEditorial || !form.cta_label.trim()) {
+      // Clear unused CTA target fields so we don't persist orphan data.
+      ctaTargetKind = null
+      ctaTargetUrl = null
+      ctaTargetProductId = null
+      ctaTargetProductIds = []
     }
 
     const partial: Partial<Announcement> = {
@@ -144,12 +202,12 @@ export function AnnouncementDialog({
       body: form.body.trim() || null,
       image_url: form.image_url.trim() || null,
       cta_label: form.cta_label.trim() || null,
-      cta_url: form.cta_url.trim() || null,
-      product_id: form.product_id.trim() || null,
-      product_ids: form.product_ids
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
+      cta_target_kind: ctaTargetKind,
+      cta_target_url: ctaTargetUrl,
+      cta_target_product_id: ctaTargetProductId,
+      cta_target_product_ids: ctaTargetProductIds,
+      product_id: form.product_id,
+      product_ids: form.product_ids,
       audience_tags: form.audience_tags,
       starts_at: form.starts_at || null,
       ends_at: form.ends_at || null,
@@ -208,6 +266,7 @@ export function AnnouncementDialog({
             form={form}
             setField={setField}
             error={error}
+            pickerProducts={pickerProducts}
           />
         )}
       </Panel.Body>
@@ -258,15 +317,26 @@ interface FieldsFormProps {
   form: FormState
   setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void
   error: string | null
+  pickerProducts: PickerProduct[]
 }
 
-function FieldsForm({ type, form, setField, error }: FieldsFormProps) {
+function FieldsForm({
+  type,
+  form,
+  setField,
+  error,
+  pickerProducts,
+}: FieldsFormProps) {
+  const isEditorial =
+    type === 'text' || type === 'image' || type === 'image_text'
+  const showCtaTargetPicker = isEditorial && form.cta_label.trim().length > 0
+
   return (
     <div className="space-y-4">
       {/* Type-specific fields */}
       {(type === 'image' || type === 'image_text') && (
         <Field label="Image URL" required>
-          {/* TODO: replace with searchable ImageUploadField when image upload integrates with mock-mode */}
+          {/* TODO: replace with ImageUploadField */}
           <Input
             value={form.image_url}
             onChange={(e) => setField('image_url', e.target.value)}
@@ -303,32 +373,35 @@ function FieldsForm({ type, form, setField, error }: FieldsFormProps) {
         </Field>
       )}
 
+      {/* Product spotlight subject */}
       {type === 'product' && (
-        <Field label="Product ID" required>
-          {/* TODO: replace with searchable product select */}
-          <Input
+        <Field label="Featured product" required>
+          <ProductPicker
+            mode="single"
+            products={pickerProducts}
             value={form.product_id}
-            onChange={(e) => setField('product_id', e.target.value)}
-            placeholder="prod_…"
+            onChange={(next) => setField('product_id', next)}
           />
         </Field>
       )}
 
+      {/* Specials grid contents */}
       {type === 'specials_grid' && (
-        <Field label="Product IDs (comma-separated)">
-          {/* TODO: replace with searchable multi-product select */}
-          <Input
+        <Field
+          label={`Products in this grid (${form.product_ids.length})`}
+          required
+        >
+          <ProductPicker
+            mode="multi"
+            products={pickerProducts}
             value={form.product_ids}
-            onChange={(e) => setField('product_ids', e.target.value)}
-            placeholder="prod_a, prod_b, prod_c"
+            onChange={(next) => setField('product_ids', next)}
           />
         </Field>
       )}
 
-      {(type === 'text' ||
-        type === 'image' ||
-        type === 'image_text' ||
-        type === 'product') && (
+      {/* CTA — editorial cards only (text / image / image_text). */}
+      {isEditorial && (
         <>
           <Field label="CTA label">
             <Input
@@ -337,14 +410,13 @@ function FieldsForm({ type, form, setField, error }: FieldsFormProps) {
               placeholder="Learn more"
             />
           </Field>
-          {type !== 'product' && (
-            <Field label="CTA URL">
-              <Input
-                value={form.cta_url}
-                onChange={(e) => setField('cta_url', e.target.value)}
-                placeholder="https://…"
-              />
-            </Field>
+
+          {showCtaTargetPicker && (
+            <CtaDestinationField
+              form={form}
+              setField={setField}
+              pickerProducts={pickerProducts}
+            />
           )}
         </>
       )}
@@ -386,6 +458,81 @@ function FieldsForm({ type, form, setField, error }: FieldsFormProps) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
+  )
+}
+
+interface CtaDestinationFieldProps {
+  form: FormState
+  setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void
+  pickerProducts: PickerProduct[]
+}
+
+function CtaDestinationField({
+  form,
+  setField,
+  pickerProducts,
+}: CtaDestinationFieldProps) {
+  const KINDS: { value: CtaTargetKind; label: string; hint: string }[] = [
+    { value: 'products', label: 'Product list', hint: 'Open a curated list' },
+    { value: 'product', label: 'Single product', hint: 'Open one product' },
+    { value: 'url', label: 'External URL', hint: 'Open a website' },
+  ]
+
+  return (
+    <Field label="When customers tap it…">
+      <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+        <div className="grid grid-cols-3 gap-2">
+          {KINDS.map((opt) => {
+            const active = form.cta_target_kind === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setField('cta_target_kind', opt.value)}
+                aria-pressed={active}
+                className={cn(
+                  'rounded-md border bg-background px-2 py-2 text-left transition-colors',
+                  active
+                    ? 'border-accent ring-1 ring-accent'
+                    : 'hover:bg-muted/50',
+                )}
+              >
+                <div className="text-xs font-semibold">{opt.label}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {opt.hint}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {form.cta_target_kind === 'url' && (
+          <Input
+            value={form.cta_target_url}
+            onChange={(e) => setField('cta_target_url', e.target.value)}
+            placeholder="https://…"
+          />
+        )}
+
+        {form.cta_target_kind === 'product' && (
+          <ProductPicker
+            mode="single"
+            products={pickerProducts}
+            value={form.cta_target_product_id}
+            onChange={(next) => setField('cta_target_product_id', next)}
+          />
+        )}
+
+        {form.cta_target_kind === 'products' && (
+          <ProductPicker
+            mode="multi"
+            products={pickerProducts}
+            value={form.cta_target_product_ids}
+            onChange={(next) => setField('cta_target_product_ids', next)}
+          />
+        )}
+      </div>
+    </Field>
   )
 }
 
