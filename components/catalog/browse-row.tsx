@@ -36,13 +36,13 @@ export function BrowseRow({
     <div className="flex items-center gap-3 px-3 py-2.5">
       <QuantitySelector quantity={quantity} onChange={onChange} />
       {thumbSrc ? (
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-background">
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-white p-1">
           <Image
             src={thumbSrc}
             alt={displayName}
             width={40}
             height={40}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             unoptimized
           />
         </div>

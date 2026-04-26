@@ -56,7 +56,7 @@ export function PalletsRail({ deals, quantities, onChange, showPrices }: Pallets
               <img
                 src={deal.image_url}
                 alt={deal.title}
-                className="h-20 w-full object-cover"
+                className="h-20 w-full bg-white object-contain p-1.5"
               />
             ) : (
               <div className="flex h-20 w-full items-center justify-center bg-muted">

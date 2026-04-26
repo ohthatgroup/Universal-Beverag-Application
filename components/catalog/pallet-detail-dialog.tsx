@@ -53,13 +53,13 @@ export function PalletDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md p-0">
         {deal.image_url ? (
-          <div className="relative h-40 w-full overflow-hidden rounded-t-xl bg-muted">
+          <div className="relative h-40 w-full overflow-hidden rounded-t-xl bg-white">
             <Image
               src={deal.image_url}
               alt={deal.title}
               fill
               sizes="(max-width: 480px) 100vw, 28rem"
-              className="object-cover"
+              className="object-contain p-3"
             />
           </div>
         ) : (
@@ -92,14 +92,14 @@ export function PalletDetailDialog({
                     key={item.product_id}
                     className="flex items-center gap-3 px-3 py-2.5"
                   >
-                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-white">
                       {item.image_url ? (
                         <Image
                           src={item.image_url}
                           alt={item.product_title}
                           fill
                           sizes="40px"
-                          className="object-cover"
+                          className="object-contain p-1"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center">

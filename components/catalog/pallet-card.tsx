@@ -22,7 +22,7 @@ export function PalletCard({ palletDeal, quantity, onChange, showPrices }: Palle
         <img
           src={palletDeal.image_url}
           alt={palletDeal.title}
-          className="h-36 w-full object-cover"
+          className="h-36 w-full bg-white object-contain p-2"
         />
       ) : (
         <div className="flex h-36 w-full items-center justify-center bg-muted">

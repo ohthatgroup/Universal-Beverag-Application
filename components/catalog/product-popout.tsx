@@ -54,14 +54,14 @@ export function ProductPopout({
       contentClassName="max-w-[22rem] p-4"
       preventAutoFocus
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-background/40">
+      <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-white">
         {thumbSrc ? (
           <Image
             src={thumbSrc}
             alt=""
             fill
             sizes="(min-width: 768px) 22rem, 90vw"
-            className="object-cover"
+            className="object-contain p-4"
             unoptimized
           />
         ) : (

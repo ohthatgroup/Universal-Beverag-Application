@@ -47,14 +47,16 @@ export function ProductTile({
       )}
     >
       {thumbSrc ? (
-        <Image
-          src={thumbSrc}
-          alt=""
-          fill
-          sizes="(min-width: 1024px) 12vw, (min-width: 640px) 18vw, 33vw"
-          className="object-cover"
-          unoptimized
-        />
+        <div className="absolute inset-0 bg-white">
+          <Image
+            src={thumbSrc}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 12vw, (min-width: 640px) 18vw, 33vw"
+            className="object-contain p-3"
+            unoptimized
+          />
+        </div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 p-3">
           <span className="line-clamp-4 text-center text-sm font-bold leading-tight text-muted-foreground">
