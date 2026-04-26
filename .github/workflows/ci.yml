@@ -9,9 +9,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: anon-test-key
-      SUPABASE_SERVICE_ROLE_KEY: service-role-test-key
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       FEATURE_ECWID_PUSH: false
     steps:

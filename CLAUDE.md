@@ -26,7 +26,7 @@ E2E tests run against a real database and require a built app (`npm run build &&
 
 ## Architecture
 
-Single Next.js 15 (App Router) monolith deployed to Cloudflare Workers via OpenNext. The customer-facing portal runs against Neon Postgres via the `pg` driver bound through Hyperdrive in production. Some legacy Supabase-client code remains in `lib/supabase/` for in-flight migration paths but **the customer portal does not use it** — see Database below. No ORM, no state management library.
+Single Next.js 15 (App Router) monolith deployed to Cloudflare Workers via OpenNext. The customer-facing portal runs against Neon Postgres via the `pg` driver bound through Hyperdrive in production. No ORM, no state management library.
 
 ### Two User Surfaces
 

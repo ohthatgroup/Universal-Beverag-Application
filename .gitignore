@@ -50,6 +50,7 @@ Universal Beverages Price list MAR. 25 25 DRINKS (2).xlsx
 !/tests/unit/section-gated-pdf-import.test.ts
 /scripts/*
 !/scripts/extract-pdf-layout.py
+!/scripts/export-products-without-images.ts
 !/scripts/import-official-product-images.ts
 !/scripts/migrate-extracted-products.ts
 !/scripts/product-image-search.ts

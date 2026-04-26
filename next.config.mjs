@@ -2,7 +2,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const assetBaseUrl = process.env.NEXT_PUBLIC_ASSET_BASE_URL
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const configDir = path.dirname(fileURLToPath(import.meta.url))
 
 function toRemotePattern(rawUrl, pathname = '/**') {
@@ -19,7 +18,6 @@ function toRemotePattern(rawUrl, pathname = '/**') {
 
 const remotePatterns = [
   toRemotePattern(assetBaseUrl),
-  toRemotePattern(supabaseUrl, '/storage/v1/object/public/**'),
 ].filter(Boolean)
 
 /** @type {import('next').NextConfig} */
