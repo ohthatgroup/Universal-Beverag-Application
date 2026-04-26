@@ -2,10 +2,11 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Calendar, RotateCcw, Sparkles } from 'lucide-react'
+import { ArrowRight, Calendar, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Panel } from '@/components/ui/panel'
 import { OrderStatusDot } from '@/components/ui/status-dot'
+import { ReorderList, type ReorderableOrder } from '@/components/portal/reorder-list'
 import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -25,12 +26,11 @@ interface StartOrderForkProps {
   } | null
   /** Total submitted+delivered orders (drives progressive reveal). */
   submittedOrderCount: number
-  /** Most recent submitted/delivered order. Null when `submittedOrderCount === 0`. */
-  lastOrder: {
-    id: string
-    deliveryDate: string
-    itemCount: number
-  } | null
+  /**
+   * Recent submitted/delivered orders, newest first. The ReorderList
+   * surfaces the first 3 with a "Show more" expand.
+   */
+  recentOrders: ReorderableOrder[]
 }
 
 type PathKind = 'reorder' | 'usuals' | 'scratch'
@@ -38,6 +38,8 @@ type PathKind = 'reorder' | 'usuals' | 'scratch'
 interface PendingPath {
   kind: PathKind
   targetDate: string
+  /** When `kind === 'reorder'`, the source order id being cloned. */
+  reorderSourceId?: string
 }
 
 export function StartOrderFork({
@@ -46,10 +48,8 @@ export function StartOrderFork({
   nextNextDeliveryDate,
   primaryDraft,
   submittedOrderCount,
-  lastOrder,
+  recentOrders,
 }: StartOrderForkProps) {
-  // Date that the three paths will use. Advances past the draft's date when
-  // a draft already exists at the next delivery date.
   const draftBlocksNext =
     primaryDraft !== null && primaryDraft.deliveryDate === nextDeliveryDate
   const initialForkDate = draftBlocksNext ? nextNextDeliveryDate : nextDeliveryDate
@@ -57,40 +57,47 @@ export function StartOrderFork({
   const [forkDate, setForkDate] = useState(initialForkDate)
   const [pendingPath, setPendingPath] = useState<PendingPath | null>(null)
 
-  const showReorder = submittedOrderCount >= 1 && lastOrder !== null
+  const showReorder = submittedOrderCount >= 1 && recentOrders.length > 0
   const showUsuals = submittedOrderCount >= 3
   const showFork = showReorder || showUsuals || primaryDraft !== null
+
   const draftHref = primaryDraft
     ? buildCustomerOrderDeepLink(token, primaryDraft.id) ?? '#'
     : '#'
 
-  // When a path is tapped, decide whether the action conflicts with an
-  // existing draft at `forkDate`. In real wiring, conflict triggers the
-  // ConfirmReplace dialog; otherwise the action runs immediately.
   const draftAtForkDate =
     primaryDraft !== null && primaryDraft.deliveryDate === forkDate
 
-  const handlePath = (kind: PathKind) => {
+  const handlePath = (kind: PathKind, reorderSourceId?: string) => {
     if (draftAtForkDate) {
-      setPendingPath({ kind, targetDate: forkDate })
+      setPendingPath({ kind, targetDate: forkDate, reorderSourceId })
       return
     }
-    runPath(kind, forkDate)
+    runPath(kind, forkDate, reorderSourceId)
   }
 
-  const runPath = (kind: PathKind, targetDate: string) => {
+  const runPath = (
+    kind: PathKind,
+    targetDate: string,
+    reorderSourceId?: string,
+  ) => {
     // TODO: wire up real path actions — see docs/handoff/homepage-redesign.md.
     const friendlyDate = formatDeliveryDate(targetDate)
-    if (kind === 'reorder' && lastOrder) {
-      window.alert(
-        `Reorder ${formatDeliveryDate(lastOrder.deliveryDate)} (${lastOrder.itemCount} items) — would create draft for ${friendlyDate}.`,
-      )
+    if (kind === 'reorder') {
+      const source = recentOrders.find((o) => o.id === reorderSourceId)
+      if (source) {
+        window.alert(
+          `Reorder ${formatDeliveryDate(source.deliveryDate)} (${source.itemCount} items) — would clone into a draft for ${friendlyDate} and drop into the order builder.`,
+        )
+      }
     } else if (kind === 'usuals') {
       window.alert(
-        `Order your usuals — would create a draft for ${friendlyDate} pre-filled with the customer's usuals.`,
+        `Order your usuals — would create a draft for ${friendlyDate} pre-filled with the customer's usuals and drop into the order builder.`,
       )
     } else {
-      window.alert(`Start from scratch — would create an empty draft for ${friendlyDate}.`)
+      window.alert(
+        `Start from scratch — would create an empty draft for ${friendlyDate} and drop into the order builder.`,
+      )
     }
   }
 
@@ -99,13 +106,12 @@ export function StartOrderFork({
     if (value && value >= todayISODate()) setForkDate(value)
   }
 
-  // When draft exists, fork date must skip past the draft's date.
   const minForkDate =
     primaryDraft !== null && primaryDraft.deliveryDate >= todayISODate()
       ? addDays(primaryDraft.deliveryDate, 1)
       : todayISODate()
 
-  // ---- Brand-new customer (no history, no draft): show single Start order CTA ----
+  // ---- Brand-new customer (no history, no draft): single Start order CTA ----
   if (!showFork) {
     return (
       <section className="space-y-3">
@@ -125,13 +131,11 @@ export function StartOrderFork({
   }
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       {primaryDraft && (
         <Link
           href={draftHref}
-          className={cn(
-            'group flex items-center gap-3 rounded-xl bg-accent px-4 py-3 text-accent-foreground shadow-sm transition-colors hover:bg-accent/90',
-          )}
+          className="group flex items-center gap-3 rounded-xl bg-accent px-4 py-3 text-accent-foreground shadow-sm transition-colors hover:bg-accent/90"
         >
           <OrderStatusDot status="draft" className="bg-accent-foreground/30" />
           <div className="flex-1 text-sm">
@@ -148,7 +152,7 @@ export function StartOrderFork({
       )}
 
       {primaryDraft && (
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex items-center gap-3 pt-1">
           <span className="h-px flex-1 bg-foreground/10" />
           <span className="text-xs uppercase tracking-wide text-muted-foreground">
             or start a new order
@@ -164,38 +168,47 @@ export function StartOrderFork({
         onChange={onChangeDate}
       />
 
-      {showReorder && lastOrder && (
-        <PathRow
-          icon={<RotateCcw className="h-4 w-4" />}
-          label={`Reorder ${formatDeliveryDate(lastOrder.deliveryDate)} (${lastOrder.itemCount} items)`}
-          variant={primaryDraft ? 'outline' : 'accent'}
-          onClick={() => handlePath('reorder')}
-        />
+      {showReorder && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Reorder a recent order
+          </h3>
+          <ReorderList
+            orders={recentOrders}
+            onReorder={(orderId) => handlePath('reorder', orderId)}
+          />
+        </div>
       )}
 
-      {showUsuals && (
+      <div className="space-y-2 pt-1">
+        {(showReorder || showUsuals) && (
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Or
+          </h3>
+        )}
+        {showUsuals && (
+          <PathRow
+            icon={<Sparkles className="h-4 w-4" />}
+            label="Order your usuals"
+            variant="outline"
+            onClick={() => handlePath('usuals')}
+          />
+        )}
         <PathRow
-          icon={<Sparkles className="h-4 w-4" />}
-          label="Order your usuals"
+          label="Start from scratch"
           variant="outline"
-          onClick={() => handlePath('usuals')}
+          onClick={() => handlePath('scratch')}
         />
-      )}
-
-      <PathRow
-        label="Start from scratch"
-        variant="outline"
-        onClick={() => handlePath('scratch')}
-      />
+      </div>
 
       <ConfirmReplaceDialog
         pendingPath={pendingPath}
         primaryDraft={primaryDraft}
-        lastOrder={lastOrder}
+        recentOrders={recentOrders}
         onCancel={() => setPendingPath(null)}
         onConfirm={() => {
           if (pendingPath) {
-            runPath(pendingPath.kind, pendingPath.targetDate)
+            runPath(pendingPath.kind, pendingPath.targetDate, pendingPath.reorderSourceId)
             setPendingPath(null)
           }
         }}
@@ -261,7 +274,10 @@ function PathRow({ label, icon, variant, onClick }: PathRowProps) {
       size="lg"
       onClick={onClick}
       className={cn(
+        // Mobile: full row, generous tap target.
+        // Desktop (sm+): size to content, left-anchored.
         'h-12 w-full justify-between gap-3 rounded-xl px-4',
+        'sm:w-auto sm:justify-start',
         variant === 'outline' && 'border bg-card hover:bg-muted/50',
       )}
     >
@@ -269,7 +285,7 @@ function PathRow({ label, icon, variant, onClick }: PathRowProps) {
         {icon}
         {label}
       </span>
-      <ArrowRight className="h-4 w-4" />
+      <ArrowRight className="h-4 w-4 sm:ml-2" />
     </Button>
   )
 }
@@ -279,7 +295,7 @@ function PathRow({ label, icon, variant, onClick }: PathRowProps) {
 interface ConfirmReplaceDialogProps {
   pendingPath: PendingPath | null
   primaryDraft: StartOrderForkProps['primaryDraft']
-  lastOrder: StartOrderForkProps['lastOrder']
+  recentOrders: ReorderableOrder[]
   onCancel: () => void
   onConfirm: () => void
 }
@@ -287,7 +303,7 @@ interface ConfirmReplaceDialogProps {
 function ConfirmReplaceDialog({
   pendingPath,
   primaryDraft,
-  lastOrder,
+  recentOrders,
   onCancel,
   onConfirm,
 }: ConfirmReplaceDialogProps) {
@@ -300,9 +316,13 @@ function ConfirmReplaceDialog({
     )
   }
 
+  const reorderSource = pendingPath.reorderSourceId
+    ? recentOrders.find((o) => o.id === pendingPath.reorderSourceId)
+    : null
+
   const replacementSummary =
-    pendingPath.kind === 'reorder' && lastOrder
-      ? `last week's order (${lastOrder.itemCount} items from ${formatDeliveryDate(lastOrder.deliveryDate)})`
+    pendingPath.kind === 'reorder' && reorderSource
+      ? `the order from ${formatDeliveryDate(reorderSource.deliveryDate)} (${reorderSource.itemCount} items)`
       : pendingPath.kind === 'usuals'
         ? 'your usuals'
         : 'a fresh empty draft'

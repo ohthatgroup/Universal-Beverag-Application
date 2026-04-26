@@ -1,5 +1,5 @@
 import { OrdersList } from '@/components/orders/orders-list'
-import { PortalPageHeader } from '@/components/portal/portal-page-header'
+import { HomepageGreeting } from '@/components/portal/homepage-greeting'
 import { StartOrderFork } from '@/components/portal/start-order-fork'
 import { PastOrdersSection } from '@/components/portal/past-orders-section'
 import { AccountStatsCard } from '@/components/portal/account-stats-card'
@@ -199,72 +199,82 @@ export default async function PortalHome({
     (o) => o.status === 'submitted' || o.status === 'delivered',
   )
   const submittedOrderCount = submittedOrders.length
-  // ordersResult is already ordered delivery_date desc, so the first row is the most recent.
-  const lastOrderRow = submittedOrders[0] ?? null
-  const lastOrder = lastOrderRow
-    ? {
-        id: lastOrderRow.id,
-        deliveryDate: lastOrderRow.delivery_date,
-        itemCount: lastOrderRow.item_count ?? 0,
-      }
-    : null
+  // ordersResult is already ordered delivery_date desc, so newest first.
+  const recentOrders = submittedOrders.slice(0, 5).map((row) => ({
+    id: row.id,
+    deliveryDate: row.delivery_date,
+    itemCount: row.item_count ?? 0,
+    total: Number(row.total ?? 0),
+    status: row.status as 'submitted' | 'delivered',
+  }))
 
   const nonDraftCurrentOrders = currentOrders.filter((order) => order.status !== 'draft')
 
-  const greetingName = (profile.business_name ?? '').trim() || (profile.contact_name ?? '').trim()
-
   return (
-    <div className="space-y-8">
-      {greetingName ? <PortalPageHeader title={greetingName} /> : null}
-
-      <StartOrderFork
-        token={token}
-        nextDeliveryDate={nextDeliveryDate}
-        nextNextDeliveryDate={nextNextDeliveryDate}
-        primaryDraft={primaryDraft}
-        submittedOrderCount={submittedOrderCount}
-        lastOrder={lastOrder}
-      />
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          For you
-        </h2>
-        {/* TODO: replace with real announcements query */}
-        <AnnouncementsStack
-          announcements={MOCK_ANNOUNCEMENTS}
-          token={token}
-          primaryDraftOrderId={primaryDraftRow?.id ?? null}
-          showPrices={profile.show_prices}
+    <div className="-mx-4 md:-mx-6">
+      {/* Above the fold — welcome moment + start-order surface, on the page background. */}
+      <div className="mx-auto w-full max-w-[600px] space-y-6 px-4 pb-8 md:px-6">
+        <HomepageGreeting
+          contactName={profile.contact_name}
+          businessName={profile.business_name}
         />
-      </section>
 
-      {nonDraftCurrentOrders.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Recent orders
-          </h2>
-          <OrdersList
+        <StartOrderFork
+          token={token}
+          nextDeliveryDate={nextDeliveryDate}
+          nextNextDeliveryDate={nextNextDeliveryDate}
+          primaryDraft={primaryDraft}
+          submittedOrderCount={submittedOrderCount}
+          recentOrders={recentOrders}
+        />
+      </div>
+
+      {/* Below the fold — curated content + history + reference data, on a
+          subtly tinted surface. The tone shift signals a different zone:
+          the salesman side of the page. */}
+      <div className="border-t border-foreground/5 bg-muted/30">
+        <div className="mx-auto w-full max-w-[600px] space-y-8 px-4 py-8 md:px-6">
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              For you
+            </h2>
+            {/* TODO: replace with real announcements query */}
+            <AnnouncementsStack
+              announcements={MOCK_ANNOUNCEMENTS}
+              token={token}
+              primaryDraftOrderId={primaryDraftRow?.id ?? null}
+              showPrices={profile.show_prices}
+            />
+          </section>
+
+          {nonDraftCurrentOrders.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Recent orders
+              </h2>
+              <OrdersList
+                token={token}
+                orders={nonDraftCurrentOrders}
+                variant="current"
+                showPrices={profile.show_prices}
+              />
+            </section>
+          )}
+
+          <PastOrdersSection
             token={token}
-            orders={nonDraftCurrentOrders}
-            variant="current"
+            orders={pastOrders}
             showPrices={profile.show_prices}
           />
-        </section>
-      )}
 
-      <PastOrdersSection
-        token={token}
-        orders={pastOrders}
-        showPrices={profile.show_prices}
-      />
-
-      {/* TODO: replace with real account stats query */}
-      <AccountStatsCard
-        casesThisMonth={MOCK_STATS.casesThisMonth}
-        spendThisMonth={MOCK_STATS.spendThisMonth}
-        ordersThisMonth={MOCK_STATS.ordersThisMonth}
-      />
+          {/* TODO: replace with real account stats query */}
+          <AccountStatsCard
+            casesThisMonth={MOCK_STATS.casesThisMonth}
+            spendThisMonth={MOCK_STATS.spendThisMonth}
+            ordersThisMonth={MOCK_STATS.ordersThisMonth}
+          />
+        </div>
+      </div>
     </div>
   )
 }

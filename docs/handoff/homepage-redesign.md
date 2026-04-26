@@ -23,6 +23,7 @@ a missing entry means a silently broken feature.
 | 11 | `app/(portal)/portal/[token]/page.tsx` | `nextNextDeliveryDate` mocked as `addDays(nextDeliveryDate, 7)` | cutoff-aware delivery-date utility (skip weekends/holidays/cutoffs) |
 | 12 | `components/portal/start-order-fork.tsx` | path-tap handlers fire `window.alert` | `clone_order(source, new_date)` for Reorder; "compute usuals" SQL helper for Usuals; existing draft-create endpoint for Scratch |
 | 13 | `components/portal/start-order-fork.tsx` | confirm-replace dialog only fires the same `window.alert` | atomic swap-draft-contents endpoint (e.g., `delete_order_items` + `clone_order` in one tx) |
+| 14 | `components/portal/reorder-list.tsx` | `OrderPreviewSheet` shows hardcoded `getMockPreviewItems` line items | `GET /api/portal/orders/[id]/items` (or RSC fetch) to load real items per preview |
 
 ## Entries
 
@@ -182,6 +183,22 @@ a missing entry means a silently broken feature.
     `StartOrderHero` does today).
 - **Blocked on:** the "compute usuals" SQL helper (Usuals path); everything
   else exists.
+
+### 13a. OrderPreviewSheet line items are mocked
+
+- **File:** `components/portal/reorder-list.tsx` `getMockPreviewItems` line ~140
+- **What the UI does now:** When the customer taps the eye-icon Preview
+  button on a row in the `<ReorderList>`, the sheet opens with hardcoded
+  archetype line items (Coca-Cola, Sprite, Dasani, …) sized to the order's
+  `itemCount`.
+- **What needs to happen:** Fetch the real line items for the order id —
+  either via `GET /api/portal/orders/[id]/items` on sheet-open, or by
+  pre-fetching items for `recentOrders` in the homepage RSC and passing
+  them in as a prop. Per-open lazy fetch is probably simpler since most
+  customers won't preview every row.
+- **Blocked on:** none — the items endpoint already exists for the
+  readonly order page (`/portal/[token]/order/link/[id]`); reuse the
+  same query.
 
 ### 13. Confirm-replace dialog doesn't actually replace
 

@@ -305,6 +305,205 @@ The handoff doc gets these new entries appended:
 | 12 | `components/portal/start-order-fork.tsx` | path-tap handlers fire `window.alert` | `clone_order(source_order_id, new_delivery_date)` for Reorder; "compute usuals" SQL helper for Usuals; existing draft-create endpoint for Scratch |
 | 13 | `components/portal/start-order-fork.tsx` | confirm-replace dialog wiring (does not actually replace) | `submit_order` / `delete_order_items` + `clone_order` to swap a draft's contents |
 
+## Iteration 2 (post-review feedback)
+
+After the first build, the customer flagged three issues during a live
+preview review:
+
+1. **"Above the fold feels incomplete"** — three big buttons floating in
+   white space read as sparse. The Resume Draft block is rich (date,
+   item count); the path rows below it are bare labels.
+2. **"Jarring on desktop"** — the page column was `max-w-3xl` (768px)
+   while the FYP feed was `max-w-[600px]`, with both centered. As you
+   scrolled the content shifted inward at the FYP boundary.
+3. **"Need a list of previous orders I can reorder from with a preview
+   button"** — the single "Reorder last order" button only handled the
+   most-recent case. Customers want to pick a specific historical order
+   (the big monthly stocking order vs. last week's small fill-in) and
+   peek at its line items before committing.
+
+The iteration:
+
+- Replaces the single Reorder `<PathRow>` with a new `<ReorderList>`
+  that shows the most-recent 3 orders by default with "Show n more"
+  expansion (top 5 from the RSC). Each row carries date, item count,
+  total, an eye-icon Preview affordance, and a Reorder button. The
+  topmost row is amber-tinted (figure); subsequent rows are plain
+  borders (ground).
+- Adds `<OrderPreviewSheet>`, a `<Panel variant="bottom-sheet">` that
+  shows the order's line items as a read-only list (product name +
+  pack label + qty + line total) with a full-width accent
+  "Reorder these items" CTA in the footer. In mock mode the items are
+  hardcoded archetypes; real wiring is handoff entry 13a.
+- Wraps the entire homepage stack in `max-w-[600px] mx-auto` so the
+  whole page is one editorial column on desktop. The FYP and AccountStats
+  components keep their internal max-widths as harmless defaults so they
+  remain self-contained if reused elsewhere.
+- Path rows (`Order your usuals`, `Start from scratch`) are now
+  `w-full` on mobile but `sm:w-auto sm:justify-start` on desktop so
+  they no longer stretch to fill the column. They size to content like
+  Doctrine Rule for buttons specifies.
+- The Reorder action confirms by dropping the customer into the order
+  builder pre-loaded with the cloned items (so they always tweak before
+  submitting). In mock mode the path-handler `window.alert` describes
+  this, including which source order is being cloned.
+
+### Updated component contract — `<StartOrderFork>`
+
+```tsx
+interface StartOrderForkProps {
+  token: string
+  nextDeliveryDate: string
+  nextNextDeliveryDate: string
+  primaryDraft: { id, deliveryDate, itemCount, updatedAt } | null
+  submittedOrderCount: number
+  /** Top 5 most-recent submitted/delivered orders, newest first. */
+  recentOrders: ReorderableOrder[]
+}
+```
+
+The single `lastOrder` prop is replaced by `recentOrders[]`. `<ReorderList>`
+slices to 3 by default and exposes a "Show more" expand.
+
+### Updated layout
+
+```
+┌──────────────────────── max-w-[600px] mx-auto ──────────────────────┐
+│ Page header (greeting)                                              │
+│ Resume draft (if present, accent block)                             │
+│ — or start a new order —                                            │
+│ for delivery <date> · Change date                                   │
+│                                                                      │
+│ REORDER A RECENT ORDER                                              │
+│ ┌─────────────────────────────────────────────────────────────┐    │
+│ │ ● Apr 25 · 24 items · $214.00              [👁] [Reorder]  │    │  ← row 0 amber-tinted
+│ └─────────────────────────────────────────────────────────────┘    │
+│ ┌─────────────────────────────────────────────────────────────┐    │
+│ │ ● Apr 18 · 18 items · $164.00              [👁] [Reorder]  │    │  ← rows 1+ plain border
+│ └─────────────────────────────────────────────────────────────┘    │
+│ ┌─────────────────────────────────────────────────────────────┐    │
+│ │ ● Apr 11 ·  9 items ·  $84.00              [👁] [Reorder]  │    │
+│ └─────────────────────────────────────────────────────────────┘    │
+│           Show 2 more ▾                                             │
+│                                                                      │
+│ OR                                                                  │
+│ ┌──────────────────────────┐                                        │  ← desktop sm:w-auto
+│ │ ★ Order your usuals    →│                                        │
+│ └──────────────────────────┘                                        │
+│ ┌──────────────────────────┐                                        │
+│ │   Start from scratch   →│                                        │
+│ └──────────────────────────┘                                        │
+│                                                                      │
+│ FOR YOU [announcements feed]                                        │
+│ RECENT ORDERS [OrdersList]                                          │
+│ PAST ORDERS                                                         │
+│ Account stats                                                       │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+## Iteration 3 (the welcome moment + zone separation)
+
+After iteration 2 the structure was right but the page still didn't feel
+like an *arrival*. Customer feedback:
+
+> "Above the fold needs to be visually separated from below the fold.
+> And we need to add a nice greeting and maybe today's date and time.
+> Think like a designer first — you want to impress the customer when
+> they enter."
+
+The literal phrasing the customer suggested:
+
+> *"Good Morning Maya — Today is Tuesday May 4 — It is 4:15 — what can
+> we get for Maya Deli today?"*
+
+That phrasing reads as one continuous welcome sentence. It splits
+naturally into three layers, becoming a `<HomepageGreeting>` block:
+
+```
+Good morning, Maya
+Today is Tuesday, May 4 · It's 4:15 PM
+
+What can we get for Maya Deli today?
+```
+
+- Period-of-day greeting + first name (text-2xl, semibold).
+- Quiet temporal context line (text-sm muted) — orients the customer
+  before they make scheduling decisions.
+- Lead-in question that uses the *business name* (because that's what
+  they're ordering for) — this becomes the page asking the question
+  that the start-order fork answers, so the fork no longer floats.
+
+### Time-zone handling
+
+The greeting reads the browser's local clock — server-side rendering
+would lie about the customer's timezone (Cloudflare Workers runs UTC,
+so a 7pm EST customer would see "Good morning"). `<HomepageGreeting>`
+is therefore a client component. It hydrates with the user's local
+time and updates every 60 seconds.
+
+Pre-hydration the greeting renders "Hello" + omits the time line, so
+the layout doesn't shift on hydration.
+
+### Above-the-fold vs below-the-fold zones
+
+The page now has two visually distinct surfaces:
+
+- **Above the fold** — page background. The welcome moment + start-order
+  surface. Operational, customer-driven.
+- **Below the fold** — `border-t border-foreground/5 bg-muted/30`. The
+  curated content + history + reference data. Salesman-driven and
+  reference.
+
+This satisfies the "separate the two pillars" feedback without an
+explicit divider line — the tone shift is enough.
+
+### Layout
+
+```
+┌──────────────── max-w-[600px] mx-auto ─────────────────┐
+│                                                         │
+│  Good morning, Maya                                     │
+│  Today is Tuesday, May 4 · It's 4:15 PM                 │
+│                                                         │
+│  What can we get for Maya Deli today?                   │
+│                                                         │
+│  Resume draft for Apr 25, 2026 [accent block]           │
+│  — or start a new order —                               │
+│  for delivery May 2 · Change date                       │
+│                                                         │
+│  REORDER A RECENT ORDER                                 │
+│  [list rows]                                            │
+│                                                         │
+│  OR                                                     │
+│  [Order your usuals]    [Start from scratch]            │
+│                                                         │
+├──── border-t  bg-muted/30 ──────────────────────────────┤  ← zone seam
+│                                                         │
+│  FOR YOU [announcements feed]                           │
+│  RECENT ORDERS [list]                                   │
+│  PAST ORDERS                                            │
+│  Account stats card                                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Greeting fallbacks
+
+| `contact_name` | `business_name` | Greeting | Question |
+|---|---|---|---|
+| "Maya" | "Maya Deli" | "Good morning, Maya" | "What can we get for Maya Deli today?" |
+| "Maya" | empty | "Good morning, Maya" | "What can we get for Maya today?" |
+| empty | "Maya Deli" | "Good morning" | "What can we get for Maya Deli today?" |
+| empty | empty | "Good morning" | "What can we get for you today?" |
+
+### Period-of-day boundaries
+
+| Hour (local) | Greeting |
+|---|---|
+| 0–4 | Good evening |
+| 5–11 | Good morning |
+| 12–16 | Good afternoon |
+| 17–23 | Good evening |
+
 ## Plan format
 
 This is a single-PR change. The implementation is one new component + one page rewrite + handoff doc update. No multi-step plan needed.
