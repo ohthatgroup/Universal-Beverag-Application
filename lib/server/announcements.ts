@@ -206,6 +206,22 @@ function inlineProductIds(a: Announcement): string[] {
   return []
 }
 
+/**
+ * Every product UUID an announcement could need resolved on the homepage —
+ * inline products PLUS any product-target CTA on an editorial card. The
+ * drawer (`<PromoSheet>`) opens with these.
+ */
+function allProductIds(a: Announcement): string[] {
+  const inline = inlineProductIds(a)
+  if (a.cta_target_kind === 'product' && a.cta_target_product_id) {
+    return [...inline, a.cta_target_product_id]
+  }
+  if (a.cta_target_kind === 'products') {
+    return [...inline, ...a.cta_target_product_ids]
+  }
+  return inline
+}
+
 interface ProductRow {
   id: string
   brand_id: string | null
@@ -261,8 +277,10 @@ export async function fetchInlineAnnouncementProducts(
   announcements: Announcement[],
   customerId: string,
 ): Promise<Map<string, CatalogProduct>> {
+  // Resolve every product an announcement could need — inline products AND
+  // product-target CTAs (the drawer body needs the latter).
   const ids = Array.from(
-    new Set(announcements.flatMap((a) => inlineProductIds(a))),
+    new Set(announcements.flatMap((a) => allProductIds(a))),
   )
   if (ids.length === 0) return new Map()
 
@@ -361,4 +379,40 @@ export function pickResolvedProducts(
     return { product: null, products }
   }
   return { product: null, products: [] }
+}
+
+/**
+ * Resolve the products that `<PromoSheet>` should display when the customer
+ * taps the announcement banner. Same fallback chain as
+ * `resolvePromoProductIds` — CTA target first, then content_type inline ids.
+ *
+ * Returns `null` when no products should open a drawer (e.g. text card with
+ * no CTA, or url-target CTA, or content with all-discontinued products).
+ *
+ * Also returns `hasMissingProducts` so the drawer can render the
+ * "Some products… no longer available" notice when stale UUIDs were
+ * skipped.
+ */
+export function pickDrawerProducts(
+  a: Announcement,
+  productMap: Map<string, CatalogProduct>,
+): { products: CatalogProduct[]; hasMissingProducts: boolean } | null {
+  // url targets don't open a drawer — they open in a new tab.
+  if (a.cta_target_kind === 'url') return null
+
+  const ids = resolvePromoProductIds(a)
+  if (ids.length === 0) return null
+
+  const products = ids
+    .map((id) => productMap.get(id))
+    .filter((p): p is CatalogProduct => Boolean(p))
+
+  // No surviving products → nothing to show. Caller should treat this as
+  // "no drawer."
+  if (products.length === 0) return null
+
+  return {
+    products,
+    hasMissingProducts: products.length < ids.length,
+  }
 }

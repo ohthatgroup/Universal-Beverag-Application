@@ -47,25 +47,44 @@ interface AnnouncementsStackProps {
   announcements: Announcement[]
   token: string
   primaryDraftOrderId: string | null
+  primaryDraftDate?: string | null
   showPrices: boolean
   /**
    * Pre-resolved per-card products keyed by announcement id. Spotlight cards
    * pull their single product from `product`; specials-grid cards pull their
-   * tile list from `products`. Editorial cards (text/image/image_text) ignore
-   * both — their CTAs route to `<PromoSheet>` which resolves on the client.
+   * tile list from `products`. Editorial cards ignore this — they open the
+   * drawer instead.
    */
   resolvedProductsByAnnouncement?: Record<
     string,
     { product: CatalogProduct | null; products: CatalogProduct[] }
   >
+  /**
+   * Pre-resolved drawer products keyed by announcement id. When non-null,
+   * the card surface is clickable and opens `<PromoSheet>` with these
+   * products. When null, the card is non-clickable (or the CTA is a real
+   * url-target link, handled separately by the card body).
+   */
+  drawerProductsByAnnouncement?: Record<
+    string,
+    { products: CatalogProduct[]; hasMissingProducts: boolean } | null
+  >
+  /**
+   * product_id → qty in the customer's primary draft. Seeded into the
+   * drawer's steppers on every open.
+   */
+  initialQuantitiesByProductId?: Record<string, number>
 }
 
 export async function AnnouncementsStack({
   announcements,
   token,
   primaryDraftOrderId,
+  primaryDraftDate = null,
   showPrices,
   resolvedProductsByAnnouncement,
+  drawerProductsByAnnouncement,
+  initialQuantitiesByProductId = {},
 }: AnnouncementsStackProps) {
   if (announcements.length === 0) return null
 
@@ -73,15 +92,20 @@ export async function AnnouncementsStack({
     <div className="mx-auto w-full max-w-[600px] space-y-4">
       {announcements.map((a) => {
         const resolved = resolvedProductsByAnnouncement?.[a.id]
+        const drawer = drawerProductsByAnnouncement?.[a.id] ?? null
         return (
           <AnnouncementCard
             key={a.id}
             announcement={a}
             token={token}
             primaryDraftOrderId={primaryDraftOrderId}
+            primaryDraftDate={primaryDraftDate}
             showPrices={showPrices}
             resolvedProduct={resolved?.product ?? null}
             resolvedProducts={resolved?.products}
+            drawerProducts={drawer?.products ?? null}
+            drawerHasMissing={drawer?.hasMissingProducts ?? false}
+            initialQuantitiesByProductId={initialQuantitiesByProductId}
           />
         )
       })}

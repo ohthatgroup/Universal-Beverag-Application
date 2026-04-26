@@ -1,107 +1,184 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 import { Money } from '@/components/ui/money'
-import { ProductTile } from '@/components/catalog/product-tile'
-import { ProductPopout } from '@/components/catalog/product-popout'
-import { Stepper } from '@/components/ui/stepper'
+import { PromoSheet } from '@/components/portal/promo-sheet'
 import type { Announcement } from '@/components/portal/announcements-stack'
 import type { CatalogProduct } from '@/lib/types'
 import { cn, getProductPackLabel } from '@/lib/utils'
 
 /**
- * Wrap CTA content in the right link element for the announcement's
- * destination kind:
- *   - 'products' / 'product' → Next <Link> to /portal/[token]/promo/[id]
- *   - 'url'                  → external <a target="_blank">
- *   - null                   → no CTA renders (caller already gates on this)
+ * Wraps an editorial card body so the entire surface is the click target.
+ *
+ * Three modes based on the announcement's CTA destination:
+ *   - drawer products available → tap opens `<PromoSheet>` with those
+ *     products. CTA button (when present) just rides along visually.
+ *   - `cta_target_kind === 'url'` → tap opens the URL in a new tab.
+ *   - otherwise → no click handler, card is informational.
  */
-function CtaLink({
+function CardSurface({
   announcement,
   token,
+  primaryDraftOrderId,
+  primaryDraftDate,
+  showPrices,
+  drawerProducts,
+  drawerHasMissing,
+  initialQuantitiesByProductId,
   className,
   children,
 }: {
   announcement: Announcement
   token: string
+  primaryDraftOrderId: string | null
+  primaryDraftDate: string | null
+  showPrices: boolean
+  drawerProducts: CatalogProduct[] | null
+  drawerHasMissing: boolean
+  initialQuantitiesByProductId: Record<string, number>
   className?: string
   children: ReactNode
 }) {
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const kind = announcement.cta_target_kind
-  if (kind === 'products' || kind === 'product') {
+
+  // Drawer mode — most common: any text/image/image_text card with a
+  // product CTA gets the drawer.
+  if (drawerProducts && drawerProducts.length > 0) {
+    const initialForDrawer: Record<string, number> = {}
+    for (const p of drawerProducts) {
+      const qty = initialQuantitiesByProductId[p.id] ?? 0
+      if (qty > 0) initialForDrawer[p.id] = qty
+    }
     return (
-      <Link
-        href={`/portal/${token}/promo/${announcement.id}`}
-        className={className}
-      >
-        {children}
-      </Link>
+      <>
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className={cn(
+            'block w-full cursor-pointer text-left transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            className,
+          )}
+        >
+          {children}
+        </button>
+        <PromoSheet
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          title={announcement.title ?? 'Promotion'}
+          subtitle={announcement.body ?? null}
+          products={drawerProducts}
+          initialQuantities={initialForDrawer}
+          primaryDraftId={primaryDraftOrderId}
+          primaryDraftDate={primaryDraftDate}
+          showPrices={showPrices}
+          hasMissingProducts={drawerHasMissing}
+          token={token}
+        />
+      </>
     )
   }
-  // url (or null/legacy) — fall through to external anchor.
-  return (
-    <a
-      href={announcement.cta_target_url ?? '#'}
-      target="_blank"
-      rel="noreferrer"
-      className={className}
-    >
-      {children}
-    </a>
-  )
+
+  // URL-target — open the URL in a new tab. No drawer.
+  if (kind === 'url' && announcement.cta_target_url) {
+    return (
+      <a
+        href={announcement.cta_target_url}
+        target="_blank"
+        rel="noreferrer"
+        className={cn('block w-full', className)}
+      >
+        {children}
+      </a>
+    )
+  }
+
+  // No CTA — informational card, plain wrapper.
+  return <div className={className}>{children}</div>
 }
 
 interface AnnouncementCardProps {
   announcement: Announcement
   token: string
   primaryDraftOrderId: string | null
+  primaryDraftDate?: string | null
   showPrices: boolean
   resolvedProduct?: CatalogProduct | null
   resolvedProducts?: CatalogProduct[]
+  drawerProducts?: CatalogProduct[] | null
+  drawerHasMissing?: boolean
+  initialQuantitiesByProductId?: Record<string, number>
 }
 
 export function AnnouncementCard({
   announcement,
   token,
   primaryDraftOrderId,
+  primaryDraftDate = null,
   showPrices,
   resolvedProduct = null,
   resolvedProducts,
+  drawerProducts = null,
+  drawerHasMissing = false,
+  initialQuantitiesByProductId = {},
 }: AnnouncementCardProps) {
+  const surfaceProps = {
+    announcement,
+    token,
+    primaryDraftOrderId,
+    primaryDraftDate,
+    showPrices,
+    drawerProducts,
+    drawerHasMissing,
+    initialQuantitiesByProductId,
+  }
+
   switch (announcement.content_type) {
     case 'text':
-      return <TextCard a={announcement} token={token} />
+      return (
+        <CardSurface {...surfaceProps}>
+          <TextCardBody a={announcement} />
+        </CardSurface>
+      )
     case 'image':
-      return <ImageBannerCard a={announcement} token={token} />
+      return (
+        <CardSurface {...surfaceProps}>
+          <ImageBannerCardBody a={announcement} />
+        </CardSurface>
+      )
     case 'image_text':
-      return <ImageTextCard a={announcement} token={token} />
+      return (
+        <CardSurface {...surfaceProps}>
+          <ImageTextCardBody a={announcement} />
+        </CardSurface>
+      )
     case 'product':
       return (
-        <ProductSpotlightCard
-          a={announcement}
-          product={resolvedProduct}
-          token={token}
-          primaryDraftOrderId={primaryDraftOrderId}
-          showPrices={showPrices}
-        />
+        <CardSurface {...surfaceProps}>
+          <ProductSpotlightCardBody
+            a={announcement}
+            product={resolvedProduct}
+            showPrices={showPrices}
+          />
+        </CardSurface>
       )
     case 'specials_grid':
       return (
-        <SpecialsGridCard
-          a={announcement}
-          products={resolvedProducts ?? []}
-          showPrices={showPrices}
-          badgeOverrides={announcement.badge_overrides}
-        />
+        <CardSurface {...surfaceProps}>
+          <SpecialsGridCardBody
+            a={announcement}
+            products={resolvedProducts ?? []}
+            showPrices={showPrices}
+            badgeOverrides={announcement.badge_overrides}
+          />
+        </CardSurface>
       )
   }
 }
 
-// ---- TextCard -----------------------------------------------------------
+// ---- TextCardBody -------------------------------------------------------
 
-function TextCard({ a, token }: { a: Announcement; token: string }) {
+function TextCardBody({ a }: { a: Announcement }) {
   return (
     <div className="rounded-xl border bg-card px-4 py-4">
       {a.title && <p className="text-base font-semibold">{a.title}</p>}
@@ -110,20 +187,18 @@ function TextCard({ a, token }: { a: Announcement; token: string }) {
       )}
       {a.cta_label && a.cta_target_kind && (
         <div className="mt-3 flex justify-end">
-          <CtaLink announcement={a} token={token}>
-            <Button variant="outline" size="sm">
-              {a.cta_label}
-            </Button>
-          </CtaLink>
+          <span className="pointer-events-none inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium">
+            {a.cta_label}
+          </span>
         </div>
       )}
     </div>
   )
 }
 
-// ---- ImageBannerCard ----------------------------------------------------
+// ---- ImageBannerCardBody ------------------------------------------------
 
-function ImageBannerCard({ a, token }: { a: Announcement; token: string }) {
+function ImageBannerCardBody({ a }: { a: Announcement }) {
   return (
     <div className="relative overflow-hidden rounded-xl">
       {a.image_url ? (
@@ -141,24 +216,18 @@ function ImageBannerCard({ a, token }: { a: Announcement; token: string }) {
           <span className="text-base font-semibold text-white">{a.title}</span>
         )}
         {a.cta_label && a.cta_target_kind && (
-          <CtaLink announcement={a} token={token} className="shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-white/50 bg-transparent text-white hover:bg-white/10 hover:text-white"
-            >
-              {a.cta_label}
-            </Button>
-          </CtaLink>
+          <span className="pointer-events-none inline-flex h-9 shrink-0 items-center rounded-md border border-white/50 bg-transparent px-3 text-sm font-medium text-white">
+            {a.cta_label}
+          </span>
         )}
       </div>
     </div>
   )
 }
 
-// ---- ImageTextCard ------------------------------------------------------
+// ---- ImageTextCardBody --------------------------------------------------
 
-function ImageTextCard({ a, token }: { a: Announcement; token: string }) {
+function ImageTextCardBody({ a }: { a: Announcement }) {
   return (
     <div className="flex flex-col gap-4 overflow-hidden rounded-xl border bg-card p-4 md:flex-row md:items-center">
       <div className="shrink-0 md:w-[40%]">
@@ -179,52 +248,31 @@ function ImageTextCard({ a, token }: { a: Announcement; token: string }) {
           <p className="text-sm text-muted-foreground">{a.body}</p>
         )}
         {a.cta_label && a.cta_target_kind && (
-          <CtaLink
-            announcement={a}
-            token={token}
-            className="mt-1 self-start"
-          >
-            <Button variant="outline" size="sm">
-              {a.cta_label}
-            </Button>
-          </CtaLink>
+          <span className="pointer-events-none mt-1 inline-flex h-9 items-center self-start rounded-md border border-input bg-background px-3 text-sm font-medium">
+            {a.cta_label}
+          </span>
         )}
       </div>
     </div>
   )
 }
 
-// ---- ProductSpotlightCard -----------------------------------------------
+// ---- ProductSpotlightCardBody -------------------------------------------
+//
+// Visual-only — clicking the card opens `<PromoSheet>` with the single
+// resolved product (handled by `<CardSurface>`). Customer adjusts qty +
+// commits there.
 
-function ProductSpotlightCard({
+function ProductSpotlightCardBody({
   a,
   product,
-  primaryDraftOrderId,
   showPrices,
 }: {
   a: Announcement
   product: CatalogProduct | null
-  token: string
-  primaryDraftOrderId: string | null
   showPrices: boolean
 }) {
-  // Local quantity state. In mock mode and without a draft, this is just
-  // a visual stub — real autosave wiring is a backend task.
-  const [qty, setQty] = useState(0)
-
   const packLabel = product ? getProductPackLabel(product) : null
-  const hasDraft = primaryDraftOrderId !== null
-
-  const handleAddPress = () => {
-    if (!hasDraft) {
-      // TODO: open <Panel variant="bottom-sheet"> date picker — backend task.
-      window.alert(
-        'Pick a delivery date to start an order. (Date-picker sheet TBD.)',
-      )
-      return
-    }
-    setQty(1)
-  }
 
   return (
     <div className="rounded-xl border-2 border-accent/30 bg-card p-4">
@@ -267,18 +315,9 @@ function ProductSpotlightCard({
           )}
 
           <div className="mt-3 flex justify-end">
-            {hasDraft && qty > 0 ? (
-              <Stepper quantity={qty} onChange={setQty} size="sm" />
-            ) : (
-              <Button
-                variant="accent"
-                size="sm"
-                onClick={handleAddPress}
-                disabled={!product}
-              >
-                {a.cta_label ?? 'Add to order'}
-              </Button>
-            )}
+            <span className="pointer-events-none inline-flex h-9 items-center rounded-md bg-accent px-3 text-sm font-medium text-accent-foreground">
+              {a.cta_label ?? 'Add to order'}
+            </span>
           </div>
         </div>
       </div>
@@ -286,12 +325,15 @@ function ProductSpotlightCard({
   )
 }
 
-// ---- SpecialsGridCard ---------------------------------------------------
+// ---- SpecialsGridCardBody ----------------------------------------------
+//
+// Visual preview tiles only. Tapping anywhere on the card opens
+// `<PromoSheet>` with all the products (handled by `<CardSurface>`).
+// Steppers and ProductPopout live inside the drawer.
 
-function SpecialsGridCard({
+function SpecialsGridCardBody({
   a,
   products,
-  showPrices,
   badgeOverrides,
 }: {
   a: Announcement
@@ -299,19 +341,6 @@ function SpecialsGridCard({
   showPrices: boolean
   badgeOverrides: Record<string, string>
 }) {
-  const [openProductId, setOpenProductId] = useState<string | null>(null)
-  const [quantities, setQuantities] = useState<Record<string, number>>({})
-
-  const openProduct =
-    openProductId !== null
-      ? products.find((p) => p.id === openProductId) ?? null
-      : null
-
-  const setQty = (productId: string, qty: number) => {
-    setQuantities((prev) => ({ ...prev, [productId]: qty }))
-    // TODO: wire up autosave via useAutoSavePortal — backend task.
-  }
-
   return (
     <div className="rounded-xl border border-accent/20 bg-accent/5 p-3">
       <p className="mb-2 text-sm font-semibold text-accent">
@@ -331,11 +360,20 @@ function SpecialsGridCard({
                     {badgeOverrides[p.id]}
                   </span>
                 )}
-                <ProductTile
-                  product={p}
-                  quantity={quantities[p.id] ?? 0}
-                  onOpen={() => setOpenProductId(p.id)}
-                />
+                {/* Static thumbnail — no interactivity here; the drawer
+                    handles steppers and popouts. */}
+                <div className="aspect-[4/5] overflow-hidden rounded-xl bg-white">
+                  {p.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.image_url}
+                      alt={p.title}
+                      className="h-full w-full object-contain p-2"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-muted" />
+                  )}
+                </div>
               </div>
             ))
           : Array.from({ length: 4 }, (_, i) => (
@@ -345,18 +383,6 @@ function SpecialsGridCard({
               />
             ))}
       </div>
-
-      <ProductPopout
-        product={openProduct}
-        quantity={openProduct ? quantities[openProduct.id] ?? 0 : 0}
-        onChange={(next) => {
-          if (openProduct) setQty(openProduct.id, next)
-        }}
-        onOpenChange={(open) => {
-          if (!open) setOpenProductId(null)
-        }}
-        showPrices={showPrices}
-      />
     </div>
   )
 }

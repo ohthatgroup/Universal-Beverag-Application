@@ -4,6 +4,7 @@ import { AnnouncementsStack } from '@/components/portal/announcements-stack'
 import {
   fetchHomepageAnnouncements,
   fetchInlineAnnouncementProducts,
+  pickDrawerProducts,
   pickResolvedProducts,
 } from '@/lib/server/announcements'
 import { getRequestDb } from '@/lib/server/db'
@@ -49,9 +50,9 @@ export default async function PortalHome({
     profile.tags ?? [],
   )
 
-  // Resolve products for inline cards (spotlight + specials_grid). Editorial
-  // cards don't need this — their CTAs route to <PromoSheet> which resolves
-  // on the client.
+  // Resolve products for inline cards (spotlight + specials_grid) AND for
+  // the drawer (any editorial card with a product-target CTA). One batched
+  // query covers both — see fetchInlineAnnouncementProducts.
   const productMap = await fetchInlineAnnouncementProducts(
     db,
     announcements,
@@ -61,8 +62,32 @@ export default async function PortalHome({
     string,
     { product: CatalogProduct | null; products: CatalogProduct[] }
   > = {}
+  const drawerProductsByAnnouncement: Record<
+    string,
+    { products: CatalogProduct[]; hasMissingProducts: boolean } | null
+  > = {}
   for (const a of announcements) {
     resolvedProductsByAnnouncement[a.id] = pickResolvedProducts(a, productMap)
+    drawerProductsByAnnouncement[a.id] = pickDrawerProducts(a, productMap)
+  }
+
+  // Look up the customer's primary draft items so the drawer's steppers
+  // start at the right qty for products they've already added.
+  const primaryDraftId = drafts[0]?.id ?? null
+  const primaryDraftDate = drafts[0]?.deliveryDate ?? null
+  const initialQuantitiesByProductId: Record<string, number> = {}
+  if (primaryDraftId) {
+    const itemsResult = await db.query<{ product_id: string; quantity: number }>(
+      `select product_id, quantity
+         from order_items
+        where order_id = $1
+          and product_id is not null
+          and quantity > 0`,
+      [primaryDraftId],
+    )
+    for (const row of itemsResult.rows) {
+      initialQuantitiesByProductId[row.product_id] = row.quantity
+    }
   }
 
   return (
@@ -83,9 +108,12 @@ export default async function PortalHome({
         <AnnouncementsStack
           announcements={announcements}
           token={token}
-          primaryDraftOrderId={drafts[0]?.id ?? null}
+          primaryDraftOrderId={primaryDraftId}
+          primaryDraftDate={primaryDraftDate}
           showPrices={profile.show_prices}
           resolvedProductsByAnnouncement={resolvedProductsByAnnouncement}
+          drawerProductsByAnnouncement={drawerProductsByAnnouncement}
+          initialQuantitiesByProductId={initialQuantitiesByProductId}
         />
       </section>
     </div>
