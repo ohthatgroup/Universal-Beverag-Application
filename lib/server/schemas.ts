@@ -308,6 +308,8 @@ export const announcementContentTypeEnum = z.enum([
   'specials_grid',
 ])
 
+export const announcementKindEnum = z.enum(['announcement', 'deal'])
+
 export const announcementCtaTargetKindEnum = z.enum(['products', 'product', 'url'])
 
 const announcementProductQuantitySchema = z.object({
@@ -316,6 +318,7 @@ const announcementProductQuantitySchema = z.object({
 })
 
 const announcementFields = {
+  kind: announcementKindEnum,
   content_type: announcementContentTypeEnum,
   title: z.string().max(300).nullable(),
   body: z.string().max(2000).nullable(),

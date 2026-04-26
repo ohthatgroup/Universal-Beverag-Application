@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { buildPortalItemSaveRequest } from '@/lib/portal-order-save'
 
 describe('buildPortalItemSaveRequest', () => {
-  it('throws when no product or pallet is provided', () => {
+  it('throws when productId is missing', () => {
     expect(() =>
+      // @ts-expect-error — intentionally missing productId for the negative test
       buildPortalItemSaveRequest({
         quantity: 1,
         unitPrice: 10,
       })
-    ).toThrow('Autosave requires either productId or palletDealId')
+    ).toThrow('Autosave requires productId')
   })
 
   it('builds a DELETE request when quantity is zero', () => {
@@ -22,7 +23,6 @@ describe('buildPortalItemSaveRequest', () => {
       method: 'DELETE',
       body: {
         productId: 'prod-1',
-        palletDealId: null,
       },
     })
   })
@@ -30,15 +30,14 @@ describe('buildPortalItemSaveRequest', () => {
   it('builds a PUT request when quantity is greater than zero', () => {
     expect(
       buildPortalItemSaveRequest({
-        palletDealId: 'pallet-1',
+        productId: 'prod-1',
         quantity: 3,
         unitPrice: 8.75,
       })
     ).toEqual({
       method: 'PUT',
       body: {
-        productId: null,
-        palletDealId: 'pallet-1',
+        productId: 'prod-1',
         quantity: 3,
         unitPrice: 8.75,
       },

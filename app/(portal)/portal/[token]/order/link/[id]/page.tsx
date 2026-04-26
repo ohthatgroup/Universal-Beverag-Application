@@ -49,12 +49,11 @@ export default async function PortalOrderLinkPage({
     const { rows: orderItems } = await db.query<{
       id: string
       product_id: string | null
-      pallet_deal_id: string | null
       quantity: number
       unit_price: number | null
       line_total: number | null
     }>(
-      `select id, product_id, pallet_deal_id, quantity, unit_price, line_total
+      `select id, product_id, quantity, unit_price, line_total
        from order_items
        where order_id = $1 and quantity > 0
        order by id asc`,
@@ -64,11 +63,8 @@ export default async function PortalOrderLinkPage({
     const productIds = orderItems
       .map((item) => item.product_id)
       .filter((value): value is string => Boolean(value))
-    const palletIds = orderItems
-      .map((item) => item.pallet_deal_id)
-      .filter((value): value is string => Boolean(value))
 
-    const [productsResult, palletsResult, brandsResult] = await Promise.all([
+    const [productsResult, brandsResult] = await Promise.all([
       productIds.length
         ? db.query<{
             id: string
@@ -85,30 +81,20 @@ export default async function PortalOrderLinkPage({
             [productIds]
           )
         : Promise.resolve({ rows: [] }),
-      palletIds.length
-        ? db.query<{ id: string; title: string; description: string | null }>(
-            `select id, title, description
-             from pallet_deals
-             where id = any($1::uuid[])`,
-            [palletIds]
-          )
-        : Promise.resolve({ rows: [] }),
       db.query<{ id: string; name: string }>('select id, name from brands'),
     ])
 
     const productById = new Map(productsResult.rows.map((product) => [product.id, product] as const))
-    const palletById = new Map(palletsResult.rows.map((pallet) => [pallet.id, pallet] as const))
     const brandById = new Map(brandsResult.rows.map((brand) => [brand.id, brand.name] as const))
 
     const items = orderItems.map((item) => {
       const product = item.product_id ? productById.get(item.product_id) : null
-      const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
       const brandName = product?.brand_id ? brandById.get(product.brand_id) ?? null : null
 
       return {
         id: item.id,
-        title: product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item',
-        details: (product ? getProductPackLabel(product) : null) ?? pallet?.description ?? '',
+        title: product ? getProductDisplayName(product, brandName) : 'Unknown item',
+        details: product ? getProductPackLabel(product) ?? '' : '',
         quantity: item.quantity,
         unitPrice: Number(item.unit_price ?? 0),
         lineTotal: Number(item.line_total ?? 0),
@@ -158,11 +144,10 @@ export default async function PortalOrderLinkPage({
       ),
       db.query<{
         product_id: string | null
-        pallet_deal_id: string | null
         quantity: number
         unit_price: number
       }>(
-        `select product_id, pallet_deal_id, quantity, unit_price
+        `select product_id, quantity, unit_price
          from order_items
          where order_id = $1 and quantity > 0`,
         [order.id]

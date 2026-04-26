@@ -28,7 +28,6 @@ interface OrderPreviewSheetProps {
 interface PreviewItemRow {
   id: string
   product_id: string | null
-  pallet_deal_id: string | null
   quantity: number
   unit_price: number
   line_total: number | null
@@ -38,8 +37,6 @@ interface PreviewItemRow {
   product_pack_count: number | null
   product_size_value: number | null
   product_size_uom: string | null
-  pallet_title: string | null
-  pallet_image_url: string | null
 }
 
 /**
@@ -184,9 +181,8 @@ function PreviewItemRow({
   item: PreviewItemRow
   showPrices: boolean
 }) {
-  const title =
-    item.product_title ?? item.pallet_title ?? 'Removed product'
-  const imageUrl = item.product_image_url ?? item.pallet_image_url ?? null
+  const title = item.product_title ?? 'Removed product'
+  const imageUrl = item.product_image_url ?? null
   const packLabel = item.product_id
     ? getProductPackLabel({
         pack_details: item.product_pack_details,

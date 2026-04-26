@@ -11,11 +11,11 @@ import { TagChipInput } from '@/components/ui/tag-chip-input'
 import {
   ProductPicker,
   type PickerProduct,
-  type PickerQuantity,
 } from '@/components/admin/product-picker'
 import type {
   Announcement,
   AnnouncementContentType,
+  AnnouncementKind,
   CtaTargetKind,
   ProductQuantityOverride,
 } from '@/components/portal/announcements-stack'
@@ -25,6 +25,12 @@ interface AnnouncementDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialAnnouncement?: Announcement | null
+  /**
+   * For new (non-editing) opens, what kind to default to. Drives the
+   * dialog title + the saved row's `kind` field. Editing always uses the
+   * existing announcement's kind. Defaults to 'announcement'.
+   */
+  defaultKind?: AnnouncementKind
   onSave: (data: Partial<Announcement>) => void
   /**
    * Products to feed the search-as-you-type picker. Empty array hides the
@@ -50,6 +56,7 @@ const TYPE_OPTIONS: TypeOption[] = [
 ]
 
 interface FormState {
+  kind: AnnouncementKind
   content_type: AnnouncementContentType | null
   title: string
   body: string
@@ -77,6 +84,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
+  kind: 'announcement',
   content_type: null,
   title: '',
   body: '',
@@ -97,6 +105,7 @@ const EMPTY_FORM: FormState = {
 
 function announcementToForm(a: Announcement): FormState {
   return {
+    kind: a.kind,
     content_type: a.content_type,
     title: a.title ?? '',
     body: a.body ?? '',
@@ -120,6 +129,7 @@ export function AnnouncementDialog({
   open,
   onOpenChange,
   initialAnnouncement = null,
+  defaultKind = 'announcement',
   onSave,
   pickerProducts = [],
 }: AnnouncementDialogProps) {
@@ -134,11 +144,11 @@ export function AnnouncementDialog({
       setForm(announcementToForm(initialAnnouncement))
       setStep(2)
     } else {
-      setForm(EMPTY_FORM)
+      setForm({ ...EMPTY_FORM, kind: defaultKind })
       setStep(1)
     }
     setError(null)
-  }, [open, initialAnnouncement])
+  }, [open, initialAnnouncement, defaultKind])
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -222,6 +232,7 @@ export function AnnouncementDialog({
     }
 
     const partial: Partial<Announcement> = {
+      kind: form.kind,
       content_type: type,
       title: form.title.trim() || null,
       body: form.body.trim() || null,
@@ -243,11 +254,12 @@ export function AnnouncementDialog({
     onOpenChange(false)
   }
 
+  const noun = form.kind === 'deal' ? 'Deal' : 'Announcement'
   const dialogTitle = isEditing
-    ? 'Edit Announcement'
+    ? `Edit ${noun}`
     : step === 1
-    ? 'New Announcement'
-    : `New Announcement: ${TYPE_OPTIONS.find((o) => o.value === form.content_type)?.label ?? ''}`
+    ? `New ${noun}`
+    : `New ${noun}: ${TYPE_OPTIONS.find((o) => o.value === form.content_type)?.label ?? ''}`
 
   return (
     <Panel
@@ -359,6 +371,38 @@ function FieldsForm({
 
   return (
     <div className="space-y-4">
+      {/* Kind toggle — Announcement vs Deal. Both kinds use the same
+          content types; this just marks the row for the homepage stack
+          and the admin tab split. */}
+      <Field label="Kind">
+        <div className="inline-flex rounded-md border bg-muted/40 p-0.5 text-xs font-medium">
+          {(
+            [
+              { value: 'announcement', label: 'Announcement' },
+              { value: 'deal', label: 'Deal' },
+            ] as const
+          ).map((opt) => {
+            const active = form.kind === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setField('kind', opt.value)}
+                aria-pressed={active}
+                className={cn(
+                  'rounded px-3 py-1 transition-colors',
+                  active
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </Field>
+
       {/* Type-specific fields */}
       {(type === 'image' || type === 'image_text') && (
         <Field label="Image URL" required>

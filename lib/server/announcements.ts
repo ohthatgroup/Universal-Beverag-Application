@@ -14,6 +14,7 @@ import type { CatalogProduct } from '@/lib/types'
 
 interface AnnouncementRow {
   id: string
+  kind: string
   content_type: string
   title: string | null
   body: string | null
@@ -55,6 +56,7 @@ function toIsoDate(value: string | Date | null): string | null {
 export function rowToAnnouncement(row: AnnouncementRow): Announcement {
   return {
     id: row.id,
+    kind: (row.kind ?? 'announcement') as Announcement['kind'],
     content_type: row.content_type as Announcement['content_type'],
     title: row.title,
     body: row.body,
@@ -80,6 +82,7 @@ export function rowToAnnouncement(row: AnnouncementRow): Announcement {
 
 const ANNOUNCEMENT_COLUMNS_UNPREFIXED = `
   id,
+  kind,
   content_type,
   title,
   body,
@@ -104,6 +107,7 @@ const ANNOUNCEMENT_COLUMNS_UNPREFIXED = `
 
 const ANNOUNCEMENT_COLUMNS_A_PREFIXED = `
   a.id,
+  a.kind,
   a.content_type,
   a.title,
   a.body,

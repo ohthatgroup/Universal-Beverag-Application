@@ -51,8 +51,8 @@ export default async function AnnouncementsPage() {
   return (
     <div className="space-y-2">
       <PageHeader
-        title="Announcements"
-        description="Curated content shown on the customer homepage."
+        title="Deals & Announcements"
+        description="Curated deals and editorial content shown on the customer homepage."
       />
       <AnnouncementsManager
         initialAnnouncements={announcements}

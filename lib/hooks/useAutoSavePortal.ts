@@ -20,8 +20,7 @@ export function useAutoSavePortal({
 }: UseAutoSavePortalOptions) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingPayloadRef = useRef<{
-    productId?: string | null
-    palletDealId?: string | null
+    productId: string
     quantity: number
     unitPrice: number
   } | null>(null)
@@ -31,12 +30,10 @@ export function useAutoSavePortal({
   const persist = useCallback(
     async ({
       productId,
-      palletDealId,
       quantity,
       unitPrice,
     }: {
-      productId?: string | null
-      palletDealId?: string | null
+      productId: string
       quantity: number
       unitPrice: number
     }) => {
@@ -48,7 +45,6 @@ export function useAutoSavePortal({
       try {
         requestData = buildPortalItemSaveRequest({
           productId,
-          palletDealId,
           quantity,
           unitPrice,
         })
@@ -85,8 +81,7 @@ export function useAutoSavePortal({
 
   const runPersist = useCallback(
     async (payload: {
-      productId?: string | null
-      palletDealId?: string | null
+      productId: string
       quantity: number
       unitPrice: number
     }) => {
@@ -103,8 +98,7 @@ export function useAutoSavePortal({
 
   const save = useCallback(
     (args: {
-      productId?: string | null
-      palletDealId?: string | null
+      productId: string
       quantity: number
       unitPrice: number
     }) => {

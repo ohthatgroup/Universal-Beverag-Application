@@ -48,8 +48,8 @@ export async function POST(
       // duplicate draft).
       await db.query('delete from order_items where order_id = $1', [existingDraft.id])
       await db.query(
-        `insert into order_items (order_id, product_id, pallet_deal_id, quantity, unit_price)
-         select $1, product_id, pallet_deal_id, quantity, unit_price
+        `insert into order_items (order_id, product_id, quantity, unit_price)
+         select $1, product_id, quantity, unit_price
          from order_items
          where order_id = $2 and quantity > 0`,
         [existingDraft.id, order.id]

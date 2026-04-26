@@ -12,8 +12,8 @@ interface CustomerHomepageManagerProps {
 
 // TODO: replace with real data from per-customer queries (see docs/handoff/homepage-redesign.md)
 const MOCK_GLOBAL_DEALS = [
-  { id: 'deal-1', title: 'Spring beverage pallet', price: 89.99, savings: '$12' },
-  { id: 'deal-2', title: 'Mixed energy 4-pack pallet', price: 124.5, savings: '$18' },
+  { id: 'deal-1', title: 'Spring beverage bundle', price: 89.99, savings: '$12' },
+  { id: 'deal-2', title: 'Mixed energy 4-pack bundle', price: 124.5, savings: '$18' },
 ]
 
 const MOCK_GLOBAL_ANNOUNCEMENTS = [
@@ -45,7 +45,7 @@ export function CustomerHomepageManager({
             Deals
           </h2>
           <p className="text-sm text-muted-foreground">
-            Active pallet deals visible to all customers:
+            Active deals visible to all customers:
           </p>
         </header>
 

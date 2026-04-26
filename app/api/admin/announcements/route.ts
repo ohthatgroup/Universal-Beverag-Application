@@ -22,6 +22,7 @@ export async function GET(request: Request) {
 
 interface InsertedRow {
   id: string
+  kind: string
   content_type: string
   title: string | null
   body: string | null
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
 
     const { rows } = await db.query<InsertedRow>(
       `insert into announcements (
+         kind,
          content_type,
          title,
          body,
@@ -77,13 +79,14 @@ export async function POST(request: Request) {
          sort_order
        ) values (
          $1, $2, $3, $4, $5,
-         $6, $7, $8, $9::uuid[],
-         $10, $11::uuid[], $12::jsonb, $13::jsonb, $14::text[],
-         $15::date, $16::date, $17,
-         coalesce($18, (select coalesce(max(sort_order), -1) + 1 from announcements))
+         $6, $7, $8, $9, $10::uuid[],
+         $11, $12::uuid[], $13::jsonb, $14::jsonb, $15::text[],
+         $16::date, $17::date, $18,
+         coalesce($19, (select coalesce(max(sort_order), -1) + 1 from announcements))
        )
        returning
          id,
+         kind,
          content_type,
          title,
          body,
@@ -105,6 +108,7 @@ export async function POST(request: Request) {
          created_at,
          updated_at`,
       [
+        payload.kind ?? 'announcement',
         payload.content_type ?? 'text',
         payload.title ?? null,
         payload.body ?? null,

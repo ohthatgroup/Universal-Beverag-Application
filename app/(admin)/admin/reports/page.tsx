@@ -42,11 +42,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       ? db.query<{
           order_id: string
           product_id: string | null
-          pallet_deal_id: string | null
           quantity: number
           line_total: number | null
         }>(
-          `select order_id, product_id, pallet_deal_id, quantity, line_total
+          `select order_id, product_id, quantity, line_total
            from order_items
            where order_id = any($1::uuid[])`,
           [orderIds]

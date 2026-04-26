@@ -236,7 +236,6 @@ export function PromoSheet({
               },
               body: JSON.stringify({
                 productId,
-                palletDealId: null,
                 quantity: qty,
                 unitPrice: product.effective_price,
               }),

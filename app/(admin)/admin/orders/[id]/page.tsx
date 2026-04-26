@@ -61,7 +61,6 @@ export default async function AdminOrderDetailPage({
     { rows: customers },
     { rows: items },
     { rows: products },
-    { rows: pallets },
     { rows: brands },
     { rows: priorOrdered },
     { rows: salesmanRows },
@@ -86,12 +85,11 @@ export default async function AdminOrderDetailPage({
       db.query<{
         id: string
         product_id: string | null
-        pallet_deal_id: string | null
         quantity: number
         unit_price: number
         line_total: number | null
       }>(
-        `select id, product_id, pallet_deal_id, quantity, unit_price, line_total
+        `select id, product_id, quantity, unit_price, line_total
          from order_items
          where order_id = $1
          order by id asc`,
@@ -114,7 +112,6 @@ export default async function AdminOrderDetailPage({
          order by title asc`,
         order.customer_id ? [order.customer_id] : []
       ),
-      db.query<{ id: string; title: string; description: string | null }>('select id, title, description from pallet_deals'),
       db.query<{ id: string; name: string }>('select id, name from brands'),
       order.customer_id
         ? db.query<{ product_id: string }>(
@@ -135,17 +132,13 @@ export default async function AdminOrderDetailPage({
 
   const customer = customers[0] ?? null
   const productById = new Map(products.map((product) => [product.id, product] as const))
-  const palletById = new Map(pallets.map((pallet) => [pallet.id, pallet] as const))
   const brandById = new Map(brands.map((brand) => [brand.id, brand.name] as const))
   const orderStatus = asOrderStatus(order.status)
   const orderId = order.id
   const submittedAt = order.submitted_at
   const orderItems = items
-  const getItemHref = (item: { product_id: string | null; pallet_deal_id: string | null }) => {
-    if (item.product_id) return `/admin/catalog/${item.product_id}`
-    if (item.pallet_deal_id) return `/admin/catalog/pallets/${item.pallet_deal_id}`
-    return null
-  }
+  const getItemHref = (item: { product_id: string | null }) =>
+    item.product_id ? `/admin/catalog/${item.product_id}` : null
   const orderDeepLink = buildCustomerOrderDeepLink(customer?.access_token ?? null, order.id)
   const pickerProducts = products.map((product) => ({
     id: product.id,
@@ -212,14 +205,12 @@ export default async function AdminOrderDetailPage({
 
   const editorItems: AdminOrderEditorItem[] = orderItems.map((item) => {
     const product = item.product_id ? productById.get(item.product_id) : null
-    const pallet = item.pallet_deal_id ? palletById.get(item.pallet_deal_id) : null
     const brandName = product?.brand_id ? brandById.get(product.brand_id) ?? null : null
     return {
       id: item.id,
       productId: item.product_id,
-      palletDealId: item.pallet_deal_id,
-      label: product ? getProductDisplayName(product, brandName) : pallet?.title ?? 'Unknown item',
-      pack: (product ? getProductPackLabel(product) : null) ?? pallet?.description ?? null,
+      label: product ? getProductDisplayName(product, brandName) : 'Unknown item',
+      pack: product ? getProductPackLabel(product) ?? null : null,
       quantity: item.quantity,
       unitPrice: Number(item.unit_price ?? 0),
       lineTotal: Number(item.line_total ?? 0),

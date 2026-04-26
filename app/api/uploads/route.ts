@@ -3,7 +3,7 @@ import { requireAuthContext } from '@/lib/server/auth'
 import { storeUploadedAsset } from '@/lib/server/assets'
 import { buildRateLimitKey, consumeRateLimit, getEnvRateLimit } from '@/lib/server/rate-limit'
 
-const ALLOWED_FOLDERS = ['products', 'brands', 'pallets']
+const ALLOWED_FOLDERS = ['products', 'brands', 'announcements']
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
 const uploadRateLimit = getEnvRateLimit('UPLOAD_RATE_LIMIT_MAX', 'UPLOAD_RATE_LIMIT_WINDOW_MS', {

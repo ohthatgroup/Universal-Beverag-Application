@@ -9,6 +9,17 @@ export type AnnouncementContentType =
   | 'specials_grid'
 
 /**
+ * Top-level intent. Both kinds use the same content_type rendering, but
+ * deals show under a "Deals" section in the admin and (eventually) get
+ * different badging on the customer side.
+ *
+ *   'announcement' → editorial / informational content
+ *   'deal'         → pallet-style preselect, typically with locked
+ *                    quantities authored by the salesman
+ */
+export type AnnouncementKind = 'announcement' | 'deal'
+
+/**
  * Where the announcement's CTA leads. Editorial cards (text / image /
  * image_text) pick one explicitly; product/specials_grid cards have an
  * implicit destination from their own `product_id` / `product_ids`.
@@ -32,6 +43,7 @@ export interface ProductQuantityOverride {
 
 export interface Announcement {
   id: string
+  kind: AnnouncementKind
   content_type: AnnouncementContentType
   title: string | null
   body: string | null

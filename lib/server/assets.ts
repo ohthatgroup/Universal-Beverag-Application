@@ -1,7 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 const ASSET_ROOT = 'uploads'
-const ALLOWED_FOLDERS = new Set(['products', 'brands', 'pallets'])
+const ALLOWED_FOLDERS = new Set(['products', 'brands', 'announcements'])
 
 declare global {
   interface CloudflareEnv {

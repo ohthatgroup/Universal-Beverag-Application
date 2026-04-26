@@ -11,13 +11,15 @@ export default async function AdminDrawerPage() {
   const context = await requirePageAuth(['salesman'])
   const db = await getRequestDb()
 
-  const [customers, products, brands, pallets, staff] = await Promise.all([
+  const [customers, products, brands, announcements, staff] = await Promise.all([
     db.query<{ count: string }>(`select count(*)::text as count from profiles where role = 'customer'`),
     db.query<{ count: string }>(
       `select count(*)::text as count from products where customer_id is null and is_discontinued = false`
     ),
     db.query<{ count: string }>(`select count(*)::text as count from brands`),
-    db.query<{ count: string }>(`select count(*)::text as count from pallet_deals where is_active = true`),
+    db.query<{ count: string }>(
+      `select count(*)::text as count from announcements where is_active = true`
+    ),
     db.query<{ count: string }>(`select count(*)::text as count from profiles where role = 'salesman'`),
   ])
 
@@ -25,7 +27,11 @@ export default async function AdminDrawerPage() {
     { href: '/admin/customers', label: 'Customers', value: customers.rows[0]?.count },
     { href: '/admin/catalog', label: 'Products', value: products.rows[0]?.count },
     { href: '/admin/brands', label: 'Brands', value: brands.rows[0]?.count },
-    { href: '/admin/catalog/pallets', label: 'Pallet deals', value: pallets.rows[0]?.count },
+    {
+      href: '/admin/announcements',
+      label: 'Deals & announcements',
+      value: announcements.rows[0]?.count,
+    },
     { href: '/admin/staff', label: 'Staff', value: staff.rows[0]?.count },
     { href: '/admin/reports', label: 'Reports' },
   ]

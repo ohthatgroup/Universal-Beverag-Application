@@ -35,6 +35,7 @@ export type Database = {
           created_at: string
           updated_at: string
           product_quantities: Json
+          kind: string
         }
         Insert: {
           id?: string
@@ -58,6 +59,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           product_quantities?: Json
+          kind?: string
         }
         Update: {
           id?: string
@@ -81,6 +83,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           product_quantities?: Json
+          kind?: string
         }
         Relationships: [
           {
@@ -303,7 +306,6 @@ export type Database = {
           id: string
           order_id: string
           product_id: string | null
-          pallet_deal_id: string | null
           quantity: number
           unit_price: number
           line_total: number | null
@@ -312,7 +314,6 @@ export type Database = {
           id?: string
           order_id: string
           product_id?: string | null
-          pallet_deal_id?: string | null
           quantity?: number
           unit_price: number
           line_total?: number | null
@@ -321,7 +322,6 @@ export type Database = {
           id?: string
           order_id?: string
           product_id?: string | null
-          pallet_deal_id?: string | null
           quantity?: number
           unit_price?: number
           line_total?: number | null
@@ -332,13 +332,6 @@ export type Database = {
             columns: ['order_id']
             isOneToOne: false
             referencedRelation: 'orders'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'order_items_pallet_deal_id_fkey'
-            columns: ['pallet_deal_id']
-            isOneToOne: false
-            referencedRelation: 'pallet_deals'
             referencedColumns: ['id']
           },
           {
@@ -395,82 +388,6 @@ export type Database = {
             referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
-        ]
-      }
-      pallet_deal_items: {
-        Row: {
-          id: string
-          pallet_deal_id: string
-          product_id: string
-          quantity: number
-        }
-        Insert: {
-          id?: string
-          pallet_deal_id: string
-          product_id: string
-          quantity: number
-        }
-        Update: {
-          id?: string
-          pallet_deal_id?: string
-          product_id?: string
-          quantity?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'pallet_deal_items_pallet_deal_id_fkey'
-            columns: ['pallet_deal_id']
-            isOneToOne: false
-            referencedRelation: 'pallet_deals'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'pallet_deal_items_product_id_fkey'
-            columns: ['product_id']
-            isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      pallet_deals: {
-        Row: {
-          id: string
-          title: string
-          pallet_type: string
-          image_url: string | null
-          price: number
-          savings_text: string | null
-          description: string | null
-          is_active: boolean
-          sort_order: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          title: string
-          pallet_type: string
-          image_url?: string | null
-          price: number
-          savings_text?: string | null
-          description?: string | null
-          is_active?: boolean
-          sort_order?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          title?: string
-          pallet_type?: string
-          image_url?: string | null
-          price?: number
-          savings_text?: string | null
-          description?: string | null
-          is_active?: boolean
-          sort_order?: number
-          created_at?: string
-        }
-        Relationships: [
         ]
       }
       preset_brand_rules: {

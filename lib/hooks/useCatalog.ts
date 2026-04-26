@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import type { CatalogProduct, Brand } from '@/lib/types'
 import { getProductSizeLabel } from '@/lib/utils'
 
-export type CatalogTab = 'pallets' | 'all'
+export type CatalogTab = 'all'
 export type GroupBy = 'brand' | 'size' | 'size-brand'
 
 export interface FilterState {
@@ -43,11 +43,8 @@ export function useCatalog({
     groupBy: defaultGroupBy,
   })
 
-  // Step 1: Filter by active tab
-  const tabFiltered = useMemo<CatalogProduct[]>(() => {
-    // 'pallets' tab is handled at the page level (different data source)
-    return products
-  }, [products])
+  // Step 1: All products (tab system retained for future use; only 'all' today).
+  const tabFiltered = useMemo<CatalogProduct[]>(() => products, [products])
 
   // Step 2: Apply search + dropdowns
   const filtered = useMemo<CatalogProduct[]>(() => {

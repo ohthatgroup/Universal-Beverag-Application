@@ -37,12 +37,11 @@ export async function GET(
         : Promise.resolve({ rows: [] }),
       db.query<{
         product_id: string | null
-        pallet_deal_id: string | null
         quantity: number
         unit_price: number
         line_total: number | null
       }>(
-        `select product_id, pallet_deal_id, quantity, unit_price, line_total
+        `select product_id, quantity, unit_price, line_total
          from order_items
          where order_id = $1 and quantity > 0
          order by id asc`,
@@ -53,11 +52,8 @@ export async function GET(
     const productIds = itemRows
       .map((item) => item.product_id)
       .filter((value): value is string => !!value)
-    const palletIds = itemRows
-      .map((item) => item.pallet_deal_id)
-      .filter((value): value is string => !!value)
 
-    const [productsResponse, palletsResponse, brandsResponse] = await Promise.all([
+    const [productsResponse, brandsResponse] = await Promise.all([
       productIds.length
         ? db.query<{
             id: string
@@ -74,35 +70,18 @@ export async function GET(
             [productIds]
           )
         : Promise.resolve({ rows: [] }),
-      palletIds.length
-        ? db.query<{ id: string; title: string; description: string | null }>(
-            `select id, title, description from pallet_deals where id = any($1::uuid[])`,
-            [palletIds]
-          )
-        : Promise.resolve({ rows: [] }),
       db.query<{ id: string; name: string }>('select id, name from brands'),
     ])
 
     const productMap = new Map(productsResponse.rows.map((product) => [product.id, product] as const))
-    const palletMap = new Map(palletsResponse.rows.map((pallet) => [pallet.id, pallet] as const))
     const brandMap = new Map(brandsResponse.rows.map((brand) => [brand.id, brand.name] as const))
 
     const items: OrderMarkdownItem[] = itemRows.map((item) => {
-      if (item.product_id) {
-        const product = productMap.get(item.product_id)
-        const brandName = product?.brand_id ? brandMap.get(product.brand_id) ?? null : null
-        return {
-          label: product ? getProductDisplayName(product, brandName) : 'Unknown Product',
-          pack: product ? getProductPackLabel(product) ?? null : null,
-          quantity: item.quantity,
-          unitPrice: Number(item.unit_price ?? 0),
-          lineTotal: Number(item.line_total ?? 0),
-        }
-      }
-      const pallet = item.pallet_deal_id ? palletMap.get(item.pallet_deal_id) : null
+      const product = item.product_id ? productMap.get(item.product_id) : null
+      const brandName = product?.brand_id ? brandMap.get(product.brand_id) ?? null : null
       return {
-        label: pallet?.title ?? 'Unknown Pallet',
-        pack: pallet?.description ?? 'Pallet deal',
+        label: product ? getProductDisplayName(product, brandName) : 'Unknown Product',
+        pack: product ? getProductPackLabel(product) ?? null : null,
         quantity: item.quantity,
         unitPrice: Number(item.unit_price ?? 0),
         lineTotal: Number(item.line_total ?? 0),

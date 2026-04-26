@@ -45,11 +45,6 @@ const ADMIN_LINKS: NavLink[] = [
     match: (p) => p.startsWith('/admin/brands'),
   },
   {
-    href: '/admin/catalog/pallets',
-    label: 'Pallets',
-    match: (p) => p.startsWith('/admin/catalog/pallets'),
-  },
-  {
     href: '/admin/presets',
     label: 'Presets',
     match: (p) => p.startsWith('/admin/presets'),

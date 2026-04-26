@@ -3,15 +3,18 @@ import { apiOk, getRequestId, logApiEvent, parseBody, toErrorResponse } from '@/
 import { getRequestDb } from '@/lib/server/db'
 import { requirePortalOrderAccess, requirePortalToken } from '@/lib/server/customer-order-access'
 
+// `palletDealId` is accepted-and-ignored on the input schema for backward
+// compatibility with any in-flight client builds; it never makes it past
+// validation. Once the rollout is stable this can be tightened.
 const upsertItemSchema = z.object({
-  productId: z.string().uuid().nullable().optional(),
+  productId: z.string().uuid(),
   palletDealId: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().int().min(0),
   unitPrice: z.coerce.number().min(0),
 })
 
 const deleteItemSchema = z.object({
-  productId: z.string().uuid().nullable().optional(),
+  productId: z.string().uuid(),
   palletDealId: z.string().uuid().nullable().optional(),
 })
 
@@ -25,24 +28,9 @@ function isUniqueViolation(error: unknown) {
   )
 }
 
-function resolveIdentity(payload: { productId?: string | null; palletDealId?: string | null }) {
-  if (payload.productId && payload.palletDealId) {
-    return null
-  }
-  if (!payload.productId && !payload.palletDealId) {
-    return null
-  }
-
-  if (payload.productId) {
-    return { column: 'product_id' as const, value: payload.productId }
-  }
-
-  return { column: 'pallet_deal_id' as const, value: payload.palletDealId as string }
-}
-
 /**
  * GET /api/portal/orders/[id]/items
- * Return the order's line items joined with product/pallet details.
+ * Return the order's product line items joined with product details.
  * Used by the order-history preview sheet.
  * Auth: X-Customer-Token header
  */
@@ -60,7 +48,6 @@ export async function GET(
     const { rows } = await db.query<{
       id: string
       product_id: string | null
-      pallet_deal_id: string | null
       quantity: number
       unit_price: number
       line_total: number | null
@@ -70,13 +57,10 @@ export async function GET(
       product_pack_count: number | null
       product_size_value: number | null
       product_size_uom: string | null
-      pallet_title: string | null
-      pallet_image_url: string | null
     }>(
       `select
          oi.id,
          oi.product_id,
-         oi.pallet_deal_id,
          oi.quantity,
          oi.unit_price,
          oi.line_total,
@@ -85,12 +69,9 @@ export async function GET(
          p.pack_details  as product_pack_details,
          p.pack_count    as product_pack_count,
          p.size_value    as product_size_value,
-         p.size_uom      as product_size_uom,
-         pd.title        as pallet_title,
-         pd.image_url    as pallet_image_url
+         p.size_uom      as product_size_uom
        from order_items oi
-       left join products p      on p.id  = oi.product_id
-       left join pallet_deals pd on pd.id = oi.pallet_deal_id
+       left join products p on p.id = oi.product_id
        where oi.order_id = $1
          and oi.quantity > 0
        order by oi.id asc`,
@@ -109,7 +90,7 @@ export async function GET(
 
 /**
  * PUT /api/portal/orders/[id]/items
- * Upsert an order item (auto-save). Quantity 0 is handled by DELETE.
+ * Upsert a product line item (auto-save). Quantity 0 is handled by DELETE.
  * Auth: X-Customer-Token header
  */
 export async function PUT(
@@ -131,22 +112,13 @@ export async function PUT(
       )
     }
 
-    const identity = resolveIdentity(payload)
-    if (!identity) {
-      return Response.json(
-        { error: { code: 'validation_error', message: 'Provide either productId or palletDealId' } },
-        { status: 400 }
-      )
-    }
-
     const { rows: existingRows } = await db.query<{ id: string }>(
       `select id
        from order_items
        where order_id = $1
-         and ${identity.column} = $2
-         and ${identity.column === 'product_id' ? 'pallet_deal_id is null' : 'product_id is null'}
+         and product_id = $2
        limit 1`,
-      [order.id, identity.value]
+      [order.id, payload.productId]
     )
     const existing = existingRows[0] ?? null
 
@@ -160,9 +132,9 @@ export async function PUT(
     } else {
       try {
         await db.query(
-          `insert into order_items (order_id, quantity, unit_price, product_id, pallet_deal_id)
-           values ($1, $2, $3, $4, $5)`,
-          [order.id, payload.quantity, payload.unitPrice, payload.productId ?? null, payload.palletDealId ?? null]
+          `insert into order_items (order_id, quantity, unit_price, product_id)
+           values ($1, $2, $3, $4)`,
+          [order.id, payload.quantity, payload.unitPrice, payload.productId]
         )
       } catch (insertError) {
         if (isUniqueViolation(insertError)) {
@@ -170,10 +142,9 @@ export async function PUT(
             `select id
              from order_items
              where order_id = $1
-               and ${identity.column} = $2
-               and ${identity.column === 'product_id' ? 'pallet_deal_id is null' : 'product_id is null'}
+               and product_id = $2
              limit 1`,
-            [order.id, identity.value]
+            [order.id, payload.productId]
           )
           const retriedExisting = retryRows[0]
           if (!retriedExisting) {
@@ -204,7 +175,7 @@ export async function PUT(
 
 /**
  * DELETE /api/portal/orders/[id]/items
- * Delete a specific order item (auto-save when quantity reaches 0).
+ * Delete a specific product line item (auto-save when quantity reaches 0).
  * Auth: X-Customer-Token header
  */
 export async function DELETE(
@@ -226,17 +197,10 @@ export async function DELETE(
       )
     }
 
-    if (!payload.productId && !payload.palletDealId) {
-      return Response.json(
-        { error: { code: 'validation_error', message: 'Either productId or palletDealId is required' } },
-        { status: 400 }
-      )
-    }
-
     await db.query(
       `delete from order_items
-       where order_id = $1 and ${payload.productId ? 'product_id = $2' : 'pallet_deal_id = $2'}`,
-      [order.id, payload.productId ?? payload.palletDealId]
+       where order_id = $1 and product_id = $2`,
+      [order.id, payload.productId]
     )
 
     return apiOk({ deleted: true }, 200, requestId)

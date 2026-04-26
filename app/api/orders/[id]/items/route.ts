@@ -7,15 +7,17 @@ const paramsSchema = z.object({
   id: z.string().uuid(),
 })
 
+// `palletDealId` accepted-and-ignored on the schema for backward
+// compatibility with any old client builds.
 const upsertItemSchema = z.object({
-  productId: z.string().uuid().nullable().optional(),
+  productId: z.string().uuid(),
   palletDealId: z.string().uuid().nullable().optional(),
   quantity: z.number().int().min(1),
   unitPrice: z.number().min(0),
 })
 
 const deleteItemSchema = z.object({
-  productId: z.string().uuid().nullable().optional(),
+  productId: z.string().uuid(),
   palletDealId: z.string().uuid().nullable().optional(),
 })
 
@@ -27,21 +29,6 @@ function isUniqueViolation(error: unknown) {
     typeof (error as { code?: unknown }).code === 'string' &&
     (error as { code: string }).code === '23505'
   )
-}
-
-function resolveIdentity(payload: { productId?: string | null; palletDealId?: string | null }) {
-  if (payload.productId && payload.palletDealId) {
-    throw new RouteError(400, 'validation_error', 'Provide either productId or palletDealId, not both')
-  }
-  if (!payload.productId && !payload.palletDealId) {
-    throw new RouteError(400, 'validation_error', 'Either productId or palletDealId is required')
-  }
-
-  if (payload.productId) {
-    return { column: 'product_id' as const, value: payload.productId }
-  }
-
-  return { column: 'pallet_deal_id' as const, value: payload.palletDealId as string }
 }
 
 export async function PUT(
@@ -63,15 +50,12 @@ export async function PUT(
       throw new RouteError(409, 'order_not_draft', 'Can only modify draft orders')
     }
 
-    const identity = resolveIdentity(payload)
     const { rows: existingRows } = await db.query<{ id: string; quantity: number }>(
       `select id, quantity
        from order_items
-       where order_id = $1 and ${identity.column} = $2 and ${
-         identity.column === 'product_id' ? 'pallet_deal_id is null' : 'product_id is null'
-       }
+       where order_id = $1 and product_id = $2
        limit 1`,
-      [context.order.id, identity.value]
+      [context.order.id, payload.productId]
     )
     const existing = existingRows[0] ?? null
 
@@ -88,20 +72,18 @@ export async function PUT(
     } else {
       try {
         await db.query(
-          `insert into order_items (order_id, quantity, unit_price, product_id, pallet_deal_id)
-           values ($1, $2, $3, $4, $5)`,
-          [context.order.id, payload.quantity, payload.unitPrice, payload.productId ?? null, payload.palletDealId ?? null]
+          `insert into order_items (order_id, quantity, unit_price, product_id)
+           values ($1, $2, $3, $4)`,
+          [context.order.id, payload.quantity, payload.unitPrice, payload.productId]
         )
       } catch (insertError) {
         if (isUniqueViolation(insertError)) {
           const { rows: retryRows } = await db.query<{ id: string; quantity: number }>(
             `select id, quantity
              from order_items
-             where order_id = $1 and ${identity.column} = $2 and ${
-               identity.column === 'product_id' ? 'pallet_deal_id is null' : 'product_id is null'
-             }
+             where order_id = $1 and product_id = $2
              limit 1`,
-            [context.order.id, identity.value]
+            [context.order.id, payload.productId]
           )
           const retriedExisting = retryRows[0]
           if (!retriedExisting) throw insertError
@@ -121,8 +103,7 @@ export async function PUT(
 
     logApiEvent(requestId, 'order_item_upserted', {
       orderId: context.order.id,
-      productId: payload.productId ?? null,
-      palletDealId: payload.palletDealId ?? null,
+      productId: payload.productId,
       operation,
       userId: context.userId,
     })
@@ -155,22 +136,15 @@ export async function DELETE(
       throw new RouteError(409, 'order_not_draft', 'Can only modify draft orders')
     }
 
-    if (!payload.productId && !payload.palletDealId) {
-      throw new RouteError(400, 'validation_error', 'Either productId or palletDealId is required')
-    }
-
     await db.query(
       `delete from order_items
-       where order_id = $1 and ${
-         payload.productId ? 'product_id = $2' : 'pallet_deal_id = $2'
-       }`,
-      [context.order.id, payload.productId ?? payload.palletDealId]
+       where order_id = $1 and product_id = $2`,
+      [context.order.id, payload.productId]
     )
 
     logApiEvent(requestId, 'order_item_deleted', {
       orderId: context.order.id,
-      productId: payload.productId ?? null,
-      palletDealId: payload.palletDealId ?? null,
+      productId: payload.productId,
       userId: context.userId,
     })
 

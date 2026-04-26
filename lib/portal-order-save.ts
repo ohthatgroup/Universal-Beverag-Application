@@ -1,13 +1,14 @@
 export interface PortalItemSavePayload {
-  productId?: string | null
+  productId: string
+  /** Deprecated — pallets merged into announcements. Accepted for back-compat, ignored. */
   palletDealId?: string | null
   quantity: number
   unitPrice: number
 }
 
 export function validatePortalItemSavePayload(payload: PortalItemSavePayload) {
-  if (!payload.productId && !payload.palletDealId) {
-    throw new Error('Autosave requires either productId or palletDealId')
+  if (!payload.productId) {
+    throw new Error('Autosave requires productId')
   }
 }
 
@@ -18,8 +19,7 @@ export function buildPortalItemSaveRequest(payload: PortalItemSavePayload) {
     return {
       method: 'DELETE' as const,
       body: {
-        productId: payload.productId ?? null,
-        palletDealId: payload.palletDealId ?? null,
+        productId: payload.productId,
       },
     }
   }
@@ -27,8 +27,7 @@ export function buildPortalItemSaveRequest(payload: PortalItemSavePayload) {
   return {
     method: 'PUT' as const,
     body: {
-      productId: payload.productId ?? null,
-      palletDealId: payload.palletDealId ?? null,
+      productId: payload.productId,
       quantity: payload.quantity,
       unitPrice: Number(payload.unitPrice),
     },

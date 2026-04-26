@@ -156,54 +156,10 @@ export type CustomerProductUpdate = Partial<CustomerProductInsert>
 
 // ---- Pallet Deals -------------------------------------------------------
 
-export type PalletType = 'single' | 'mixed'
-
-export interface PalletDeal {
-  id: string
-  title: string
-  pallet_type: PalletType
-  image_url: string | null
-  price: number
-  savings_text: string | null
-  description: string | null
-  is_active: boolean
-  sort_order: number
-  created_at: string
-}
-
-export interface PalletDealInsert {
-  id?: string
-  title: string
-  pallet_type: PalletType
-  image_url?: string | null
-  price: number
-  savings_text?: string | null
-  description?: string | null
-  is_active?: boolean
-  sort_order?: number
-}
-
-export type PalletDealUpdate = Partial<PalletDealInsert>
-
-// ---- Pallet Deal Items --------------------------------------------------
-
-export interface PalletDealItem {
-  id: string
-  pallet_deal_id: string
-  product_id: string
-  quantity: number
-}
-
-export interface PalletDealItemInsert {
-  id?: string
-  pallet_deal_id: string
-  product_id: string
-  quantity: number
-}
-
-export type PalletDealItemUpdate = Partial<PalletDealItemInsert>
-
 // ---- Orders -------------------------------------------------------------
+// Pallet deals were merged into the announcements model — see migration
+// 202604260005_merge_pallets_into_announcements.sql. A "deal" is now an
+// announcement with kind='deal' and per-product locked quantities.
 
 export type OrderStatus = 'draft' | 'submitted' | 'delivered'
 
@@ -237,7 +193,6 @@ export interface OrderItem {
   id: string
   order_id: string
   product_id: string | null
-  pallet_deal_id: string | null
   quantity: number
   unit_price: number
   line_total: number // GENERATED ALWAYS AS (quantity * unit_price) STORED
@@ -247,7 +202,6 @@ export interface OrderItemInsert {
   id?: string
   order_id: string
   product_id?: string | null
-  pallet_deal_id?: string | null
   quantity: number
   unit_price: number
 }
@@ -298,10 +252,9 @@ export interface CatalogProduct extends Product {
   effective_price: number // custom_price ?? price
 }
 
-// Order item enriched with product/pallet details (for display)
+// Order item enriched with product details (for display)
 export interface OrderItemDetail extends OrderItem {
   product: Product | null
-  pallet_deal: PalletDeal | null
 }
 
 // Full order with all items expanded

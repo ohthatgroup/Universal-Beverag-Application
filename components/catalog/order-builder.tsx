@@ -37,7 +37,6 @@ interface OrderBuilderProps {
   defaultGroupBy?: GroupByOption
   initialItems: Array<{
     product_id: string | null
-    pallet_deal_id: string | null
     quantity: number
     unit_price: number
   }>

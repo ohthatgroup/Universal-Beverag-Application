@@ -34,7 +34,6 @@ import { formatCurrency, formatDeliveryDate } from '@/lib/utils'
 export interface AdminOrderEditorItem {
   id: string
   productId: string | null
-  palletDealId: string | null
   label: string
   pack: string | null
   quantity: number

@@ -68,11 +68,16 @@ export function AnnouncementsManager({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] =
     useState<Announcement | null>(null)
+  const [createKind, setCreateKind] =
+    useState<'announcement' | 'deal'>('announcement')
+  const [activeTab, setActiveTab] = useState<'announcements' | 'deals'>(
+    'announcements',
+  )
   const [error, setError] = useState<string | null>(null)
 
   const now = useMemo(() => new Date(), [])
-  const liveRows = rows.filter((a) => isLive(a, now))
-  const scheduledRows = rows.filter((a) => !isLive(a, now))
+  const dealRows = rows.filter((a) => a.kind === 'deal')
+  const announcementRows = rows.filter((a) => a.kind !== 'deal')
 
   // Surface fetch errors as a plain message above the table; cleared on the
   // next successful mutation.
@@ -169,6 +174,7 @@ export function AnnouncementsManager({
 
   const openCreate = () => {
     setEditingAnnouncement(null)
+    setCreateKind(activeTab === 'deals' ? 'deal' : 'announcement')
     setDialogOpen(true)
   }
 
@@ -251,7 +257,7 @@ export function AnnouncementsManager({
         <div /> {/* spacer — page title lives in PageHeader */}
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />
-          New announcement
+          {activeTab === 'deals' ? 'New deal' : 'New announcement'}
         </Button>
       </div>
 
@@ -264,33 +270,44 @@ export function AnnouncementsManager({
         </div>
       )}
 
-      <Tabs defaultValue="live">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) =>
+          setActiveTab(v === 'deals' ? 'deals' : 'announcements')
+        }
+      >
         <TabsList>
-          <TabsTrigger value="live">Live ({liveRows.length})</TabsTrigger>
-          <TabsTrigger value="scheduled">
-            Scheduled ({scheduledRows.length})
+          <TabsTrigger value="announcements">
+            Announcements ({announcementRows.length})
+          </TabsTrigger>
+          <TabsTrigger value="deals">
+            Deals ({dealRows.length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="live">
-          <AnnouncementsTable
-            rows={liveRows}
+        <TabsContent value="announcements">
+          <KindSection
+            rows={announcementRows}
             allRows={rows}
+            now={now}
             onMoveRow={moveRow}
             onToggleActive={toggleActive}
             onEdit={openEdit}
             onDelete={removeRow}
+            emptyLabel="No announcements yet — create one with the button above."
           />
         </TabsContent>
 
-        <TabsContent value="scheduled">
-          <AnnouncementsTable
-            rows={scheduledRows}
+        <TabsContent value="deals">
+          <KindSection
+            rows={dealRows}
             allRows={rows}
+            now={now}
             onMoveRow={moveRow}
             onToggleActive={toggleActive}
             onEdit={openEdit}
             onDelete={removeRow}
+            emptyLabel="No deals yet — create one to set locked-quantity bundles."
           />
         </TabsContent>
       </Tabs>
@@ -299,9 +316,83 @@ export function AnnouncementsManager({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         initialAnnouncement={editingAnnouncement}
+        defaultKind={createKind}
         onSave={handleSave}
         pickerProducts={pickerProducts}
       />
+    </div>
+  )
+}
+
+interface KindSectionProps {
+  rows: Announcement[]
+  allRows: Announcement[]
+  now: Date
+  onMoveRow: (id: string, direction: 'up' | 'down') => void
+  onToggleActive: (id: string, isActive: boolean) => void
+  onEdit: (a: Announcement) => void
+  onDelete: (id: string) => void
+  emptyLabel: string
+}
+
+/**
+ * One side of the kind split (Announcements or Deals). Splits into
+ * Live + Scheduled subgroups so a salesman can see what's running vs what's
+ * queued. Scheduled = future starts_at, past ends_at, or is_active=false.
+ */
+function KindSection({
+  rows,
+  allRows,
+  now,
+  onMoveRow,
+  onToggleActive,
+  onEdit,
+  onDelete,
+  emptyLabel,
+}: KindSectionProps) {
+  const liveRows = rows.filter((a) => isLive(a, now))
+  const scheduledRows = rows.filter((a) => !isLive(a, now))
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+        {emptyLabel}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {liveRows.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Live ({liveRows.length})
+          </h3>
+          <AnnouncementsTable
+            rows={liveRows}
+            allRows={allRows}
+            onMoveRow={onMoveRow}
+            onToggleActive={onToggleActive}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
+      )}
+      {scheduledRows.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Scheduled ({scheduledRows.length})
+          </h3>
+          <AnnouncementsTable
+            rows={scheduledRows}
+            allRows={allRows}
+            onMoveRow={onMoveRow}
+            onToggleActive={onToggleActive}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -11,6 +11,7 @@ const paramsSchema = z.object({
 
 interface UpdatedRow {
   id: string
+  kind: string
   content_type: string
   title: string | null
   body: string | null
@@ -66,6 +67,7 @@ export async function PATCH(
     const has = (key: FieldKey) =>
       Object.prototype.hasOwnProperty.call(payload, key)
 
+    if (has('kind')) addSet('kind', payload.kind)
     if (has('content_type')) addSet('content_type', payload.content_type)
     if (has('title')) addSet('title', payload.title)
     if (has('body')) addSet('body', payload.body)
@@ -99,7 +101,7 @@ export async function PATCH(
       // Nothing to update — return current row.
       const { rows } = await db.query<UpdatedRow>(
         `select
-           id, content_type, title, body, image_url, cta_label,
+           id, kind, content_type, title, body, image_url, cta_label,
            cta_target_kind, cta_target_url, cta_target_product_id,
            cta_target_product_ids, product_id, product_ids,
            badge_overrides, product_quantities, audience_tags,
@@ -119,7 +121,7 @@ export async function PATCH(
                  set ${sets.join(', ')}
                  where id = $1
                  returning
-                   id, content_type, title, body, image_url, cta_label,
+                   id, kind, content_type, title, body, image_url, cta_label,
                    cta_target_kind, cta_target_url, cta_target_product_id,
                    cta_target_product_ids, product_id, product_ids,
                    badge_overrides, product_quantities, audience_tags,
