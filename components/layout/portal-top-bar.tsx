@@ -149,19 +149,6 @@ export function PortalTopBar({ token, salesman }: PortalTopBarProps) {
           </Button>
         </Panel.Header>
         <Panel.Body className="space-y-1 px-3 py-3">
-          <a
-            href={callHref}
-            onClick={() => setMenuOpen(false)}
-            className="flex w-full items-start gap-3 rounded-lg bg-accent px-3 py-3 text-left text-sm text-accent-foreground hover:bg-accent/90"
-          >
-            <Phone className="mt-0.5 h-4 w-4" />
-            <span className="flex flex-col leading-tight">
-              <span className="font-semibold">Call {salesman.name}</span>
-              <span className="text-xs text-accent-foreground/80">
-                {formatPhoneNumber(salesman.phone)}
-              </span>
-            </span>
-          </a>
           {links.map((link) => (
             <Link
               key={link.href}
