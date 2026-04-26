@@ -64,6 +64,16 @@ export function FamilySheet({
     setInlineQuery('')
   }, [activeFamily, isOpen])
 
+  // Reset the body scroll to the top when the active family changes — the
+  // pill switcher should land you at the top of the new family's grid, not
+  // wherever you happened to be in the previous family's list.
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (activeFamily && bodyRef.current) {
+      bodyRef.current.scrollTop = 0
+    }
+  }, [activeFamily])
+
   // Clear the search-mode typed query whenever we leave search mode.
   useEffect(() => {
     if (!isSearchMode) setSearchQuery('')
@@ -298,7 +308,7 @@ export function FamilySheet({
 
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-2 pb-24 pt-3">
+        <div ref={bodyRef} className="flex-1 overflow-y-auto px-2 pb-24 pt-3">
           {isFamilyMode && familyProducts.length === 0 && (
             <EmptyState
               title="No products match"
