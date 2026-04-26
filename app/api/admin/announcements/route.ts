@@ -34,6 +34,10 @@ interface InsertedRow {
   product_id: string | null
   product_ids: string[] | null
   badge_overrides: Record<string, string> | null
+  product_quantities: Record<
+    string,
+    { default_qty?: number; locked?: boolean }
+  > | null
   audience_tags: string[] | null
   starts_at: string | null
   ends_at: string | null
@@ -65,6 +69,7 @@ export async function POST(request: Request) {
          product_id,
          product_ids,
          badge_overrides,
+         product_quantities,
          audience_tags,
          starts_at,
          ends_at,
@@ -73,9 +78,9 @@ export async function POST(request: Request) {
        ) values (
          $1, $2, $3, $4, $5,
          $6, $7, $8, $9::uuid[],
-         $10, $11::uuid[], $12::jsonb, $13::text[],
-         $14::date, $15::date, $16,
-         coalesce($17, (select coalesce(max(sort_order), -1) + 1 from announcements))
+         $10, $11::uuid[], $12::jsonb, $13::jsonb, $14::text[],
+         $15::date, $16::date, $17,
+         coalesce($18, (select coalesce(max(sort_order), -1) + 1 from announcements))
        )
        returning
          id,
@@ -91,6 +96,7 @@ export async function POST(request: Request) {
          product_id,
          product_ids,
          badge_overrides,
+         product_quantities,
          audience_tags,
          starts_at::text as starts_at,
          ends_at::text as ends_at,
@@ -111,6 +117,7 @@ export async function POST(request: Request) {
         payload.product_id ?? null,
         payload.product_ids ?? [],
         JSON.stringify(payload.badge_overrides ?? {}),
+        JSON.stringify(payload.product_quantities ?? {}),
         payload.audience_tags ?? [],
         payload.starts_at ?? null,
         payload.ends_at ?? null,

@@ -310,6 +310,11 @@ export const announcementContentTypeEnum = z.enum([
 
 export const announcementCtaTargetKindEnum = z.enum(['products', 'product', 'url'])
 
+const announcementProductQuantitySchema = z.object({
+  default_qty: z.number().int().min(0).max(9999).optional(),
+  locked: z.boolean().optional(),
+})
+
 const announcementFields = {
   content_type: announcementContentTypeEnum,
   title: z.string().max(300).nullable(),
@@ -323,6 +328,7 @@ const announcementFields = {
   product_id: uuidSchema.nullable(),
   product_ids: z.array(uuidSchema),
   badge_overrides: z.record(z.string(), z.string()),
+  product_quantities: z.record(uuidSchema, announcementProductQuantitySchema),
   audience_tags: z.array(z.string().max(80)),
   starts_at: isoDateSchema.nullable(),
   ends_at: isoDateSchema.nullable(),

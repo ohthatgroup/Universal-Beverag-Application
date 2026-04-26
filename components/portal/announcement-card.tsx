@@ -69,6 +69,7 @@ function CardSurface({
           subtitle={announcement.body ?? null}
           products={drawerProducts}
           initialQuantities={initialForDrawer}
+          productQuantities={announcement.product_quantities}
           primaryDraftId={primaryDraftOrderId}
           primaryDraftDate={primaryDraftDate}
           showPrices={showPrices}

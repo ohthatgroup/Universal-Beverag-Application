@@ -34,6 +34,7 @@ export type Database = {
           sort_order: number
           created_at: string
           updated_at: string
+          product_quantities: Json
         }
         Insert: {
           id?: string
@@ -56,6 +57,7 @@ export type Database = {
           sort_order?: number
           created_at?: string
           updated_at?: string
+          product_quantities?: Json
         }
         Update: {
           id?: string
@@ -78,6 +80,7 @@ export type Database = {
           sort_order?: number
           created_at?: string
           updated_at?: string
+          product_quantities?: Json
         }
         Relationships: [
           {

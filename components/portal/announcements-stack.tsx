@@ -19,6 +19,17 @@ export type AnnouncementContentType =
  */
 export type CtaTargetKind = 'products' | 'product' | 'url'
 
+/**
+ * Per-product preselection authored by the salesman. Missing entries (or
+ * empty `default_qty`) fall back to "stepper starts at the customer's
+ * existing-draft qty (or 0)". `locked: true` makes the row non-editable in
+ * the drawer — the customer commits at exactly `default_qty`.
+ */
+export interface ProductQuantityOverride {
+  default_qty?: number
+  locked?: boolean
+}
+
 export interface Announcement {
   id: string
   content_type: AnnouncementContentType
@@ -34,6 +45,7 @@ export interface Announcement {
   product_id: string | null
   product_ids: string[]
   badge_overrides: Record<string, string>
+  product_quantities: Record<string, ProductQuantityOverride>
   audience_tags: string[]
   starts_at: string | null
   ends_at: string | null

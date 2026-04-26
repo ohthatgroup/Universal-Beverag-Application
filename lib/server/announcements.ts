@@ -5,7 +5,10 @@
 // (hide/pin) live on `customer_announcements` and are applied in
 // `fetchHomepageAnnouncements`.
 
-import type { Announcement } from '@/components/portal/announcements-stack'
+import type {
+  Announcement,
+  ProductQuantityOverride,
+} from '@/components/portal/announcements-stack'
 import type { DbFacade } from '@/lib/server/db'
 import type { CatalogProduct } from '@/lib/types'
 
@@ -23,6 +26,7 @@ interface AnnouncementRow {
   product_id: string | null
   product_ids: string[] | null
   badge_overrides: Record<string, string> | null
+  product_quantities: Record<string, ProductQuantityOverride> | null
   audience_tags: string[] | null
   starts_at: string | null
   ends_at: string | null
@@ -63,6 +67,7 @@ export function rowToAnnouncement(row: AnnouncementRow): Announcement {
     product_id: row.product_id,
     product_ids: row.product_ids ?? [],
     badge_overrides: row.badge_overrides ?? {},
+    product_quantities: row.product_quantities ?? {},
     audience_tags: row.audience_tags ?? [],
     starts_at: toIsoDate(row.starts_at),
     ends_at: toIsoDate(row.ends_at),
@@ -87,6 +92,7 @@ const ANNOUNCEMENT_COLUMNS_UNPREFIXED = `
   product_id,
   product_ids,
   badge_overrides,
+  product_quantities,
   audience_tags,
   starts_at::text as starts_at,
   ends_at::text as ends_at,
@@ -110,6 +116,7 @@ const ANNOUNCEMENT_COLUMNS_A_PREFIXED = `
   a.product_id,
   a.product_ids,
   a.badge_overrides,
+  a.product_quantities,
   a.audience_tags,
   a.starts_at::text as starts_at,
   a.ends_at::text as ends_at,

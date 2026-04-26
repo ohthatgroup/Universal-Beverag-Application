@@ -11,11 +11,13 @@ import { TagChipInput } from '@/components/ui/tag-chip-input'
 import {
   ProductPicker,
   type PickerProduct,
+  type PickerQuantity,
 } from '@/components/admin/product-picker'
 import type {
   Announcement,
   AnnouncementContentType,
   CtaTargetKind,
+  ProductQuantityOverride,
 } from '@/components/portal/announcements-stack'
 import { cn } from '@/lib/utils'
 
@@ -62,6 +64,12 @@ interface FormState {
   product_id: string | null
   /** Specials grid contents (independent of CTA destination). */
   product_ids: string[]
+  /**
+   * Per-product preselection — keyed by product_id. Drives the drawer's
+   * `default_qty` + `locked` rendering. Only used for Product spotlight +
+   * Specials grid (the CTA destination picker doesn't carry these).
+   */
+  product_quantities: Record<string, ProductQuantityOverride>
   audience_tags: string[]
   starts_at: string
   ends_at: string
@@ -80,6 +88,7 @@ const EMPTY_FORM: FormState = {
   cta_target_product_ids: [],
   product_id: null,
   product_ids: [],
+  product_quantities: {},
   audience_tags: [],
   starts_at: '',
   ends_at: '',
@@ -99,6 +108,7 @@ function announcementToForm(a: Announcement): FormState {
     cta_target_product_ids: a.cta_target_product_ids,
     product_id: a.product_id,
     product_ids: a.product_ids,
+    product_quantities: a.product_quantities ?? {},
     audience_tags: a.audience_tags,
     starts_at: a.starts_at ? a.starts_at.slice(0, 10) : '',
     ends_at: a.ends_at ? a.ends_at.slice(0, 10) : '',
@@ -196,6 +206,21 @@ export function AnnouncementDialog({
       ctaTargetProductIds = []
     }
 
+    // Trim product_quantities to ids that are actually selected. Otherwise
+    // a salesman who unselects a product after setting its qty would leave
+    // orphan jsonb entries.
+    const validIds = new Set<string>()
+    if (type === 'product' && form.product_id) validIds.add(form.product_id)
+    if (type === 'specials_grid') {
+      for (const id of form.product_ids) validIds.add(id)
+    }
+    const trimmedQuantities: Record<string, ProductQuantityOverride> = {}
+    for (const [id, q] of Object.entries(form.product_quantities)) {
+      if (validIds.has(id) && (q.default_qty || q.locked)) {
+        trimmedQuantities[id] = q
+      }
+    }
+
     const partial: Partial<Announcement> = {
       content_type: type,
       title: form.title.trim() || null,
@@ -208,6 +233,7 @@ export function AnnouncementDialog({
       cta_target_product_ids: ctaTargetProductIds,
       product_id: form.product_id,
       product_ids: form.product_ids,
+      product_quantities: trimmedQuantities,
       audience_tags: form.audience_tags,
       starts_at: form.starts_at || null,
       ends_at: form.ends_at || null,
@@ -381,7 +407,13 @@ function FieldsForm({
             products={pickerProducts}
             value={form.product_id}
             onChange={(next) => setField('product_id', next)}
+            quantities={form.product_quantities}
+            onChangeQuantities={(next) => setField('product_quantities', next)}
           />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Set a default quantity, or lock it so the customer can&apos;t change
+            it.
+          </p>
         </Field>
       )}
 
@@ -396,6 +428,8 @@ function FieldsForm({
             products={pickerProducts}
             value={form.product_ids}
             onChange={(next) => setField('product_ids', next)}
+            quantities={form.product_quantities}
+            onChangeQuantities={(next) => setField('product_quantities', next)}
           />
         </Field>
       )}

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { ArrowRight, X } from 'lucide-react'
+import { ArrowRight, Lock, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Stepper } from '@/components/ui/stepper'
 import {
@@ -16,6 +16,7 @@ import {
 } from '@/lib/utils'
 import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import type { CatalogProduct } from '@/lib/types'
+import type { ProductQuantityOverride } from '@/components/portal/announcements-stack'
 
 interface PromoSheetProps {
   open: boolean
@@ -27,6 +28,13 @@ interface PromoSheetProps {
   products: CatalogProduct[]
   /** product_id → qty already in the customer's primary draft. */
   initialQuantities: Record<string, number>
+  /**
+   * Salesman-authored per-product preselection from the announcement.
+   * `default_qty` seeds the stepper when the customer hasn't already added
+   * the product to their draft. `locked` forces the qty + hides the
+   * stepper.
+   */
+  productQuantities?: Record<string, ProductQuantityOverride>
   /** Primary draft id. Null → first commit auto-creates a draft for tomorrow. */
   primaryDraftId: string | null
   /** Primary draft delivery date (ISO YYYY-MM-DD). */
@@ -64,6 +72,7 @@ export function PromoSheet({
   subtitle,
   products,
   initialQuantities,
+  productQuantities,
   primaryDraftId,
   primaryDraftDate,
   showPrices,
@@ -71,11 +80,42 @@ export function PromoSheet({
   token,
 }: PromoSheetProps) {
   const router = useRouter()
-  // Local selection map. Seeded from the primary draft on every open so the
-  // customer sees their existing quantities and can adjust without losing
-  // them.
+
+  /**
+   * Compute the seed qty for each product on every open.
+   * Precedence (high → low):
+   *   1. Locked override → exactly `default_qty` regardless of existing.
+   *      The salesman is dictating; commit will overwrite.
+   *   2. Existing-draft qty (from `initialQuantities`) — what the customer
+   *      already added; never silently drop.
+   *   3. Default qty from a non-locked override — the salesman's
+   *      preselection when nothing is there yet.
+   *   4. 0 — no preselect.
+   */
+  const seedQuantities = useMemo(() => {
+    const seed: Record<string, number> = {}
+    for (const p of products) {
+      const override = productQuantities?.[p.id]
+      if (override?.locked && (override.default_qty ?? 0) > 0) {
+        seed[p.id] = override.default_qty as number
+        continue
+      }
+      const existing = initialQuantities[p.id] ?? 0
+      if (existing > 0) {
+        seed[p.id] = existing
+        continue
+      }
+      if ((override?.default_qty ?? 0) > 0) {
+        seed[p.id] = override?.default_qty as number
+      }
+    }
+    return seed
+  }, [products, productQuantities, initialQuantities])
+
+  // Local selection map. Seeded from the override + draft logic above so the
+  // customer sees the right starting state, and can adjust unlocked rows.
   const [quantities, setQuantities] =
-    useState<Record<string, number>>(initialQuantities)
+    useState<Record<string, number>>(seedQuantities)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(open)
@@ -85,11 +125,11 @@ export function PromoSheet({
   useEffect(() => {
     if (open) {
       setMounted(true)
-      setQuantities(initialQuantities)
+      setQuantities(seedQuantities)
       setError(null)
       setIsSubmitting(false)
     }
-  }, [open, initialQuantities])
+  }, [open, seedQuantities])
 
   // Keep the dialog mounted briefly during the close animation.
   const handleOpenChange = (next: boolean) => {
@@ -309,6 +349,10 @@ export function PromoSheet({
                   const qty = quantities[product.id] ?? 0
                   const packLabel = getProductPackLabel(product)
                   const lineTotal = qty * product.effective_price
+                  const override = productQuantities?.[product.id]
+                  const isLocked = Boolean(
+                    override?.locked && (override?.default_qty ?? 0) > 0,
+                  )
                   return (
                     <li key={product.id} className="px-5 py-3">
                       <div className="flex items-start justify-between gap-3">
@@ -349,17 +393,32 @@ export function PromoSheet({
                               )}
                             </div>
                           )}
+                          {isLocked && (
+                            <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-accent">
+                              <Lock className="h-3 w-3" aria-hidden />
+                              Quantity set by your salesman
+                            </div>
+                          )}
                         </div>
                         <div className="flex-none">
-                          <Stepper
-                            quantity={qty}
-                            onChange={(next) =>
-                              setQuantities((prev) => ({
-                                ...prev,
-                                [product.id]: next,
-                              }))
-                            }
-                          />
+                          {isLocked ? (
+                            <span
+                              className="inline-flex h-9 min-w-[3rem] items-center justify-center rounded-full border border-accent bg-accent/10 px-3 text-sm font-semibold tabular-nums text-accent"
+                              aria-label={`Locked at ${qty}`}
+                            >
+                              {qty}
+                            </span>
+                          ) : (
+                            <Stepper
+                              quantity={qty}
+                              onChange={(next) =>
+                                setQuantities((prev) => ({
+                                  ...prev,
+                                  [product.id]: next,
+                                }))
+                              }
+                            />
+                          )}
                         </div>
                       </div>
                     </li>
