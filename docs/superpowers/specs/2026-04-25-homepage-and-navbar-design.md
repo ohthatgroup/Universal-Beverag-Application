@@ -1,5 +1,14 @@
 # Homepage Extension + Navbar Redesign — Design Spec
 
+> **⚠️ Status: implemented (with revisions).** The original spec called for
+> `AccountStatsCard` + `AnnouncementsStack` — only the announcements stack
+> shipped; the stats card was dropped during build. Several patterns
+> evolved beyond what's drawn here (notably, `<PromoSheet>` drawer
+> replaced what this doc treated as inline interactions, and the homepage
+> has since gained a customer-group override cascade). See
+> `docs/handoff/state-and-next-steps-2026-04-26.md` for current state.
+> Preserved for the design intent and the navbar restructure rationale.
+
 **Status:** draft for sign-off
 **Date:** 2026-04-25
 **Builds on:** [`docs/design-system.md`](../../design-system.md), [`docs/agent-briefs/homepage-redesign-brief.md`](../../agent-briefs/homepage-redesign-brief.md), [`docs/superpowers/specs/2026-04-25-surface-system-rebuild-design.md`](./2026-04-25-surface-system-rebuild-design.md)

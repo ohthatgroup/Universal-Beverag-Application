@@ -1,4 +1,10 @@
-# Homepage Redesign — Engineering Handoff
+# Homepage Redesign — Engineering Handoff (HISTORICAL)
+
+> **⚠️ This document is historical.** Most TODOs listed below have been
+> resolved. The current state of the system + ranked next steps lives at
+> [`state-and-next-steps-2026-04-26.md`](state-and-next-steps-2026-04-26.md).
+> See §6 of that doc for a per-entry status of everything below. Preserved
+> here for archaeology.
 
 This document tracks every mock, `// TODO`, and placeholder shipped in the
 homepage extension + admin announcements design pass (spec at
