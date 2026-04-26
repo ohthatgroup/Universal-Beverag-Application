@@ -3,27 +3,46 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { History, ListChecks, Menu, ShoppingBag, UserCircle, X } from 'lucide-react'
+import { History, ListChecks, Menu, Phone, UserCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Panel } from '@/components/ui/panel'
-import { useStartOrderDrawer } from '@/components/portal/start-order-drawer-context'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
 import { cn } from '@/lib/utils'
 
 interface PortalTopBarProps {
   token: string
+  /**
+   * The salesman who created this customer's account. Phone is the
+   * tel:-formatted number; name is the rep's display name.
+   */
+  salesman: {
+    name: string
+    phone: string
+  }
 }
 
-export function PortalTopBar({ token }: PortalTopBarProps) {
+function formatPhoneNumber(raw: string): string {
+  // E.164 → "(555) 123-4567" for US-style display. Fall back to raw on
+  // anything we don't recognize (international, malformed, etc.) so we
+  // never silently drop digits.
+  const digits = raw.replace(/[^\d]/g, '')
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+  return raw
+}
+
+export function PortalTopBar({ token, salesman }: PortalTopBarProps) {
   const pathname = usePathname()
   const base = buildCustomerPortalBasePath(token) ?? '/portal'
   const [menuOpen, setMenuOpen] = useState(false)
-  const drawer = useStartOrderDrawer()
 
-  const openDrawer = () => {
-    setMenuOpen(false)
-    drawer.open()
-  }
+  const callHref = `tel:${salesman.phone.replace(/[^\d+]/g, '')}`
+  const callLabel = `Call ${salesman.name.split(' ')[0]}`
+  const callTitle = `Call ${salesman.name} · ${formatPhoneNumber(salesman.phone)}`
 
   const links = [
     {
@@ -84,17 +103,14 @@ export function PortalTopBar({ token }: PortalTopBarProps) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* Start order — labeled on both mobile and desktop now,
-                so it never reads as a passive icon. */}
-            <Button
-              type="button"
-              variant="accent"
-              size="sm"
-              onClick={openDrawer}
-              className="h-8"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              Start order
+            {/* Call salesman — primary affordance, since the rep
+                relationship IS the product in wholesale. tel: link
+                triggers the device's dialer. */}
+            <Button asChild variant="accent" size="sm" className="h-8">
+              <a href={callHref} title={callTitle}>
+                <Phone className="h-4 w-4" />
+                {callLabel}
+              </a>
             </Button>
 
             <Button
@@ -133,14 +149,19 @@ export function PortalTopBar({ token }: PortalTopBarProps) {
           </Button>
         </Panel.Header>
         <Panel.Body className="space-y-1 px-3 py-3">
-          <button
-            type="button"
-            onClick={openDrawer}
-            className="flex w-full items-center gap-3 rounded-lg bg-accent px-3 py-3 text-left text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+          <a
+            href={callHref}
+            onClick={() => setMenuOpen(false)}
+            className="flex w-full items-start gap-3 rounded-lg bg-accent px-3 py-3 text-left text-sm text-accent-foreground hover:bg-accent/90"
           >
-            <ShoppingBag className="h-4 w-4" />
-            Start order
-          </button>
+            <Phone className="mt-0.5 h-4 w-4" />
+            <span className="flex flex-col leading-tight">
+              <span className="font-semibold">Call {salesman.name}</span>
+              <span className="text-xs text-accent-foreground/80">
+                {formatPhoneNumber(salesman.phone)}
+              </span>
+            </span>
+          </a>
           {links.map((link) => (
             <Link
               key={link.href}

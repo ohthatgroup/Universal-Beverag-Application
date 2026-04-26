@@ -74,6 +74,15 @@ export default async function PortalLayout({
 
   const usualsCount = Number(usualsCountResult.rows[0]?.count ?? 0)
 
+  // TODO: salesman is the staff member who created this customer's profile.
+  // Schema doesn't yet carry that link; add `profiles.created_by` (uuid,
+  // references profiles(id)) and join here. Until then, mock it.
+  // See docs/handoff/homepage-redesign.md entry 20.
+  const salesman = {
+    name: 'Dave Garcia',
+    phone: '+15551234567',
+  }
+
   const primaryDraftRow = draftsResult.rows[0] ?? null
   const primaryDraft = primaryDraftRow
     ? {
@@ -109,7 +118,7 @@ export default async function PortalLayout({
       }}
     >
       <div className="min-h-screen bg-background">
-        <PortalTopBar token={token} />
+        <PortalTopBar token={token} salesman={salesman} />
         <main>
           <div className="mx-auto max-w-3xl p-4 md:p-6">
             {children}

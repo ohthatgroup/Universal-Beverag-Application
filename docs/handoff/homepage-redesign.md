@@ -25,6 +25,7 @@ a missing entry means a silently broken feature.
 | 13 | `components/portal/start-order-fork.tsx` | confirm-replace dialog only fires the same `window.alert` | atomic swap-draft-contents endpoint (e.g., `delete_order_items` + `clone_order` in one tx) |
 | 14 | `components/portal/reorder-list.tsx` | `OrderPreviewSheet` shows hardcoded `getMockPreviewItems` line items | `GET /api/portal/orders/[id]/items` (or RSC fetch) to load real items per preview |
 | 15 | `components/portal/start-order-drawer.tsx` | drawer's three actions (clone recent, add usuals, start empty) all `window.alert` | clone_order / apply_usuals / draft-create endpoints (same as entries 12-13) |
+| 20 | `app/(portal)/portal/[token]/layout.tsx` | salesman name + phone hardcoded as "Dave Garcia / +15551234567" | add `profiles.created_by uuid references profiles(id)` so customers know who created their account; join in the layout query and read the rep's `contact_name` + `phone`. |
 | ~~16~~ | ~~`components/portal/manage-usuals-list.tsx`~~ | ~~hardcoded products, local-only toggle~~ | **DONE** — toggle calls `PATCH /api/portal/usuals` with optimistic UI + rollback. |
 | ~~17~~ | ~~`app/(portal)/portal/[token]/catalog/page.tsx`~~ | ~~`MOCK_PRODUCTS`~~ | **DONE** — RSC now queries products + customer_products and feeds real shape into `<ManageUsualsList>`. |
 | ~~18~~ | ~~`app/(portal)/portal/[token]/layout.tsx`~~ | ~~`MOCK_USUALS_COUNT`~~ | **DONE** — layout queries the count and feeds the drawer. |

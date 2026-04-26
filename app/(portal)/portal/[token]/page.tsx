@@ -1,6 +1,5 @@
 import { HomepageWelcome } from '@/components/portal/homepage-welcome'
 import { HomepageStartSection, type DraftForStrip } from '@/components/portal/homepage-start-section'
-import { AccountStatsCard } from '@/components/portal/account-stats-card'
 import {
   AnnouncementsStack,
   type Announcement,
@@ -108,13 +107,6 @@ const MOCK_ANNOUNCEMENTS: Announcement[] = [
   },
 ]
 
-// TODO: replace with real account stats query (see docs/handoff/homepage-redesign.md)
-const MOCK_STATS = {
-  casesThisMonth: 48,
-  spendThisMonth: 1240,
-  ordersThisMonth: 3,
-}
-
 export default async function PortalHome({
   params,
 }: {
@@ -158,25 +150,16 @@ export default async function PortalHome({
         <HomepageStartSection token={token} drafts={drafts} />
       </section>
 
-      <section className="space-y-8 rounded-2xl border border-foreground/5 bg-muted/30 px-4 py-6 md:px-6 md:py-8">
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            For you
-          </h2>
-          {/* TODO: replace with real announcements query */}
-          <AnnouncementsStack
-            announcements={MOCK_ANNOUNCEMENTS}
-            token={token}
-            primaryDraftOrderId={drafts[0]?.id ?? null}
-            showPrices={profile.show_prices}
-          />
-        </div>
-
-        {/* TODO: replace with real account stats query */}
-        <AccountStatsCard
-          casesThisMonth={MOCK_STATS.casesThisMonth}
-          spendThisMonth={MOCK_STATS.spendThisMonth}
-          ordersThisMonth={MOCK_STATS.ordersThisMonth}
+      <section className="space-y-3 rounded-2xl border border-foreground/5 bg-muted/30 px-4 py-6 md:px-6 md:py-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          For you
+        </h2>
+        {/* TODO: replace with real announcements query */}
+        <AnnouncementsStack
+          announcements={MOCK_ANNOUNCEMENTS}
+          token={token}
+          primaryDraftOrderId={drafts[0]?.id ?? null}
+          showPrices={profile.show_prices}
         />
       </section>
     </div>
