@@ -601,6 +601,100 @@ gradient.
   rather than amber-tinted. The accent affordance below the fold
   (the topmost reorder row) is in a different region.
 
+## Iteration 5 (no gradient, unified ordering panel)
+
+After iteration 4 the customer pushed back on two things:
+
+> "1. I don't like gradient.
+>  2. I need all ordering options including resume, reorder and start
+>     from scratch in one visually distinct area."
+
+The gradient/glow/glass treatment read as too "marketing splash" for an
+operational tool. And splitting the ordering paths between the hero
+(Resume Draft) and a separate fork (Reorder, Usuals, Scratch)
+fragmented what should be one decision.
+
+### What changed
+
+- `<HomepageHero>` is renamed to `<HomepageWelcome>` and stripped of
+  the navy gradient, amber glow, glass-blur draft card, and white
+  display-on-dark typography. It's now a plain type-driven block
+  (`text-3xl md:text-4xl tracking-tight` foreground for the greeting;
+  muted small text for the time line; foreground regular for the
+  question). The impressiveness comes from typography + breathing
+  whitespace + craft, not effects.
+- `<StartOrderFork>` is the unified ordering panel — a single
+  `rounded-2xl border bg-card` container that holds all four entry
+  points to the order flow:
+  1. **Resume Draft** (when present) — accent block at the top of the
+     card, edge-to-edge across the card width, the figure
+  2. **Date label** + Change date
+  3. **Reorder a recent order** — list with Show more
+  4. **Order your usuals** + **Start from scratch** — outline buttons
+- The "OR" subheading inside the fork is dropped; the visual hierarchy
+  inside the bordered card (figure → labeled list → outline buttons)
+  conveys the same thing without an explicit divider word.
+- Outline buttons inside the panel use `bg-background` (not `bg-card`)
+  so they read as outline rectangles rather than nested cards.
+
+### Layout
+
+```
+┌────────────────────────────── max-w-[600px] ──────────────────────────────┐
+│                                                                           │
+│   Good evening, Maya                                                      │
+│   Today is Saturday, April 25 · It's 9:03 PM                              │
+│                                                                           │
+│   What can we get for Maya Deli today?                                    │
+│                                                                           │
+│   ╔═════════════════════════════════════════════════════════════════════╗ │
+│   ║ ●  Resume draft for Apr 25 · 3 items                            →  ║ │ ← figure
+│   ║                                                                     ║ │
+│   ║ ┌─────────────────────────────────────────────────────────────────┐ ║ │
+│   ║ │  for delivery May 2 · Change date                               │ ║ │
+│   ║ │                                                                 │ ║ │
+│   ║ │  REORDER A RECENT ORDER                                         │ ║ │
+│   ║ │  ●  Apr 25 · 3 items · $79     [👁]  [Reorder]                  │ ║ │
+│   ║ │                                                                 │ ║ │
+│   ║ │  [★ Order your usuals →]   [Start from scratch →]               │ ║ │
+│   ║ └─────────────────────────────────────────────────────────────────┘ ║ │
+│   ╚═════════════════════════════════════════════════════════════════════╝ │
+│                                                                           │
+│   ──── below-fold panel  bg-muted/30 ───────────────────────────────────  │
+│   FOR YOU [feed]                                                          │
+│   RECENT ORDERS                                                           │
+│   PAST ORDERS                                                             │
+│   Account stats                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### Resume Draft block (inside the unified card)
+
+When `primaryDraft !== null`, the top edge of the panel is a full-width
+accent block:
+
+- `bg-accent text-accent-foreground` (no glass blur, no border)
+- The card's `overflow-hidden` clips it to the rounded corners
+- Status dot uses `bg-accent-foreground/30` for a subtle inverse
+- Hover deepens the accent slightly (`hover:bg-accent/90`)
+
+When no draft exists, the card's first row is just the date label.
+
+### Doctrine compliance
+
+- **Rule 1** — single figure: the Resume Draft accent block (or the
+  topmost amber-tinted Reorder row when no draft); everything else is
+  ground.
+- **Rule 5** — radii: `rounded-2xl` on the unified card and the
+  below-fold panel; `rounded-xl` on inner card-like elements
+  (reorder rows, glass card removed).
+- **Rule 6** — one accent per region: at most one accent affordance
+  per zone. With a draft, the Resume block is the accent; without,
+  the topmost reorder row is. The Usuals/Scratch buttons are always
+  outline.
+- **Rule 8** — hover/focus signals: handled by `<Button>` and the
+  Resume Draft Link's `hover:bg-accent/90`.
+
 ## Plan format
 
 This is a single-PR change. The implementation is one new component + one page rewrite + handoff doc update. No multi-step plan needed.

@@ -1,5 +1,5 @@
 import { OrdersList } from '@/components/orders/orders-list'
-import { HomepageHero } from '@/components/portal/homepage-hero'
+import { HomepageWelcome } from '@/components/portal/homepage-welcome'
 import { StartOrderFork } from '@/components/portal/start-order-fork'
 import { PastOrdersSection } from '@/components/portal/past-orders-section'
 import { AccountStatsCard } from '@/components/portal/account-stats-card'
@@ -212,24 +212,15 @@ export default async function PortalHome({
 
   return (
     <div className="mx-auto w-full max-w-[600px] space-y-8">
-      {/* Above the fold — atmospheric hero + start-order surface. */}
+      {/* Above the fold — type-driven welcome + the unified ordering panel. */}
       <section className="space-y-6 pt-2">
-        <HomepageHero
+        <HomepageWelcome
           contactName={profile.contact_name}
           businessName={profile.business_name}
-          token={token}
-          primaryDraft={
-            primaryDraft
-              ? {
-                  id: primaryDraft.id,
-                  deliveryDate: primaryDraft.deliveryDate,
-                  itemCount: primaryDraft.itemCount,
-                }
-              : null
-          }
         />
 
         <StartOrderFork
+          token={token}
           nextDeliveryDate={nextDeliveryDate}
           nextNextDeliveryDate={nextNextDeliveryDate}
           primaryDraft={primaryDraft}

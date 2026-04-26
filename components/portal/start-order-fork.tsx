@@ -1,23 +1,23 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { ArrowRight, Calendar, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Panel } from '@/components/ui/panel'
+import { OrderStatusDot } from '@/components/ui/status-dot'
 import { ReorderList, type ReorderableOrder } from '@/components/portal/reorder-list'
+import { buildCustomerOrderDeepLink } from '@/lib/portal-links'
 import { addDays, formatDeliveryDate, todayISODate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 interface StartOrderForkProps {
+  token: string
   /** The customer's next-available delivery date. */
   nextDeliveryDate: string
   /** The day after `nextDeliveryDate` — fork's default when a draft already occupies the next date. */
   nextNextDeliveryDate: string
-  /**
-   * In-flight draft on or after `nextDeliveryDate`. Used only for conflict
-   * detection — the draft itself is rendered as a glass card inside
-   * `<HomepageHero>`, not here.
-   */
+  /** In-flight draft on or after `nextDeliveryDate`. Null means no draft. */
   primaryDraft: {
     id: string
     deliveryDate: string
@@ -42,7 +42,19 @@ interface PendingPath {
   reorderSourceId?: string
 }
 
+/**
+ * The single visually distinct ordering panel — holds every entry
+ * point into the order flow:
+ *
+ *   1. Resume Draft (when one exists) — accent figure at the top
+ *   2. Reorder a recent order (list, top 3 with Show more)
+ *   3. Order your usuals (if ≥ 3 submitted orders)
+ *   4. Start from scratch
+ *
+ * One bordered card so the customer sees all four paths in one zone.
+ */
 export function StartOrderFork({
+  token,
   nextDeliveryDate,
   nextNextDeliveryDate,
   primaryDraft,
@@ -62,6 +74,10 @@ export function StartOrderFork({
 
   const draftAtForkDate =
     primaryDraft !== null && primaryDraft.deliveryDate === forkDate
+
+  const draftHref = primaryDraft
+    ? buildCustomerOrderDeepLink(token, primaryDraft.id) ?? '#'
+    : '#'
 
   const handlePath = (kind: PathKind, reorderSourceId?: string) => {
     if (draftAtForkDate) {
@@ -109,62 +125,84 @@ export function StartOrderFork({
   // ---- Brand-new customer (no history, no draft): single Start order CTA ----
   if (!showFork) {
     return (
-      <section className="space-y-3">
-        <DateLabel
-          label="Order for"
-          date={forkDate}
-          minDate={minForkDate}
-          onChange={onChangeDate}
-        />
-        <PathRow
-          label="Start order"
-          variant="accent"
-          onClick={() => handlePath('scratch')}
-        />
+      <section className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
+        <div className="space-y-4">
+          <DateLabel
+            label="Order for"
+            date={forkDate}
+            minDate={minForkDate}
+            onChange={onChangeDate}
+          />
+          <PathRow
+            label="Start order"
+            variant="accent"
+            onClick={() => handlePath('scratch')}
+          />
+        </div>
       </section>
     )
   }
 
   return (
-    <section className="space-y-4">
-      <DateLabel
-        label={primaryDraft ? 'for delivery' : 'Order for'}
-        date={forkDate}
-        minDate={minForkDate}
-        onChange={onChangeDate}
-      />
-
-      {showReorder && (
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Reorder a recent order
-          </h3>
-          <ReorderList
-            orders={recentOrders}
-            onReorder={(orderId) => handlePath('reorder', orderId)}
-          />
-        </div>
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      {/* 1. Resume Draft block — figure when a draft is in flight. */}
+      {primaryDraft && (
+        <Link
+          href={draftHref}
+          className="group flex items-center gap-3 bg-accent px-5 py-4 text-accent-foreground transition-colors hover:bg-accent/90 md:px-6"
+        >
+          <OrderStatusDot status="draft" className="bg-accent-foreground/30" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold">
+              Resume draft for {formatDeliveryDate(primaryDraft.deliveryDate)}
+            </div>
+            <div className="text-xs text-accent-foreground/80">
+              {primaryDraft.itemCount}{' '}
+              {primaryDraft.itemCount === 1 ? 'item' : 'items'}
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </Link>
       )}
 
-      <div className="space-y-2 pt-1">
-        {(showReorder || showUsuals) && (
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Or
-          </h3>
-        )}
-        {showUsuals && (
-          <PathRow
-            icon={<Sparkles className="h-4 w-4" />}
-            label="Order your usuals"
-            variant="outline"
-            onClick={() => handlePath('usuals')}
-          />
-        )}
-        <PathRow
-          label="Start from scratch"
-          variant="outline"
-          onClick={() => handlePath('scratch')}
+      {/* 2. Date label + Reorder list + Usuals + Scratch — all the
+          new-order entry points, inside the same card so the customer
+          sees them as one decision surface. */}
+      <div className="space-y-4 p-5 md:p-6">
+        <DateLabel
+          label={primaryDraft ? 'for delivery' : 'Order for'}
+          date={forkDate}
+          minDate={minForkDate}
+          onChange={onChangeDate}
         />
+
+        {showReorder && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Reorder a recent order
+            </h3>
+            <ReorderList
+              orders={recentOrders}
+              onReorder={(orderId) => handlePath('reorder', orderId)}
+            />
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap">
+          {showUsuals && (
+            <PathRow
+              icon={<Sparkles className="h-4 w-4" />}
+              label="Order your usuals"
+              variant="outline"
+              onClick={() => handlePath('usuals')}
+            />
+          )}
+          <PathRow
+            label="Start from scratch"
+            variant="outline"
+            onClick={() => handlePath('scratch')}
+          />
+        </div>
       </div>
 
       <ConfirmReplaceDialog
@@ -244,7 +282,7 @@ function PathRow({ label, icon, variant, onClick }: PathRowProps) {
         // Desktop (sm+): size to content, left-anchored.
         'h-12 w-full justify-between gap-3 rounded-xl px-4',
         'sm:w-auto sm:justify-start',
-        variant === 'outline' && 'border bg-card hover:bg-muted/50',
+        variant === 'outline' && 'border bg-background hover:bg-muted/50',
       )}
     >
       <span className="flex items-center gap-3 text-base font-semibold">
