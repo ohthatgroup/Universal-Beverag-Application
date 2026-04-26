@@ -41,6 +41,73 @@ function resolveIdentity(payload: { productId?: string | null; palletDealId?: st
 }
 
 /**
+ * GET /api/portal/orders/[id]/items
+ * Return the order's line items joined with product/pallet details.
+ * Used by the order-history preview sheet.
+ * Auth: X-Customer-Token header
+ */
+export async function GET(
+  request: Request,
+  routeContext: { params: Promise<{ id: string }> }
+) {
+  const requestId = getRequestId(request)
+  try {
+    const token = requirePortalToken(request)
+    const { id } = await routeContext.params
+    await requirePortalOrderAccess(id, token)
+    const db = await getRequestDb()
+
+    const { rows } = await db.query<{
+      id: string
+      product_id: string | null
+      pallet_deal_id: string | null
+      quantity: number
+      unit_price: number
+      line_total: number | null
+      product_title: string | null
+      product_image_url: string | null
+      product_pack_details: string | null
+      product_pack_count: number | null
+      product_size_value: number | null
+      product_size_uom: string | null
+      pallet_title: string | null
+      pallet_image_url: string | null
+    }>(
+      `select
+         oi.id,
+         oi.product_id,
+         oi.pallet_deal_id,
+         oi.quantity,
+         oi.unit_price,
+         oi.line_total,
+         p.title         as product_title,
+         p.image_url     as product_image_url,
+         p.pack_details  as product_pack_details,
+         p.pack_count    as product_pack_count,
+         p.size_value    as product_size_value,
+         p.size_uom      as product_size_uom,
+         pd.title        as pallet_title,
+         pd.image_url    as pallet_image_url
+       from order_items oi
+       left join products p      on p.id  = oi.product_id
+       left join pallet_deals pd on pd.id = oi.pallet_deal_id
+       where oi.order_id = $1
+         and oi.quantity > 0
+       order by oi.id asc`,
+      [id]
+    )
+
+    return apiOk({ items: rows }, 200, requestId)
+  } catch (error) {
+    logApiEvent(requestId, 'portal_order_items_get_failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    })
+    if (error instanceof Response) return error
+    return toErrorResponse(error, requestId)
+  }
+}
+
+/**
  * PUT /api/portal/orders/[id]/items
  * Upsert an order item (auto-save). Quantity 0 is handled by DELETE.
  * Auth: X-Customer-Token header

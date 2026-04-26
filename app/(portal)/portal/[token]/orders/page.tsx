@@ -1,4 +1,4 @@
-import { OrdersList } from '@/components/orders/orders-list'
+import { OrderHistoryList } from '@/components/portal/order-history-list'
 import { PortalPageHeader } from '@/components/portal/portal-page-header'
 import { OrderHistoryFilters } from '@/components/portal/order-history-filters'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
@@ -68,16 +68,10 @@ export default async function PortalOrdersPage({
 
       <OrderHistoryFilters token={token} active={statusFilter} />
 
-      <OrdersList
+      <OrderHistoryList
         token={token}
         orders={filtered}
-        variant="past"
         showPrices={profile.show_prices}
-        emptyMessage={
-          statusFilter === 'all'
-            ? 'No orders yet.'
-            : `No ${statusFilter} orders.`
-        }
       />
     </div>
   )
