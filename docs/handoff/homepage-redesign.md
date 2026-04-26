@@ -24,6 +24,11 @@ a missing entry means a silently broken feature.
 | 12 | `components/portal/start-order-fork.tsx` | path-tap handlers fire `window.alert` | `clone_order(source, new_date)` for Reorder; "compute usuals" SQL helper for Usuals; existing draft-create endpoint for Scratch |
 | 13 | `components/portal/start-order-fork.tsx` | confirm-replace dialog only fires the same `window.alert` | atomic swap-draft-contents endpoint (e.g., `delete_order_items` + `clone_order` in one tx) |
 | 14 | `components/portal/reorder-list.tsx` | `OrderPreviewSheet` shows hardcoded `getMockPreviewItems` line items | `GET /api/portal/orders/[id]/items` (or RSC fetch) to load real items per preview |
+| 15 | `components/portal/start-order-drawer.tsx` | drawer's three actions (clone recent, add usuals, start empty) all `window.alert` | clone_order / apply_usuals / draft-create endpoints (same as entries 12-13) |
+| 16 | `components/portal/manage-usuals-list.tsx` | hardcoded 12 products, local-only toggle state | products query + customer_products usuals column + PATCH endpoint |
+| 17 | `app/(portal)/portal/[token]/catalog/page.tsx` | `MOCK_PRODUCTS` array | RSC db.query for catalog products (same as the order builder uses) joined with customer_products usuals state |
+| 18 | `app/(portal)/portal/[token]/layout.tsx` | `MOCK_USUALS_COUNT` constant | derive from customer_products where is_usual = true |
+| 19 | `components/layout/portal-top-bar.tsx` | inline-SVG wordmark stand-in for the brand logo | drop the real `public/brand/universal-beverages.svg` (or .png) asset and swap to `<Image src="/brand/universal-beverages.svg" />` |
 
 ## Entries
 

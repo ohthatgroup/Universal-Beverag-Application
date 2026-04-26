@@ -1,30 +1,218 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { UserCircle } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { History, ListChecks, Menu, ShoppingBag, UserCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Panel } from '@/components/ui/panel'
+import {
+  StartOrderDrawer,
+  type RecentOrderForDrawer,
+} from '@/components/portal/start-order-drawer'
 import { buildCustomerPortalBasePath } from '@/lib/portal-links'
+import { cn } from '@/lib/utils'
 
 interface PortalTopBarProps {
   token: string
+  nextDeliveryDate: string
+  nextNextDeliveryDate: string
+  primaryDraft: {
+    id: string
+    deliveryDate: string
+    itemCount: number
+  } | null
+  recentOrders: RecentOrderForDrawer[]
+  usualsCount: number
 }
 
-export function PortalTopBar({ token }: PortalTopBarProps) {
+export function PortalTopBar({
+  token,
+  nextDeliveryDate,
+  nextNextDeliveryDate,
+  primaryDraft,
+  recentOrders,
+  usualsCount,
+}: PortalTopBarProps) {
+  const pathname = usePathname()
   const base = buildCustomerPortalBasePath(token) ?? '/portal'
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const openDrawer = () => {
+    setMenuOpen(false)
+    setDrawerOpen(true)
+  }
+
+  const links = [
+    {
+      href: `${base}/orders`,
+      label: 'Order history',
+      icon: <History className="h-4 w-4" />,
+      active: pathname === `${base}/orders` || pathname.startsWith(`${base}/orders/`),
+    },
+    {
+      href: `${base}/catalog`,
+      label: 'Catalog',
+      icon: <ListChecks className="h-4 w-4" />,
+      active: pathname === `${base}/catalog` || pathname.startsWith(`${base}/catalog/`),
+    },
+  ]
 
   return (
-    <header className="border-b bg-background">
-      <div className="mx-auto flex h-12 max-w-3xl items-center justify-between px-4 md:px-6">
-      <Link href={base} className="text-sm font-medium text-muted-foreground hover:text-foreground">
-        Universal Beverages
-      </Link>
+    <>
+      <header className="border-b bg-background">
+        <div className="mx-auto flex h-12 max-w-3xl items-center gap-2 px-4 md:px-6">
+          {/* Mobile: hamburger menu */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 md:hidden"
+            aria-label="Open menu"
+            onClick={() => setMenuOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
 
-      <Button asChild variant="ghost" size="icon" aria-label="Account">
-        <Link href={`${base}/account`}>
-          <UserCircle className="h-5 w-5" />
-        </Link>
-      </Button>
-      </div>
-    </header>
+          <Link
+            href={base}
+            aria-label="Universal Beverages — home"
+            className="inline-flex shrink-0 items-baseline text-base font-semibold tracking-tight transition-opacity hover:opacity-80"
+          >
+            <span className="text-foreground/80">Universal</span>
+            <span className="text-accent">Beverages</span>
+          </Link>
+
+          {/* Desktop: inline links */}
+          <nav className="ml-4 hidden items-center gap-1 md:flex">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  link.active
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-2">
+            {/* Desktop: explicit Start order button */}
+            <Button
+              type="button"
+              variant="accent"
+              size="sm"
+              onClick={openDrawer}
+              className="hidden md:inline-flex"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              Start order
+            </Button>
+
+            {/* Mobile: compact icon-only Start order button */}
+            <Button
+              type="button"
+              variant="accent"
+              size="icon"
+              onClick={openDrawer}
+              className="h-8 w-8 md:hidden"
+              aria-label="Start order"
+            >
+              <ShoppingBag className="h-4 w-4" />
+            </Button>
+
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              aria-label="Account"
+              className="h-8 w-8"
+            >
+              <Link href={`${base}/account`}>
+                <UserCircle className="h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile menu side-sheet */}
+      <Panel
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        variant="side-sheet"
+        srTitle="Portal menu"
+      >
+        <Panel.Header>
+          <h2 className="flex-1 text-base font-semibold">Menu</h2>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="Close menu"
+            onClick={() => setMenuOpen(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </Panel.Header>
+        <Panel.Body className="space-y-1 px-3 py-3">
+          <button
+            type="button"
+            onClick={openDrawer}
+            className="flex w-full items-center gap-3 rounded-lg bg-accent px-3 py-3 text-left text-sm font-semibold text-accent-foreground hover:bg-accent/90"
+          >
+            <ShoppingBag className="h-4 w-4" />
+            Start order
+          </button>
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+                link.active
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
+            >
+              {link.icon}
+              {link.label}
+            </Link>
+          ))}
+          <Link
+            href={`${base}/account`}
+            onClick={() => setMenuOpen(false)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+              pathname.startsWith(`${base}/account`)
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            <UserCircle className="h-4 w-4" />
+            Account
+          </Link>
+        </Panel.Body>
+      </Panel>
+
+      <StartOrderDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        token={token}
+        nextDeliveryDate={nextDeliveryDate}
+        nextNextDeliveryDate={nextNextDeliveryDate}
+        primaryDraft={primaryDraft}
+        recentOrders={recentOrders}
+        usualsCount={usualsCount}
+      />
+    </>
   )
 }

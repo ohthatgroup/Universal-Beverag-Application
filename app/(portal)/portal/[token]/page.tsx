@@ -1,7 +1,5 @@
-import { OrdersList } from '@/components/orders/orders-list'
 import { HomepageWelcome } from '@/components/portal/homepage-welcome'
-import { StartOrderFork } from '@/components/portal/start-order-fork'
-import { PastOrdersSection } from '@/components/portal/past-orders-section'
+import { HomepageDraftStrip, type DraftForStrip } from '@/components/portal/homepage-draft-strip'
 import { AccountStatsCard } from '@/components/portal/account-stats-card'
 import {
   AnnouncementsStack,
@@ -9,8 +7,7 @@ import {
 } from '@/components/portal/announcements-stack'
 import { getRequestDb } from '@/lib/server/db'
 import { resolveCustomerToken } from '@/lib/server/customer-auth'
-import { addDays, todayISODate } from '@/lib/utils'
-import type { Order } from '@/lib/types'
+import { todayISODate } from '@/lib/utils'
 
 // TODO: replace with real data from announcements query (see docs/handoff/homepage-redesign.md)
 const MOCK_ANNOUNCEMENTS: Announcement[] = [
@@ -128,110 +125,39 @@ export default async function PortalHome({
   const db = await getRequestDb()
   const today = todayISODate()
 
-  const [draftsResult, ordersResult] = await Promise.all([
-    db.query<{
-      id: string
-      delivery_date: string
-      item_count: number | null
-      updated_at: string
-    }>(
-      `select id, delivery_date::text, item_count, updated_at::text
-       from orders
-       where customer_id = $1
-         and status = 'draft'
-         and delivery_date >= $2
-       order by delivery_date asc
-       limit 5`,
-      [customerId, today]
-    ),
-    db.query<{
-      id: string
-      customer_id: string
-      delivery_date: string
-      status: 'draft' | 'submitted' | 'delivered'
-      total: number | null
-      item_count: number | null
-      submitted_at: string | null
-      delivered_at: string | null
-      created_at: string
-      updated_at: string
-    }>(
-      `select id, customer_id, delivery_date::text, status, total, item_count, submitted_at::text, delivered_at::text, created_at::text, updated_at::text
-       from orders
-       where customer_id = $1
-       order by delivery_date desc`,
-      [customerId]
-    ),
-  ])
-
-  const currentOrders: Order[] = []
-  const pastOrders: Order[] = []
-
-  for (const order of ordersResult.rows) {
-    const normalized: Order = {
-      ...order,
-      total: Number(order.total ?? 0),
-      item_count: order.item_count ?? 0,
-    }
-
-    if (normalized.status === 'draft' || normalized.delivery_date >= today) {
-      currentOrders.push(normalized)
-    } else {
-      pastOrders.push(normalized)
-    }
-  }
-
-  const nextDeliveryDate = draftsResult.rows[0]?.delivery_date ?? today
-  // TODO: replace with cutoff-aware next-next-date utility (see docs/handoff/homepage-redesign.md)
-  const nextNextDeliveryDate = addDays(nextDeliveryDate, 7)
-
-  const primaryDraftRow = draftsResult.rows[0] ?? null
-  const primaryDraft = primaryDraftRow
-    ? {
-        id: primaryDraftRow.id,
-        deliveryDate: primaryDraftRow.delivery_date,
-        itemCount: primaryDraftRow.item_count ?? 0,
-        updatedAt: primaryDraftRow.updated_at,
-      }
-    : null
-
-  const submittedOrders = ordersResult.rows.filter(
-    (o) => o.status === 'submitted' || o.status === 'delivered',
+  // Drafts only — order history moved to /portal/[token]/orders.
+  const draftsResult = await db.query<{
+    id: string
+    delivery_date: string
+    item_count: number | null
+  }>(
+    `select id, delivery_date::text, item_count
+     from orders
+     where customer_id = $1
+       and status = 'draft'
+       and delivery_date >= $2
+     order by delivery_date asc
+     limit 10`,
+    [customerId, today],
   )
-  const submittedOrderCount = submittedOrders.length
-  // ordersResult is already ordered delivery_date desc, so newest first.
-  const recentOrders = submittedOrders.slice(0, 5).map((row) => ({
+
+  const drafts: DraftForStrip[] = draftsResult.rows.map((row) => ({
     id: row.id,
     deliveryDate: row.delivery_date,
     itemCount: row.item_count ?? 0,
-    total: Number(row.total ?? 0),
-    status: row.status as 'submitted' | 'delivered',
   }))
-
-  const nonDraftCurrentOrders = currentOrders.filter((order) => order.status !== 'draft')
 
   return (
     <div className="mx-auto w-full max-w-[600px] space-y-8">
-      {/* Above the fold — type-driven welcome + the unified ordering panel. */}
       <section className="space-y-6 pt-2">
         <HomepageWelcome
           contactName={profile.contact_name}
           businessName={profile.business_name}
         />
 
-        <StartOrderFork
-          token={token}
-          nextDeliveryDate={nextDeliveryDate}
-          nextNextDeliveryDate={nextNextDeliveryDate}
-          primaryDraft={primaryDraft}
-          submittedOrderCount={submittedOrderCount}
-          recentOrders={recentOrders}
-        />
+        <HomepageDraftStrip token={token} drafts={drafts} />
       </section>
 
-      {/* Below-the-fold zone — curated content + history + reference data,
-          contained inside a subtly tinted rounded panel so it reads as a
-          distinct zone without breaking out of the layout column. */}
       <section className="space-y-8 rounded-2xl border border-foreground/5 bg-muted/30 px-4 py-6 md:px-6 md:py-8">
         <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -241,30 +167,10 @@ export default async function PortalHome({
           <AnnouncementsStack
             announcements={MOCK_ANNOUNCEMENTS}
             token={token}
-            primaryDraftOrderId={primaryDraftRow?.id ?? null}
+            primaryDraftOrderId={drafts[0]?.id ?? null}
             showPrices={profile.show_prices}
           />
         </div>
-
-        {nonDraftCurrentOrders.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Recent orders
-            </h2>
-            <OrdersList
-              token={token}
-              orders={nonDraftCurrentOrders}
-              variant="current"
-              showPrices={profile.show_prices}
-            />
-          </div>
-        )}
-
-        <PastOrdersSection
-          token={token}
-          orders={pastOrders}
-          showPrices={profile.show_prices}
-        />
 
         {/* TODO: replace with real account stats query */}
         <AccountStatsCard
