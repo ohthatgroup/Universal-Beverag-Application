@@ -11,20 +11,33 @@ export default async function AdminDrawerPage() {
   const context = await requirePageAuth(['salesman'])
   const db = await getRequestDb()
 
-  const [customers, products, brands, announcements, staff] = await Promise.all([
-    db.query<{ count: string }>(`select count(*)::text as count from profiles where role = 'customer'`),
-    db.query<{ count: string }>(
-      `select count(*)::text as count from products where customer_id is null and is_discontinued = false`
-    ),
-    db.query<{ count: string }>(`select count(*)::text as count from brands`),
-    db.query<{ count: string }>(
-      `select count(*)::text as count from announcements where is_active = true`
-    ),
-    db.query<{ count: string }>(`select count(*)::text as count from profiles where role = 'salesman'`),
-  ])
+  const [customers, products, brands, announcements, customerGroups, staff] =
+    await Promise.all([
+      db.query<{ count: string }>(
+        `select count(*)::text as count from profiles where role = 'customer'`,
+      ),
+      db.query<{ count: string }>(
+        `select count(*)::text as count from products where customer_id is null and is_discontinued = false`,
+      ),
+      db.query<{ count: string }>(`select count(*)::text as count from brands`),
+      db.query<{ count: string }>(
+        `select count(*)::text as count from announcements where is_active = true`,
+      ),
+      db.query<{ count: string }>(
+        `select count(*)::text as count from customer_groups`,
+      ),
+      db.query<{ count: string }>(
+        `select count(*)::text as count from profiles where role = 'salesman'`,
+      ),
+    ])
 
   const items: Array<{ href: string; label: string; value?: string }> = [
     { href: '/admin/customers', label: 'Customers', value: customers.rows[0]?.count },
+    {
+      href: '/admin/customer-groups',
+      label: 'Customer groups',
+      value: customerGroups.rows[0]?.count,
+    },
     { href: '/admin/catalog', label: 'Products', value: products.rows[0]?.count },
     { href: '/admin/brands', label: 'Brands', value: brands.rows[0]?.count },
     {

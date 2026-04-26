@@ -5,6 +5,40 @@ import { getRequestDb } from '@/lib/server/db'
 
 const paramsSchema = z.object({ id: z.string().uuid() })
 
+interface OverrideRow {
+  scope: string
+  scope_id: string
+  is_hidden: boolean | null
+  sort_order: number | null
+}
+
+/**
+ * GET /api/admin/announcements/[id]/overrides
+ * Returns every override row for this announcement (group + customer).
+ * Used by the group-overrides dialog on /admin/announcements and (later)
+ * any per-customer drill-down.
+ */
+export async function GET(
+  request: Request,
+  routeContext: { params: Promise<{ id: string }> },
+) {
+  const requestId = getRequestId(request)
+  try {
+    await requireAuthContext(['salesman'])
+    const { id } = paramsSchema.parse(await routeContext.params)
+    const db = await getRequestDb()
+    const { rows } = await db.query<OverrideRow>(
+      `select scope, scope_id, is_hidden, sort_order
+         from announcement_overrides
+        where announcement_id = $1`,
+      [id],
+    )
+    return apiOk({ overrides: rows }, 200, requestId)
+  } catch (error) {
+    return toErrorResponse(error, requestId)
+  }
+}
+
 const upsertOverrideSchema = z.object({
   scope: z.enum(['group', 'customer']),
   scope_id: z.string().uuid(),

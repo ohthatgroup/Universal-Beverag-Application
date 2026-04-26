@@ -56,8 +56,13 @@ const ADMIN_LINKS: NavLink[] = [
   },
   {
     href: '/admin/announcements',
-    label: 'Announcements',
+    label: 'Deals & Announcements',
     match: (p) => p.startsWith('/admin/announcements'),
+  },
+  {
+    href: '/admin/customer-groups',
+    label: 'Customer Groups',
+    match: (p) => p.startsWith('/admin/customer-groups'),
   },
   {
     href: '/admin/staff',

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import { RowReorderArrows } from '@/components/admin/row-actions'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AnnouncementDialog } from '@/components/admin/announcement-dialog'
+import { AnnouncementGroupOverridesDialog } from '@/components/admin/announcement-group-overrides-dialog'
 import type { PickerProduct } from '@/components/admin/product-picker'
 import type { Announcement } from '@/components/portal/announcements-stack'
 
@@ -74,6 +75,12 @@ export function AnnouncementsManager({
     'announcements',
   )
   const [error, setError] = useState<string | null>(null)
+  const [groupOverridesAnnouncement, setGroupOverridesAnnouncement] =
+    useState<Announcement | null>(null)
+
+  const openGroupOverrides = (a: Announcement) => {
+    setGroupOverridesAnnouncement(a)
+  }
 
   const now = useMemo(() => new Date(), [])
   const dealRows = rows.filter((a) => a.kind === 'deal')
@@ -294,6 +301,7 @@ export function AnnouncementsManager({
             onToggleActive={toggleActive}
             onEdit={openEdit}
             onDelete={removeRow}
+            onOpenGroupOverrides={openGroupOverrides}
             emptyLabel="No announcements yet — create one with the button above."
           />
         </TabsContent>
@@ -307,10 +315,20 @@ export function AnnouncementsManager({
             onToggleActive={toggleActive}
             onEdit={openEdit}
             onDelete={removeRow}
+            onOpenGroupOverrides={openGroupOverrides}
             emptyLabel="No deals yet — create one to set locked-quantity bundles."
           />
         </TabsContent>
       </Tabs>
+
+      <AnnouncementGroupOverridesDialog
+        open={groupOverridesAnnouncement !== null}
+        onOpenChange={(open) => {
+          if (!open) setGroupOverridesAnnouncement(null)
+        }}
+        announcementId={groupOverridesAnnouncement?.id ?? null}
+        announcementTitle={groupOverridesAnnouncement?.title ?? null}
+      />
 
       <AnnouncementDialog
         open={dialogOpen}
@@ -332,6 +350,7 @@ interface KindSectionProps {
   onToggleActive: (id: string, isActive: boolean) => void
   onEdit: (a: Announcement) => void
   onDelete: (id: string) => void
+  onOpenGroupOverrides: (a: Announcement) => void
   emptyLabel: string
 }
 
@@ -348,6 +367,7 @@ function KindSection({
   onToggleActive,
   onEdit,
   onDelete,
+  onOpenGroupOverrides,
   emptyLabel,
 }: KindSectionProps) {
   const liveRows = rows.filter((a) => isLive(a, now))
@@ -375,6 +395,7 @@ function KindSection({
             onToggleActive={onToggleActive}
             onEdit={onEdit}
             onDelete={onDelete}
+            onOpenGroupOverrides={onOpenGroupOverrides}
           />
         </div>
       )}
@@ -390,6 +411,7 @@ function KindSection({
             onToggleActive={onToggleActive}
             onEdit={onEdit}
             onDelete={onDelete}
+            onOpenGroupOverrides={onOpenGroupOverrides}
           />
         </div>
       )}
@@ -404,6 +426,7 @@ interface AnnouncementsTableProps {
   onToggleActive: (id: string, isActive: boolean) => void
   onEdit: (a: Announcement) => void
   onDelete: (id: string) => void
+  onOpenGroupOverrides: (a: Announcement) => void
 }
 
 function AnnouncementsTable({
@@ -413,6 +436,7 @@ function AnnouncementsTable({
   onToggleActive,
   onEdit,
   onDelete,
+  onOpenGroupOverrides,
 }: AnnouncementsTableProps) {
   if (rows.length === 0) {
     return (
@@ -501,6 +525,12 @@ function AnnouncementsTable({
                       <DropdownMenuItem onClick={() => onEdit(row)}>
                         <Pencil className="h-4 w-4" />
                         Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onOpenGroupOverrides(row)}
+                      >
+                        <Users className="h-4 w-4" />
+                        Group overrides…
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => onDelete(row.id)}

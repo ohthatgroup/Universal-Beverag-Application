@@ -22,16 +22,19 @@ type InitialValues = {
   show_prices: boolean
   custom_pricing: boolean
   default_group: 'brand' | 'size'
+  customer_group_id: string | null
 }
 
 export function CustomerEditForm({
   customerId,
   businessName,
+  groups = [],
   initialValues,
   tagSuggestions = [],
 }: {
   customerId: string
   businessName: string
+  groups?: Array<{ id: string; name: string }>
   initialValues: InitialValues
   tagSuggestions?: string[]
 }) {
@@ -65,6 +68,7 @@ export function CustomerEditForm({
           showPrices: values.show_prices,
           customPricing: values.custom_pricing,
           defaultGroup: values.default_group,
+          customerGroupId: values.customer_group_id,
         }),
       })
       const payload = (await response.json().catch(() => null)) as
@@ -198,6 +202,29 @@ export function CustomerEditForm({
           </h2>
           <div className="space-y-3">
             <div className="space-y-2">
+              <Label htmlFor="customer_group_id">Customer group</Label>
+              <select
+                id="customer_group_id"
+                name="customer_group_id"
+                value={values.customer_group_id ?? ''}
+                onChange={(e) =>
+                  set('customer_group_id', e.target.value || null)
+                }
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">No group (uses global defaults)</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Customers in a group inherit the group&apos;s deal ordering and
+                visibility. Per-customer overrides below take precedence.
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="tags">Tags</Label>
               <TagChipInput
                 id="tags"
@@ -206,7 +233,8 @@ export function CustomerEditForm({
                 suggestions={tagSuggestions}
               />
               <p className="text-xs text-muted-foreground">
-                Type and press Enter to add. Used for targeting banners and announcements.
+                Type and press Enter to add. Used for audience targeting on
+                announcements (independent of customer group).
               </p>
             </div>
             <div className="space-y-2">
