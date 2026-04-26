@@ -18,15 +18,23 @@ export interface ManageUsualsProduct {
 }
 
 interface ManageUsualsListProps {
+  token: string
   initialProducts: ManageUsualsProduct[]
+  showPrices: boolean
 }
 
 type FilterTab = 'all' | 'usuals' | 'not-usuals'
 
-export function ManageUsualsList({ initialProducts }: ManageUsualsListProps) {
+export function ManageUsualsList({
+  token,
+  initialProducts,
+  showPrices,
+}: ManageUsualsListProps) {
   const [products, setProducts] = useState(initialProducts)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  const [error, setError] = useState<string | null>(null)
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -46,12 +54,50 @@ export function ManageUsualsList({ initialProducts }: ManageUsualsListProps) {
 
   const usualsCount = products.filter((p) => p.isUsual).length
 
-  const toggleUsual = (id: string) => {
+  const toggleUsual = async (id: string) => {
+    const target = products.find((p) => p.id === id)
+    if (!target) return
+    const next = !target.isUsual
+
+    // Optimistic update
     setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isUsual: !p.isUsual } : p)),
+      prev.map((p) => (p.id === id ? { ...p, isUsual: next } : p)),
     )
-    // TODO: PATCH /api/portal/customer-products/[productId] with { isUsual }
-    // (or equivalent). See docs/handoff/homepage-redesign.md entry 16.
+    setSavingIds((prev) => new Set(prev).add(id))
+    setError(null)
+
+    try {
+      const response = await fetch('/api/portal/usuals', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Customer-Token': token,
+        },
+        body: JSON.stringify({ productId: id, isUsual: next }),
+      })
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null
+        throw new Error(payload?.error?.message ?? 'Failed to update usual')
+      }
+    } catch (saveError) {
+      // Roll back on failure.
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isUsual: !next } : p)),
+      )
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Failed to update usual',
+      )
+    } finally {
+      setSavingIds((prev) => {
+        const copy = new Set(prev)
+        copy.delete(id)
+        return copy
+      })
+    }
   }
 
   return (
@@ -99,52 +145,64 @@ export function ManageUsualsList({ initialProducts }: ManageUsualsListProps) {
         </div>
       </div>
 
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
       {visible.length === 0 ? (
         <p className="rounded-xl border border-dashed bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
-          No products match your filter.
+          {products.length === 0
+            ? 'No products available.'
+            : 'No products match your filter.'}
         </p>
       ) : (
         <ul className="divide-y divide-foreground/10 overflow-hidden rounded-xl border bg-card">
-          {visible.map((product) => (
-            <li
-              key={product.id}
-              className="flex items-center gap-3 px-4 py-3"
-            >
-              <ProductThumb product={product} />
-              <div className="min-w-0 flex-1 leading-tight">
-                <div className="truncate text-sm font-semibold">
-                  {product.title}
-                </div>
-                <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {[product.brandName, product.packLabel]
-                    .filter(Boolean)
-                    .join(' · ') || '—'}{' '}
-                  ·{' '}
-                  <Money value={product.price} className="font-normal" />
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant={product.isUsual ? 'accent' : 'outline'}
-                size="sm"
-                onClick={() => toggleUsual(product.id)}
-                className="shrink-0"
-                aria-pressed={product.isUsual}
+          {visible.map((product) => {
+            const meta =
+              [product.brandName, product.packLabel].filter(Boolean).join(' · ') ||
+              null
+            const isSaving = savingIds.has(product.id)
+            return (
+              <li
+                key={product.id}
+                className="flex items-center gap-3 px-4 py-3"
               >
-                {product.isUsual ? (
-                  <>
-                    <Check className="h-3.5 w-3.5" />
-                    Usual
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-3.5 w-3.5" />
-                    Add
-                  </>
-                )}
-              </Button>
-            </li>
-          ))}
+                <ProductThumb product={product} />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-sm font-semibold">
+                    {product.title}
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {meta && <>{meta}</>}
+                    {meta && showPrices && ' · '}
+                    {showPrices && (
+                      <Money value={product.price} className="font-normal" />
+                    )}
+                    {!meta && !showPrices && '—'}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant={product.isUsual ? 'accent' : 'outline'}
+                  size="sm"
+                  onClick={() => toggleUsual(product.id)}
+                  className="shrink-0"
+                  aria-pressed={product.isUsual}
+                  disabled={isSaving}
+                >
+                  {product.isUsual ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Usual
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-3.5 w-3.5" />
+                      Add
+                    </>
+                  )}
+                </Button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

@@ -25,9 +25,9 @@ a missing entry means a silently broken feature.
 | 13 | `components/portal/start-order-fork.tsx` | confirm-replace dialog only fires the same `window.alert` | atomic swap-draft-contents endpoint (e.g., `delete_order_items` + `clone_order` in one tx) |
 | 14 | `components/portal/reorder-list.tsx` | `OrderPreviewSheet` shows hardcoded `getMockPreviewItems` line items | `GET /api/portal/orders/[id]/items` (or RSC fetch) to load real items per preview |
 | 15 | `components/portal/start-order-drawer.tsx` | drawer's three actions (clone recent, add usuals, start empty) all `window.alert` | clone_order / apply_usuals / draft-create endpoints (same as entries 12-13) |
-| 16 | `components/portal/manage-usuals-list.tsx` | hardcoded 12 products, local-only toggle state | products query + customer_products usuals column + PATCH endpoint |
-| 17 | `app/(portal)/portal/[token]/catalog/page.tsx` | `MOCK_PRODUCTS` array | RSC db.query for catalog products (same as the order builder uses) joined with customer_products usuals state |
-| 18 | `app/(portal)/portal/[token]/layout.tsx` | `MOCK_USUALS_COUNT` constant | derive from customer_products where is_usual = true |
+| ~~16~~ | ~~`components/portal/manage-usuals-list.tsx`~~ | ~~hardcoded products, local-only toggle~~ | **DONE** — toggle calls `PATCH /api/portal/usuals` with optimistic UI + rollback. |
+| ~~17~~ | ~~`app/(portal)/portal/[token]/catalog/page.tsx`~~ | ~~`MOCK_PRODUCTS`~~ | **DONE** — RSC now queries products + customer_products and feeds real shape into `<ManageUsualsList>`. |
+| ~~18~~ | ~~`app/(portal)/portal/[token]/layout.tsx`~~ | ~~`MOCK_USUALS_COUNT`~~ | **DONE** — layout queries the count and feeds the drawer. |
 | 19 | `components/layout/portal-top-bar.tsx` | inline-SVG wordmark stand-in for the brand logo | drop the real `public/brand/universal-beverages.svg` (or .png) asset and swap to `<Image src="/brand/universal-beverages.svg" />` |
 
 ## Entries
