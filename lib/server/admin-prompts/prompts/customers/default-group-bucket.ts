@@ -1,14 +1,15 @@
-import type { Prompt, Subject } from '../../types'
+import type { Moment, Subject } from '../../types'
 import { resolveDefaultGroupId } from '@/lib/server/default-group'
 import type { DbFacade } from '@/lib/server/db'
+import { foldedWeight } from '../../weight'
 
 /** Customers sitting in the seeded "Default" group. Folds N. The
- *  evergreen `bulk-assign-group` drawer reads `prompt.subjects` to
- *  pre-check rows and sends `{ ids, customerGroupId }` to
+ *  `bulk-assign-group` drawer reads `moment.subjects` to pre-check
+ *  rows and sends `{ ids, customerGroupId }` to
  *  `/api/admin/customers/bulk-assign-group`. */
 export async function defaultGroupBucketPrompt(
   db: DbFacade,
-): Promise<Prompt | null> {
+): Promise<Moment | null> {
   const defaultId = await resolveDefaultGroupId()
   const { rows } = await db.query<{
     id: string
@@ -43,19 +44,28 @@ export async function defaultGroupBucketPrompt(
   }))
 
   const count = subjects.length
+  const weight = foldedWeight(0.7, count)
+
   return {
-    id: 'opportunity/default-group-bucket',
-    category: 'opportunity',
+    id: 'just-in/default-group-bucket',
+    category: 'just-in',
     kind: 'default-group-bucket',
-    severity: 'info',
-    title:
+    narrative:
       count === 1
-        ? `1 customer in the Default group`
-        : `${count} customers in the Default group`,
-    body: 'Assign them to a more specific group to enable targeted deals.',
+        ? "1 customer is still in the Default group."
+        : `${count} customers are still in the Default group.`,
+    when: 'segmenting',
     subjects,
-    count,
-    cta: count === 1 ? 'Assign' : `Assign ${count}`,
-    action: { kind: 'drawer', drawerKind: 'bulk-assign-group' },
+    primary: {
+      label: count === 1 ? 'Move them to a real group' : 'Sort them into groups',
+      action: { kind: 'drawer', drawerKind: 'bulk-assign-group' },
+    },
+    secondary: [
+      {
+        label: 'Make a new group first',
+        action: { kind: 'href', href: '/admin/customers/groups' },
+      },
+    ],
+    weight,
   }
 }

@@ -1,19 +1,20 @@
-import type { Prompt } from '../../types'
+import type { Moment } from '../../types'
 
 /** Evergreen "Create" affordance for the Orders page + dashboard.
  *  Drawer: `pick-customer-and-open-draft` — pick a customer + delivery
  *  date, then redirect to the order builder. */
-export function newOrderPrompt(): Prompt {
+export function newOrderPrompt(): Moment {
   return {
-    id: 'evergreen/new-order',
-    category: 'evergreen',
+    id: 'any-time/new-order',
+    category: 'any-time',
     kind: 'new-order',
-    severity: 'info',
-    title: 'Open a new order draft',
-    body: 'Pick a customer and a delivery date.',
+    narrative: 'Open a draft',
     subjects: [],
-    count: 0,
-    cta: 'New order',
-    action: { kind: 'drawer', drawerKind: 'pick-customer-and-open-draft' },
+    primary: {
+      label: 'New order',
+      action: { kind: 'drawer', drawerKind: 'pick-customer-and-open-draft' },
+    },
+    secondary: [],
+    weight: 0.1,
   }
 }

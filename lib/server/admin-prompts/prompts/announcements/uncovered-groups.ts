@@ -1,6 +1,7 @@
-import type { Prompt, Subject } from '../../types'
+import type { Moment, Subject } from '../../types'
 import { resolveDefaultGroupId } from '@/lib/server/default-group'
 import type { DbFacade } from '@/lib/server/db'
+import { foldedWeight } from '../../weight'
 
 /** Customer groups (excluding Default) that no active deal targets,
  *  given there's no active broadcast deal either. Folds N. Drawer:
@@ -8,7 +9,7 @@ import type { DbFacade } from '@/lib/server/db'
  *  the selected groups in one go. */
 export async function uncoveredGroupsPrompt(
   db: DbFacade,
-): Promise<Prompt | null> {
+): Promise<Moment | null> {
   const defaultId = await resolveDefaultGroupId()
   const { rows } = await db.query<{
     id: string
@@ -46,19 +47,23 @@ export async function uncoveredGroupsPrompt(
     sublabel: `${row.member_count} ${row.member_count === 1 ? 'customer' : 'customers'}`,
   }))
   const count = subjects.length
+  const weight = foldedWeight(0.7, count)
+
   return {
-    id: 'opportunity/uncovered-groups',
-    category: 'opportunity',
+    id: 'just-in/uncovered-groups',
+    category: 'just-in',
     kind: 'uncovered-groups',
-    severity: 'info',
-    title:
+    narrative:
       count === 1
-        ? `1 group has no deal targeting it`
-        : `${count} groups have no deals targeting them`,
-    body: 'Pin a deal to keep these segments engaged.',
+        ? "1 group has no deals targeting it right now."
+        : `${count} groups have no deals targeting them right now.`,
+    when: 'opportunity',
     subjects,
-    count,
-    cta: count === 1 ? 'Pin a deal' : `Pin a deal for ${count}`,
-    action: { kind: 'drawer', drawerKind: 'pin-deal-for-groups' },
+    primary: {
+      label: 'Pin a deal for them',
+      action: { kind: 'drawer', drawerKind: 'pin-deal-for-groups' },
+    },
+    secondary: [],
+    weight,
   }
 }

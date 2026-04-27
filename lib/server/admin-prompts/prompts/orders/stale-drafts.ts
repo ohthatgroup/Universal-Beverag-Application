@@ -1,12 +1,13 @@
-import type { Prompt, Subject } from '../../types'
+import type { Moment, Subject } from '../../types'
 import type { DbFacade } from '@/lib/server/db'
+import { foldedWeight } from '../../weight'
 
 /** Drafts untouched for 7+ days. Folds N. Drawer:
- *  `bulk-close-or-nudge` — salesman can either nudge the customer to
+ *  `stale-drafts` — salesman can either nudge the customer to
  *  finish the cart or close the draft. */
 export async function staleDraftsPrompt(
   db: DbFacade,
-): Promise<Prompt | null> {
+): Promise<Moment | null> {
   const { rows } = await db.query<{
     id: string
     business_name: string | null
@@ -39,19 +40,23 @@ export async function staleDraftsPrompt(
     sublabel: `${row.item_count ?? 0} items · ${row.days} days untouched`,
   }))
   const count = subjects.length
+  const weight = foldedWeight(0.4, count)
+
   return {
-    id: 'hygiene/stale-drafts',
-    category: 'hygiene',
+    id: 'worth-a-look/stale-drafts',
+    category: 'worth-a-look',
     kind: 'stale-drafts',
-    severity: 'warn',
-    title:
+    narrative:
       count === 1
-        ? `1 stale draft (7+ days untouched)`
-        : `${count} stale drafts (7+ days untouched)`,
-    body: 'Nudge the customer to submit, or close the draft.',
+        ? "1 draft has been sitting untouched for over a week."
+        : `${count} drafts have been sitting untouched for over a week.`,
+    when: 'order cleanup',
     subjects,
-    count,
-    cta: count === 1 ? 'Review' : `Review ${count}`,
-    action: { kind: 'drawer', drawerKind: 'stale-drafts' },
+    primary: {
+      label: 'Nudge or close them',
+      action: { kind: 'drawer', drawerKind: 'stale-drafts' },
+    },
+    secondary: [],
+    weight,
   }
 }

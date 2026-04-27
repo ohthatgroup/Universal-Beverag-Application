@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import type { PromptDrawerProps } from './registry'
+import type { MomentDrawerProps } from './registry'
 
 /**
  * Directory drawer — no batch action, no inline edit. Each row links
@@ -20,9 +20,9 @@ import type { PromptDrawerProps } from './registry'
  * enhancement). The sublabel encodes which field is missing.
  */
 export function CustomersMissingInfoDrawer({
-  prompt,
+  moment,
   onClose,
-}: PromptDrawerProps) {
+}: MomentDrawerProps) {
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
@@ -31,7 +31,7 @@ export function CustomersMissingInfoDrawer({
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="text-base font-semibold">
-            {prompt.title}
+            {moment.narrative}
           </SheetTitle>
           <SheetDescription className="text-xs">
             Click a customer to fill the missing info on their edit page.
@@ -40,7 +40,7 @@ export function CustomersMissingInfoDrawer({
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <ul className="divide-y rounded-md border">
-            {prompt.subjects.map((subject) => {
+            {moment.subjects.map((subject) => {
               const focus = pickFocusField(subject.sublabel)
               const href = `/admin/customers/${subject.id}/edit${focus ? `?focus=${focus}` : ''}`
               return (

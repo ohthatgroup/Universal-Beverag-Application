@@ -1,5 +1,6 @@
-import type { Prompt, Subject } from '../../types'
+import type { Moment, Subject } from '../../types'
 import type { DbFacade } from '@/lib/server/db'
+import { foldedWeight } from '../../weight'
 
 interface Row {
   id: string
@@ -21,7 +22,7 @@ interface Row {
  */
 export async function customersWithMissingInfoPrompt(
   db: DbFacade,
-): Promise<Prompt | null> {
+): Promise<Moment | null> {
   const { rows } = await db.query<Row>(
     `select id,
             business_name,
@@ -52,19 +53,24 @@ export async function customersWithMissingInfoPrompt(
     }
   })
 
+  const count = subjects.length
+  const weight = foldedWeight(0.4, count)
+
   return {
-    id: 'hygiene/customers-with-missing-info',
-    category: 'hygiene',
+    id: 'worth-a-look/customers-with-missing-info',
+    category: 'worth-a-look',
     kind: 'customers-with-missing-info',
-    severity: 'info',
-    title:
-      subjects.length === 1
-        ? `1 customer needs missing info`
-        : `${subjects.length} customers need missing info`,
-    body: 'Click a row to fill what’s missing on their edit page.',
+    narrative:
+      count === 1
+        ? "1 customer's profile is missing details."
+        : `${count} customers are missing some details.`,
+    when: 'profile cleanup',
     subjects,
-    count: subjects.length,
-    cta: 'Review',
-    action: { kind: 'drawer', drawerKind: 'customers-missing-info' },
+    primary: {
+      label: "Fill in what's missing",
+      action: { kind: 'drawer', drawerKind: 'customers-missing-info' },
+    },
+    secondary: [],
+    weight,
   }
 }

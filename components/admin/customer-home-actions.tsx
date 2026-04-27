@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { Check, Copy, MoreVertical, Package2, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -166,24 +165,6 @@ export function CustomerOverflowMenu() {
         }}
       />
     </>
-  )
-}
-
-export function CustomerEditButton() {
-  const { customerId } = useCtx()
-  return (
-    <Button
-      asChild
-      type="button"
-      variant="outline"
-      size="icon"
-      aria-label="Edit customer details"
-      className="h-9 w-9"
-    >
-      <Link href={`/admin/customers/${customerId}/edit`}>
-        <Pencil className="h-4 w-4" />
-      </Link>
-    </Button>
   )
 }
 

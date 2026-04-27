@@ -1,20 +1,19 @@
 import { expiringDealsPrompt } from '../prompts/announcements/expiring-deals'
 import { uncoveredGroupsPrompt } from '../prompts/announcements/uncovered-groups'
 import { newAnnouncementPrompt } from '../prompts/announcements/new-announcement'
-import { sortByCategoryOrder } from '../fold'
-import type { Prompt } from '../types'
+import type { Moment } from '../types'
 import type { DbFacade } from '@/lib/server/db'
 
-export async function getAnnouncementsPagePrompts(
+export async function getAnnouncementsPageMoments(
   db: DbFacade,
-): Promise<Prompt[]> {
+): Promise<Moment[]> {
   const [expiring, uncovered] = await Promise.all([
     expiringDealsPrompt(db),
     uncoveredGroupsPrompt(db),
   ])
-  const flat: Prompt[] = []
+  const flat: Moment[] = []
   if (expiring) flat.push(expiring)
   if (uncovered) flat.push(uncovered)
   flat.push(newAnnouncementPrompt())
-  return sortByCategoryOrder(flat)
+  return flat.sort((a, b) => b.weight - a.weight)
 }

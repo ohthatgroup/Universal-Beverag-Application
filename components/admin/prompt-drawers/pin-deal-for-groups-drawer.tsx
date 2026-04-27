@@ -10,7 +10,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
-import type { PromptDrawerProps } from './registry'
+import type { MomentDrawerProps } from './registry'
 
 interface DealOption {
   id: string
@@ -30,15 +30,15 @@ interface DealOption {
  *     placeholder; the dialog handoff is wired in slice 4 follow-up.)
  */
 export function PinDealForGroupsDrawer({
-  prompt,
+  moment,
   onClose,
   onCompleted,
-}: PromptDrawerProps) {
+}: MomentDrawerProps) {
   const [mode, setMode] = useState<'existing' | 'create'>('existing')
   const [deals, setDeals] = useState<DealOption[]>([])
   const [dealId, setDealId] = useState<string | null>(null)
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(
-    () => new Set(prompt.subjects.map((s) => s.id)),
+    () => new Set(moment.subjects.map((s) => s.id)),
   )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -135,7 +135,7 @@ export function PinDealForGroupsDrawer({
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="text-base font-semibold">
-            {prompt.title}
+            {moment.narrative}
           </SheetTitle>
           <SheetDescription className="text-xs">
             Add these groups to an existing deal, or create a new one
@@ -200,7 +200,7 @@ export function PinDealForGroupsDrawer({
           )}
 
           <ul className="divide-y rounded-md border">
-            {prompt.subjects.map((subject) => {
+            {moment.subjects.map((subject) => {
               const checked = selectedGroupIds.has(subject.id)
               const alreadyTargeted = isAlreadyTargeted(subject.id)
               return (

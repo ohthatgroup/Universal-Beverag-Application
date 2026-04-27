@@ -16,7 +16,7 @@ import {
   TEMPLATE_KINDS,
   type TemplateKind,
 } from '@/lib/server/message-templates'
-import type { PromptDrawerProps } from './registry'
+import type { MomentDrawerProps } from './registry'
 
 type Channel = 'whatsapp' | 'sms' | 'email'
 
@@ -40,25 +40,23 @@ interface SubjectMeta {
  * rendered template AND log the outreach via
  * `POST /api/admin/customers/log-outreach`.
  *
- * `prompt.action.payload.templateKind` selects which template the
- * drawer renders. `prompt.subjects[].id` is treated as the customer
- * id; the drawer fetches contact info via
- * `/api/admin/customers?ids=<csv>` (slice 4 builds that endpoint
- * inline below).
+ * `moment.primary.action.payload.templateKind` selects which template
+ * to render. `moment.subjects[].id` is the customer id; the drawer
+ * fetches contact info via `/api/admin/customers/contact-info?ids=…`.
  */
-export function OutreachDrawer({ prompt, onClose }: PromptDrawerProps) {
+export function OutreachDrawer({ moment, onClose }: MomentDrawerProps) {
   const templateKind = useMemo<TemplateKind | null>(() => {
-    if (prompt.action.kind !== 'drawer') return null
-    const kind = prompt.action.payload?.templateKind
+    if (moment.primary.action.kind !== 'drawer') return null
+    const kind = moment.primary.action.payload?.templateKind
     if (typeof kind !== 'string') return null
     return TEMPLATE_KINDS.includes(kind as TemplateKind)
       ? (kind as TemplateKind)
       : null
-  }, [prompt.action])
+  }, [moment.primary.action])
 
   const [template, setTemplate] = useState<string>('')
   const [subjectMetas, setSubjectMetas] = useState<SubjectMeta[]>(
-    prompt.subjects.map((subject) => ({
+    moment.subjects.map((subject) => ({
       subject,
       contact: { email: null, phone: null },
       contacted: false,
@@ -89,7 +87,7 @@ export function OutreachDrawer({ prompt, onClose }: PromptDrawerProps) {
         })
     }
 
-    const ids = prompt.subjects.map((s) => s.id)
+    const ids = moment.subjects.map((s) => s.id)
     if (ids.length > 0) {
       fetch(`/api/admin/customers/contact-info?ids=${ids.join(',')}`)
         .then(
@@ -128,7 +126,30 @@ export function OutreachDrawer({ prompt, onClose }: PromptDrawerProps) {
     return () => {
       cancelled = true
     }
-  }, [prompt.subjects, templateKind])
+  }, [moment.subjects, templateKind])
+
+  if (templateKind === null) {
+    return (
+      <Sheet open onOpenChange={(o) => !o && onClose()}>
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-3 p-5 sm:max-w-lg"
+        >
+          <SheetHeader>
+            <SheetTitle className="text-base font-semibold">
+              {moment.narrative}
+            </SheetTitle>
+            <SheetDescription className="text-xs">
+              Misconfigured outreach prompt — no template kind in the moment payload.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-auto flex justify-end">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+  }
 
   const renderTemplate = (
     body: string,
@@ -175,7 +196,7 @@ export function OutreachDrawer({ prompt, onClose }: PromptDrawerProps) {
         body: JSON.stringify({
           customerId: meta.subject.id,
           channel,
-          kind: templateKind ?? prompt.kind,
+          kind: templateKind ?? moment.kind,
           messageSnapshot: message,
           relatedOrderId: meta.relatedOrderId,
         }),
@@ -200,7 +221,7 @@ export function OutreachDrawer({ prompt, onClose }: PromptDrawerProps) {
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="text-base font-semibold">
-            {prompt.title}
+            {moment.narrative}
           </SheetTitle>
           <SheetDescription className="text-xs">
             Pick a channel per row. The customer&apos;s app opens with the

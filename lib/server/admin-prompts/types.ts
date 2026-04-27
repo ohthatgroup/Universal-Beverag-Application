@@ -9,16 +9,11 @@
 //   weight ≥ 0.55  →  SUBHEAD   (20-22px sans medium)
 //   weight ≥ 0.25  →  BODY      (16-17px sans regular)
 //   weight <  0.25 →  FOOTNOTE  (13-14px sans muted)
-//
-// The previous "Prompt" model and its category/severity scaffolding
-// is retained as an alias so legacy resolvers keep compiling during
-// the transition; new code should emit Moments directly.
 
 export type MomentCategory =
   | 'just-in' // recent state change — top of the page
   | 'worth-a-look' // lingering signal that hasn't been resolved
   | 'any-time' // create affordances — bottom of the page
-  | 'evergreen' // alias for any-time used by legacy code
 
 export interface Subject {
   /** Stable id — used as the row key when a drawer opens. */
@@ -77,37 +72,3 @@ export interface Moment {
    *  from freshness × event-priority. */
   weight: number
 }
-
-// ---- Legacy aliases -------------------------------------------------
-//
-// Kept so legacy resolver files (`prompts/<domain>/*.ts` written
-// against the old `Prompt` shape) keep compiling. Slice 5d cleans
-// them up. New resolvers should emit `Moment` directly.
-
-export type PromptCategory =
-  | 'urgent'
-  | 'opportunity'
-  | 'celebration'
-  | 'hygiene'
-  | 'evergreen'
-export type PromptSeverity = 'info' | 'warn' | 'success'
-export type PromptAction = DoorwayAction
-
-export interface Prompt {
-  id: string
-  category: PromptCategory
-  kind: string
-  severity: PromptSeverity
-  title: string
-  body?: string
-  subjects: Subject[]
-  count: number
-  cta: string
-  action: PromptAction
-}
-
-export type PromptTitleComposer = (
-  key: { category: PromptCategory; kind: string },
-  count: number,
-  first: Subject | undefined,
-) => string

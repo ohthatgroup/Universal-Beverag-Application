@@ -2,39 +2,36 @@
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import type { PromptDrawerProps } from './registry'
+import type { MomentDrawerProps } from './registry'
 
 /**
  * Placeholder for drawerKinds whose real implementation hasn't shipped
- * yet. Renders the prompt as JSON inside a Sheet so slice 3 can verify
- * the dispatch flow end to end. Slice 4 replaces every registered
- * stub with a real drawer.
+ * yet. Renders the moment as JSON inside a Sheet so the dispatch flow
+ * can be verified end to end.
  */
-export function StubDrawer({ prompt, onClose }: PromptDrawerProps) {
+export function StubDrawer({ moment, onClose }: MomentDrawerProps) {
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="right" className="flex w-full flex-col gap-3 p-5 sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="text-base font-semibold">
-            {prompt.title}
+            {moment.narrative}
           </SheetTitle>
         </SheetHeader>
         <div className="space-y-2 text-xs text-muted-foreground">
           <p>
             Drawer kind <code className="rounded bg-muted px-1 py-0.5">
-              {prompt.action.kind === 'drawer' ? prompt.action.drawerKind : '—'}
-            </code> isn&apos;t implemented yet. Slice 4 will replace this stub
-            with the real drawer.
+              {moment.primary.action.kind === 'drawer' ? moment.primary.action.drawerKind : '—'}
+            </code> isn&apos;t implemented yet.
           </p>
           <pre className="overflow-auto rounded-md border bg-muted/40 p-3 text-[11px]">
             {JSON.stringify(
               {
-                category: prompt.category,
-                kind: prompt.kind,
-                count: prompt.count,
-                cta: prompt.cta,
-                action: prompt.action,
-                subjects: prompt.subjects,
+                category: moment.category,
+                kind: moment.kind,
+                weight: moment.weight,
+                primary: moment.primary,
+                subjects: moment.subjects,
               },
               null,
               2,

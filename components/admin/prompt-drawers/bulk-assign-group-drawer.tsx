@@ -13,7 +13,7 @@ import {
   CustomerTypePicker,
   type GroupOption,
 } from '@/components/admin/customer-type-picker'
-import type { PromptDrawerProps } from './registry'
+import type { MomentDrawerProps } from './registry'
 
 interface ApiResponse {
   data?: {
@@ -29,12 +29,12 @@ interface ApiResponse {
  * sentinel inside the picker auto-selects the new group.
  */
 export function BulkAssignGroupDrawer({
-  prompt,
+  moment,
   onClose,
   onCompleted,
-}: PromptDrawerProps) {
+}: MomentDrawerProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(prompt.subjects.map((s) => s.id)),
+    () => new Set(moment.subjects.map((s) => s.id)),
   )
   const [groups, setGroups] = useState<GroupOption[]>([])
   const [defaultGroupId, setDefaultGroupId] = useState<string>('')
@@ -112,7 +112,7 @@ export function BulkAssignGroupDrawer({
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="text-base font-semibold">
-            {prompt.title}
+            {moment.narrative}
           </SheetTitle>
           <SheetDescription className="text-xs">
             Pick a group, deselect any customer you want to skip.
@@ -142,7 +142,7 @@ export function BulkAssignGroupDrawer({
           </div>
 
           <ul className="divide-y rounded-md border">
-            {prompt.subjects.map((subject) => {
+            {moment.subjects.map((subject) => {
               const checked = selectedIds.has(subject.id)
               return (
                 <li

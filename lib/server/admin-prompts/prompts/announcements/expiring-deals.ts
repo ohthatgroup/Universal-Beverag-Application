@@ -1,11 +1,12 @@
-import type { Prompt, Subject } from '../../types'
+import type { Moment, Subject } from '../../types'
 import type { DbFacade } from '@/lib/server/db'
+import { foldedWeight } from '../../weight'
 
 /** Active deals expiring in the next 7 days. Folds N. Drawer:
  *  `bulk-extend-deals` — pick days to extend each row. */
 export async function expiringDealsPrompt(
   db: DbFacade,
-): Promise<Prompt | null> {
+): Promise<Moment | null> {
   const { rows } = await db.query<{
     id: string
     title: string | null
@@ -39,22 +40,23 @@ export async function expiringDealsPrompt(
     }
   })
   const count = subjects.length
-  // Severity escalates if any subject expires within 1 day.
-  const severity = rows.some((row) => row.days <= 1) ? 'warn' : 'info'
+  const weight = foldedWeight(0.95, count)
 
   return {
-    id: 'urgent/expiring-deals',
-    category: 'urgent',
+    id: 'just-in/expiring-deals',
+    category: 'just-in',
     kind: 'expiring-deals',
-    severity,
-    title:
+    narrative:
       count === 1
-        ? `1 deal expires this week`
-        : `${count} deals expire this week`,
-    body: 'Extend, edit copy, or let them lapse.',
+        ? "1 deal is about to expire."
+        : `${count} deals are about to expire.`,
+    when: 'this week',
     subjects,
-    count,
-    cta: count === 1 ? 'Extend' : `Extend ${count}`,
-    action: { kind: 'drawer', drawerKind: 'bulk-extend-deals' },
+    primary: {
+      label: 'Extend or let them lapse',
+      action: { kind: 'drawer', drawerKind: 'bulk-extend-deals' },
+    },
+    secondary: [],
+    weight,
   }
 }

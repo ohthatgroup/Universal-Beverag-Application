@@ -1,5 +1,6 @@
-import type { Prompt, Subject } from '../../types'
+import type { Moment, Subject } from '../../types'
 import type { DbFacade } from '@/lib/server/db'
+import { foldedWeight } from '../../weight'
 
 interface Options {
   /** Subject ids to skip (e.g. `high-value-at-risk`'s subject). */
@@ -7,11 +8,11 @@ interface Options {
 }
 
 /** Customers with their most-recent submitted/delivered order older
- *  than 21 days. Folds N. Drawer: `bulk-send-checkin`. */
+ *  than 21 days. Folds N. Drawer: `outreach`. */
 export async function staleCustomersPrompt(
   db: DbFacade,
   options: Options = {},
-): Promise<Prompt | null> {
+): Promise<Moment | null> {
   const exclude = options.excludeIds ?? []
   const { rows } = await db.query<{
     id: string
@@ -42,23 +43,32 @@ export async function staleCustomersPrompt(
     sublabel: `${row.days} days since last order`,
   }))
   const count = subjects.length
+  const weight = foldedWeight(0.7, count)
+
   return {
-    id: 'opportunity/stale-customers',
-    category: 'opportunity',
+    id: 'just-in/stale-customers',
+    category: 'just-in',
     kind: 'stale-customers',
-    severity: 'warn',
-    title:
+    narrative:
       count === 1
-        ? `1 customer hasn't ordered in 21+ days`
-        : `${count} customers haven't ordered in 21+ days`,
-    body: 'A friendly check-in often brings them back.',
+        ? "1 customer hasn't ordered in a while."
+        : `${count} customers haven't ordered in a while.`,
+    when: 'this week',
     subjects,
-    count,
-    cta: count === 1 ? 'Check in' : `Check in with ${count}`,
-    action: {
-      kind: 'drawer',
-      drawerKind: 'outreach',
-      payload: { templateKind: 'stale-customers' },
+    primary: {
+      label: 'Reach out',
+      action: {
+        kind: 'drawer',
+        drawerKind: 'outreach',
+        payload: { templateKind: 'stale-customers' },
+      },
     },
+    secondary: [
+      {
+        label: 'Pin a one-off deal for them',
+        action: { kind: 'href', href: '/admin/announcements' },
+      },
+    ],
+    weight,
   }
 }

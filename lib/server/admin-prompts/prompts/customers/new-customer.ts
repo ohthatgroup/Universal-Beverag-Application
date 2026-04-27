@@ -1,18 +1,19 @@
-import type { Prompt } from '../../types'
+import type { Moment } from '../../types'
 
 /** Evergreen "Create" affordance for the Customers page + dashboard.
  *  Always present. Drawer wraps the existing `<NewCustomerDialog>`. */
-export function newCustomerPrompt(): Prompt {
+export function newCustomerPrompt(): Moment {
   return {
-    id: 'evergreen/new-customer',
-    category: 'evergreen',
+    id: 'any-time/new-customer',
+    category: 'any-time',
     kind: 'new-customer',
-    severity: 'info',
-    title: 'Add a new customer',
-    body: 'Create a profile and provision a portal access link.',
+    narrative: 'Add a customer',
     subjects: [],
-    count: 0,
-    cta: 'New customer',
-    action: { kind: 'drawer', drawerKind: 'new-customer' },
+    primary: {
+      label: 'New customer',
+      action: { kind: 'drawer', drawerKind: 'new-customer' },
+    },
+    secondary: [],
+    weight: 0.1,
   }
 }

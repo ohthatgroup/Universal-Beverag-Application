@@ -4,7 +4,7 @@ import Link from 'next/link'
 import type { LucideIcon } from 'lucide-react'
 import { usePromptDrawer } from '@/components/admin/prompt-drawers/registry'
 import { cn } from '@/lib/utils'
-import type { Prompt } from '@/lib/server/admin-prompts'
+import type { Moment } from '@/lib/server/admin-prompts'
 
 interface CreateCardBaseProps {
   icon: LucideIcon
@@ -76,7 +76,7 @@ export function CreateCard(props: CreateCardProps) {
   return (
     <button
       type="button"
-      onClick={() => drawer.open(props.drawerKind, asPromptShim(props))}
+      onClick={() => drawer.open(props.drawerKind, asMoment(props))}
       className={cn(cardClass, 'text-left')}
     >
       {inner}
@@ -84,16 +84,18 @@ export function CreateCard(props: CreateCardProps) {
   )
 }
 
-function asPromptShim(props: CreateCardDrawerProps): Prompt {
+function asMoment(props: CreateCardDrawerProps): Moment {
   return {
-    id: `create/${props.drawerKind}`,
-    category: 'evergreen',
+    id: `any-time/${props.drawerKind}`,
+    category: 'any-time',
     kind: props.drawerKind,
-    severity: 'info',
-    title: props.headline,
+    narrative: props.headline,
     subjects: [],
-    count: 0,
-    cta: props.headline,
-    action: { kind: 'drawer', drawerKind: props.drawerKind },
+    primary: {
+      label: props.headline,
+      action: { kind: 'drawer', drawerKind: props.drawerKind },
+    },
+    secondary: [],
+    weight: 0.1,
   }
 }

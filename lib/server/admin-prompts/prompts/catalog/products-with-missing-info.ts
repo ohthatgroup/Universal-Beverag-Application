@@ -1,5 +1,6 @@
-import type { Prompt, Subject } from '../../types'
+import type { Moment, Subject } from '../../types'
 import type { DbFacade } from '@/lib/server/db'
+import { foldedWeight } from '../../weight'
 
 interface Row {
   id: string
@@ -15,7 +16,7 @@ interface Row {
  */
 export async function productsWithMissingInfoPrompt(
   db: DbFacade,
-): Promise<Prompt | null> {
+): Promise<Moment | null> {
   const { rows } = await db.query<Row>(
     `select id,
             title,
@@ -50,19 +51,24 @@ export async function productsWithMissingInfoPrompt(
     }
   })
 
+  const count = subjects.length
+  const weight = foldedWeight(0.4, count)
+
   return {
-    id: 'hygiene/products-with-missing-info',
-    category: 'hygiene',
+    id: 'worth-a-look/products-with-missing-info',
+    category: 'worth-a-look',
     kind: 'products-with-missing-info',
-    severity: 'info',
-    title:
-      subjects.length === 1
-        ? `1 product needs missing info`
-        : `${subjects.length} products need missing info`,
-    body: 'Upload images inline, or click a row to fill brand/pack on its edit page.',
+    narrative:
+      count === 1
+        ? "1 product is missing image, brand, or pack details."
+        : `${count} products are missing image, brand, or pack details.`,
+    when: 'catalog cleanup',
     subjects,
-    count: subjects.length,
-    cta: 'Review',
-    action: { kind: 'drawer', drawerKind: 'products-missing-info' },
+    primary: {
+      label: 'Tidy up the catalog',
+      action: { kind: 'drawer', drawerKind: 'products-missing-info' },
+    },
+    secondary: [],
+    weight,
   }
 }

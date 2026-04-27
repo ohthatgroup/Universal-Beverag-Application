@@ -1,18 +1,19 @@
-import type { Prompt } from '../../types'
+import type { Moment } from '../../types'
 
 /** Evergreen "Create" affordance for the Announcements page +
  *  dashboard. Drawer wraps the existing `<AnnouncementDialog>`. */
-export function newAnnouncementPrompt(): Prompt {
+export function newAnnouncementPrompt(): Moment {
   return {
-    id: 'evergreen/new-announcement',
-    category: 'evergreen',
+    id: 'any-time/new-announcement',
+    category: 'any-time',
     kind: 'new-announcement',
-    severity: 'info',
-    title: 'New announcement or deal',
-    body: 'Pick a content type, target groups, and dates.',
+    narrative: 'Pin a deal or announcement',
     subjects: [],
-    count: 0,
-    cta: 'New',
-    action: { kind: 'drawer', drawerKind: 'new-announcement' },
+    primary: {
+      label: 'New deal',
+      action: { kind: 'drawer', drawerKind: 'new-announcement' },
+    },
+    secondary: [],
+    weight: 0.1,
   }
 }

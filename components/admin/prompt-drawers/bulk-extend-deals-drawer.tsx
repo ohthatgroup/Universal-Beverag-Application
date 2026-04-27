@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import type { PromptDrawerProps } from './registry'
+import type { MomentDrawerProps } from './registry'
 
 interface RowState {
   /** Original ends_at (YYYY-MM-DD); used to detect "touched" rows. */
@@ -25,14 +25,14 @@ interface RowState {
  * counted toward the verb button. Untouched rows are skipped.
  */
 export function BulkExtendDealsDrawer({
-  prompt,
+  moment,
   onClose,
   onCompleted,
-}: PromptDrawerProps) {
+}: MomentDrawerProps) {
   const initialRows = useMemo<Record<string, RowState>>(() => {
     const today = new Date().toISOString().slice(0, 10)
     const out: Record<string, RowState> = {}
-    for (const subject of prompt.subjects) {
+    for (const subject of moment.subjects) {
       // The subject sublabel is "expires today/tomorrow/in N days";
       // we don't get the exact date in the subject. Fall back to today;
       // the salesman just changes it. (Slice 4 follow-up: thread the
@@ -41,7 +41,7 @@ export function BulkExtendDealsDrawer({
       out[subject.id] = { original: today, value: today }
     }
     return out
-  }, [prompt.subjects])
+  }, [moment.subjects])
 
   const [rows, setRows] = useState<Record<string, RowState>>(initialRows)
   const [submitting, setSubmitting] = useState(false)
@@ -81,7 +81,7 @@ export function BulkExtendDealsDrawer({
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="text-base font-semibold">
-            {prompt.title}
+            {moment.narrative}
           </SheetTitle>
           <SheetDescription className="text-xs">
             Set a new end date per deal. Untouched rows are skipped.
@@ -96,7 +96,7 @@ export function BulkExtendDealsDrawer({
           )}
 
           <ul className="divide-y rounded-md border">
-            {prompt.subjects.map((subject) => {
+            {moment.subjects.map((subject) => {
               const state = rows[subject.id]!
               const touched = state.value > state.original
               return (

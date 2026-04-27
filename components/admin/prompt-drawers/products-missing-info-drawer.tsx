@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import type { PromptDrawerProps } from './registry'
+import type { MomentDrawerProps } from './registry'
 
 /**
  * Directory + inline image upload. Each row shows missing-field
@@ -25,9 +25,9 @@ import type { PromptDrawerProps } from './registry'
  * this drawer just kicks the same endpoint).
  */
 export function ProductsMissingInfoDrawer({
-  prompt,
+  moment,
   onClose,
-}: PromptDrawerProps) {
+}: MomentDrawerProps) {
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
@@ -36,7 +36,7 @@ export function ProductsMissingInfoDrawer({
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="text-base font-semibold">
-            {prompt.title}
+            {moment.narrative}
           </SheetTitle>
           <SheetDescription className="text-xs">
             Upload an image inline for missing-image rows, or click a
@@ -46,7 +46,7 @@ export function ProductsMissingInfoDrawer({
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <ul className="divide-y rounded-md border">
-            {prompt.subjects.map((subject) => (
+            {moment.subjects.map((subject) => (
               <ProductRow
                 key={subject.id}
                 subjectId={subject.id}

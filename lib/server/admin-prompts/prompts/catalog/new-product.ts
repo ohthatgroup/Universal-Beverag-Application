@@ -1,17 +1,18 @@
-import type { Prompt } from '../../types'
+import type { Moment } from '../../types'
 
 /** Evergreen create affordance for the Catalog page. */
-export function newProductPrompt(): Prompt {
+export function newProductPrompt(): Moment {
   return {
-    id: 'evergreen/new-product',
-    category: 'evergreen',
+    id: 'any-time/new-product',
+    category: 'any-time',
     kind: 'new-product',
-    severity: 'info',
-    title: 'Add a new product',
-    body: 'Title, brand, pack, and price.',
+    narrative: 'Add a product',
     subjects: [],
-    count: 0,
-    cta: 'New product',
-    action: { kind: 'drawer', drawerKind: 'new-product' },
+    primary: {
+      label: 'New product',
+      action: { kind: 'drawer', drawerKind: 'new-product' },
+    },
+    secondary: [],
+    weight: 0.1,
   }
 }

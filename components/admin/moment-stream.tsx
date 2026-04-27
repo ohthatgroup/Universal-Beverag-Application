@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { usePromptDrawer } from '@/components/admin/prompt-drawers/registry'
-import type { Doorway, Moment, Prompt } from '@/lib/server/admin-prompts'
+import type { Doorway, Moment } from '@/lib/server/admin-prompts'
 import { cn } from '@/lib/utils'
 
 /**
@@ -175,13 +175,13 @@ function PrimaryVerb({
   className,
 }: {
   doorway: Doorway
-  moment?: Moment
+  moment: Moment
   className?: string
 }) {
   const drawer = usePromptDrawer()
   const onClick = () => {
     if (doorway.action.kind === 'drawer') {
-      drawer.open(doorway.action.drawerKind, asPromptShim(doorway, moment))
+      drawer.open(doorway.action.drawerKind, moment)
     }
   }
 
@@ -217,7 +217,7 @@ function SecondaryVerb({
   moment,
 }: {
   doorway: Doorway
-  moment?: Moment
+  moment: Moment
 }) {
   const drawer = usePromptDrawer()
   const baseClass =
@@ -235,7 +235,7 @@ function SecondaryVerb({
       type="button"
       onClick={() => {
         if (doorway.action.kind === 'drawer') {
-          drawer.open(doorway.action.drawerKind, asPromptShim(doorway, moment))
+          drawer.open(doorway.action.drawerKind, moment)
         }
       }}
       className={baseClass}
@@ -255,7 +255,7 @@ function AnyTimeRow({ moments }: { moments: Moment[] }) {
         </span>
         {moments.map((moment, i) => (
           <span key={moment.id}>
-            <SecondaryVerb doorway={moment.primary} />
+            <SecondaryVerb doorway={moment.primary} moment={moment} />
             {i < moments.length - 1 && (
               <span aria-hidden className="mx-2 text-muted-foreground/40">
                 ·
@@ -276,21 +276,3 @@ function DefaultEmpty() {
   )
 }
 
-// The drawer registry is still keyed on the old `Prompt` shape. Until
-// we migrate the registry to consume `Moment` directly, we shim a
-// minimal Prompt out of a Doorway + Moment when opening a drawer.
-// Existing drawers (which read `prompt.subjects` / `prompt.title`)
-// keep working because we forward the moment's narrative + subjects.
-function asPromptShim(doorway: Doorway, moment?: Moment): Prompt {
-  return {
-    id: moment?.id ?? `shim/${doorway.label}`,
-    category: 'opportunity',
-    kind: moment?.kind ?? 'shim',
-    severity: 'info',
-    title: moment?.narrative ?? doorway.label,
-    subjects: moment?.subjects ?? [],
-    count: moment?.subjects.length ?? 0,
-    cta: doorway.label,
-    action: doorway.action,
-  }
-}
