@@ -40,39 +40,24 @@ const PRIMARY_LINKS: NavLink[] = [
 
 const ADMIN_LINKS: NavLink[] = [
   {
-    href: '/admin/brands',
-    label: 'Brands',
-    match: (p) => p.startsWith('/admin/brands'),
-  },
-  {
-    href: '/admin/presets',
-    label: 'Presets',
-    match: (p) => p.startsWith('/admin/presets'),
-  },
-  {
-    href: '/admin/reports',
-    label: 'Reports',
-    match: (p) => p.startsWith('/admin/reports'),
-  },
-  {
     href: '/admin/announcements',
     label: 'Deals & Announcements',
     match: (p) => p.startsWith('/admin/announcements'),
   },
   {
-    href: '/admin/customer-groups',
-    label: 'Customer Groups',
-    match: (p) => p.startsWith('/admin/customer-groups'),
-  },
-  {
-    href: '/admin/staff',
-    label: 'Staff',
-    match: (p) => p.startsWith('/admin/staff'),
-  },
-  {
     href: '/admin/settings',
     label: 'Settings',
-    match: (p) => p.startsWith('/admin/settings'),
+    match: (p) =>
+      p.startsWith('/admin/settings') ||
+      // Brands / Staff / Presets / Reports / Customer Groups have all
+      // folded into the Settings hub as drawers; the legacy standalone
+      // routes still resolve, but the active-state in the nav points
+      // at Settings.
+      p.startsWith('/admin/brands') ||
+      p.startsWith('/admin/staff') ||
+      p.startsWith('/admin/presets') ||
+      p.startsWith('/admin/reports') ||
+      p.startsWith('/admin/customers/groups'),
   },
 ]
 
@@ -80,8 +65,7 @@ const ADMIN_PATHS = new Set(ADMIN_LINKS.map((l) => l.href))
 
 export function AdminNav() {
   const pathname = usePathname()
-  const homeActive =
-    pathname === '/admin/dashboard' || pathname.startsWith('/admin/dashboard')
+  const homeActive = pathname === '/admin'
   const adminGroupActive = ADMIN_LINKS.some((l) => l.match(pathname))
 
   return (
@@ -95,7 +79,7 @@ export function AdminNav() {
         </div>
 
         <Link
-          href="/admin/dashboard"
+          href="/admin"
           aria-label="Home"
           className={cn(
             'rounded-md px-2 py-1 font-mono text-sm font-bold tracking-tight transition-colors',
@@ -127,7 +111,29 @@ export function AdminNav() {
           })}
         </nav>
 
-        <div className="ml-auto hidden md:block">
+        {/* lg+ : Admin links inline next to primary links. */}
+        <nav className="ml-auto hidden items-center gap-1 lg:flex">
+          {ADMIN_LINKS.map((item) => {
+            const active = item.match(pathname)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* md..lg : Admin links collapsed into the existing dropdown. */}
+        <div className="ml-auto hidden md:block lg:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(

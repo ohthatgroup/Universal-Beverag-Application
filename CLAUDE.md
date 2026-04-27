@@ -37,7 +37,7 @@ Single Next.js 15 (App Router) monolith deployed to Cloudflare Workers via OpenN
   - `/portal/[token]/orders` — order history
   - `/portal/[token]/account` — account settings
   - `/c/[token]/...` — short-link redirector mirroring the same routes
-- **Admin** (`app/(admin)/`) — Salesman dashboard. Email/password auth. Routes: `/admin/dashboard`, `/admin/orders`, `/admin/customers`, `/admin/catalog`, `/admin/brands`, `/admin/reports`.
+- **Admin** (`app/(admin)/`) — Salesman dashboard. Email/password auth. Routes: `/admin` (dashboard / home), `/admin/orders`, `/admin/customers`, `/admin/customers/groups`, `/admin/catalog`, `/admin/brands`, `/admin/announcements`, `/admin/reports`, `/admin/settings`.
 
 ### Database (customer portal)
 

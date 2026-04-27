@@ -23,7 +23,7 @@ export default async function PostLoginPage() {
   }
 
   if (context.profile.role === 'salesman') {
-    redirect('/admin/dashboard')
+    redirect('/admin')
   }
 
   redirect('/auth/login?error=admin_only')

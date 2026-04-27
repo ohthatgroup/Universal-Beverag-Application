@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { TagChipInput } from '@/components/ui/tag-chip-input'
+import { CustomerTypePicker, type GroupOption } from '@/components/admin/customer-type-picker'
 import { DangerZoneDeleteCustomer } from '@/components/admin/danger-zone-delete-customer'
 
 type InitialValues = {
@@ -29,14 +29,14 @@ export function CustomerEditForm({
   customerId,
   businessName,
   groups = [],
+  defaultGroupId,
   initialValues,
-  tagSuggestions = [],
 }: {
   customerId: string
   businessName: string
-  groups?: Array<{ id: string; name: string }>
+  groups?: GroupOption[]
+  defaultGroupId: string
   initialValues: InitialValues
-  tagSuggestions?: string[]
 }) {
   const router = useRouter()
   const [values, setValues] = useState(initialValues)
@@ -202,39 +202,19 @@ export function CustomerEditForm({
           </h2>
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="customer_group_id">Customer group</Label>
-              <select
+              <Label htmlFor="customer_group_id">Type</Label>
+              <CustomerTypePicker
                 id="customer_group_id"
                 name="customer_group_id"
-                value={values.customer_group_id ?? ''}
-                onChange={(e) =>
-                  set('customer_group_id', e.target.value || null)
-                }
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="">No group (uses global defaults)</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">
-                Customers in a group inherit the group&apos;s deal ordering and
-                visibility. Per-customer overrides below take precedence.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tags">Tags</Label>
-              <TagChipInput
-                id="tags"
-                value={values.tags}
-                onChange={(next) => set('tags', next)}
-                suggestions={tagSuggestions}
+                groups={groups}
+                value={values.customer_group_id}
+                onChange={(next) => set('customer_group_id', next)}
+                defaultGroupId={defaultGroupId}
               />
               <p className="text-xs text-muted-foreground">
-                Type and press Enter to add. Used for audience targeting on
-                announcements (independent of customer group).
+                The customer&apos;s segment. Group-level deal ordering and
+                visibility apply automatically; edit per-group settings from
+                the customer detail page.
               </p>
             </div>
             <div className="space-y-2">

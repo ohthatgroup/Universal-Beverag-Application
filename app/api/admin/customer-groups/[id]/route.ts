@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext, RouteError } from '@/lib/server/auth'
 import { getRequestDb } from '@/lib/server/db'
+import { isDefaultGroup } from '@/lib/server/default-group'
 
 const paramsSchema = z.object({ id: z.string().uuid() })
 
@@ -94,7 +95,10 @@ export async function PATCH(
   }
 }
 
-/** DELETE /api/admin/customer-groups/[id] — also nulls every member's customer_group_id via ON DELETE SET NULL. */
+/** DELETE /api/admin/customer-groups/[id] — refuses to delete the
+ *  Default group (it's the seeded fallback every customer-create lands
+ *  on). Otherwise nulls members' customer_group_id via ON DELETE SET
+ *  NULL and removes group-scope overrides. */
 export async function DELETE(
   request: Request,
   routeContext: { params: Promise<{ id: string }> },
@@ -103,6 +107,15 @@ export async function DELETE(
   try {
     await requireAuthContext(['salesman'])
     const { id } = paramsSchema.parse(await routeContext.params)
+
+    if (await isDefaultGroup(id)) {
+      throw new RouteError(
+        409,
+        'default_group_protected',
+        'The Default group cannot be deleted — it is the fallback for new customers.',
+      )
+    }
+
     const db = await getRequestDb()
 
     // Group-scope overrides cascade-delete via the FK on

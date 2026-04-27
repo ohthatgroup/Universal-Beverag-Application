@@ -44,11 +44,7 @@ export default async function PortalHome({
     itemCount: row.item_count ?? 0,
   }))
 
-  const announcements = await fetchHomepageAnnouncements(
-    db,
-    customerId,
-    profile.tags ?? [],
-  )
+  const announcements = await fetchHomepageAnnouncements(db, customerId)
 
   // Resolve products for inline cards (spotlight + specials_grid) AND for
   // the drawer (any editorial card with a product-target CTA). One batched

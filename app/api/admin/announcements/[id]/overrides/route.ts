@@ -39,8 +39,11 @@ export async function GET(
   }
 }
 
+// Scope is now `group` only — customer-scope overrides were retired in
+// migration 202604260007. The schema accepts the literal so old clients
+// still get a clean validation error rather than an obscure DB violation.
 const upsertOverrideSchema = z.object({
-  scope: z.enum(['group', 'customer']),
+  scope: z.literal('group'),
   scope_id: z.string().uuid(),
   // Both nullable so a single PUT can clear individual columns without
   // affecting the other. Not present in payload → not modified.
@@ -49,7 +52,7 @@ const upsertOverrideSchema = z.object({
 })
 
 const deleteOverrideSchema = z.object({
-  scope: z.enum(['group', 'customer']),
+  scope: z.literal('group'),
   scope_id: z.string().uuid(),
 })
 
@@ -62,11 +65,11 @@ const deleteOverrideSchema = z.object({
  *
  * Use cases:
  *   - Salesman pins a deal to top-of-list for a group → PUT with
- *     scope='group', sort_order=0
- *   - Salesman hides an announcement from one customer → PUT with
- *     scope='customer', is_hidden=true
- *   - Salesman uses "Set for all" on the deals page → PUT scope='group',
- *     sort_order=N (the new global sort_order they just set)
+ *     sort_order=0
+ *   - Salesman hides an announcement from a group → PUT with
+ *     is_hidden=true
+ *   - Salesman uses the per-customer "Save as new group" flow → POST a
+ *     new group, PUT each row with the new group's scope_id.
  */
 export async function PUT(
   request: Request,
@@ -137,10 +140,8 @@ export async function PUT(
 
 /**
  * DELETE /api/admin/announcements/[id]/overrides
- * Remove an override row entirely. Used by the "Apply Group Default"
- * affordance on the customer-edit page (DELETE the customer-scope row,
- * leaving the group-scope row in place — the customer now inherits from
- * the group).
+ * Remove a group-scope override row entirely so the group falls back to
+ * the announcement's global default (sort_order, is_active).
  */
 export async function DELETE(request: Request, routeContext: { params: Promise<{ id: string }> }) {
   const requestId = getRequestId(request)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { MoreHorizontal, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -12,7 +12,10 @@ import {
 import { RowReorderArrows } from '@/components/admin/row-actions'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AnnouncementDialog } from '@/components/admin/announcement-dialog'
+import {
+  AnnouncementDialog,
+  type CustomerGroupOption,
+} from '@/components/admin/announcement-dialog'
 import { AnnouncementGroupOverridesDialog } from '@/components/admin/announcement-group-overrides-dialog'
 import type { PickerProduct } from '@/components/admin/product-picker'
 import type { Announcement } from '@/components/portal/announcements-stack'
@@ -20,6 +23,7 @@ import type { Announcement } from '@/components/portal/announcements-stack'
 interface AnnouncementsManagerProps {
   initialAnnouncements: Announcement[]
   pickerProducts: PickerProduct[]
+  customerGroups: CustomerGroupOption[]
 }
 
 // Strip nullable date strings to YYYY-MM-DD so the API's date column accepts
@@ -56,14 +60,22 @@ function formatDateRange(a: Announcement): string {
   return '—'
 }
 
-function formatAudience(tags: string[]): string {
-  if (tags.length === 0) return 'All'
-  return tags.join(', ')
+function formatTargetGroups(
+  ids: string[],
+  groups: CustomerGroupOption[],
+): string {
+  if (ids.length === 0) return 'All'
+  if (groups.length === 0) return `${ids.length} group${ids.length === 1 ? '' : 's'}`
+  const byId = new Map(groups.map((g) => [g.id, g.name]))
+  const names = ids.map((id) => byId.get(id) ?? '—')
+  if (names.length <= 2) return names.join(', ')
+  return `${names.slice(0, 2).join(', ')} +${names.length - 2}`
 }
 
 export function AnnouncementsManager({
   initialAnnouncements,
   pickerProducts,
+  customerGroups,
 }: AnnouncementsManagerProps) {
   const [rows, setRows] = useState<Announcement[]>(initialAnnouncements)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -179,11 +191,15 @@ export function AnnouncementsManager({
     }
   }
 
-  const openCreate = () => {
+  // openCreate retained for future re-wiring from prompt drawers but
+  // intentionally unreferenced here while the page-level "+" button
+  // is retired. Prefix `_` so the linter accepts it as deliberate.
+  const _openCreate = () => {
     setEditingAnnouncement(null)
     setCreateKind(activeTab === 'deals' ? 'deal' : 'announcement')
     setDialogOpen(true)
   }
+  void _openCreate
 
   const openEdit = (a: Announcement) => {
     setEditingAnnouncement(a)
@@ -207,6 +223,7 @@ export function AnnouncementsManager({
       product_ids: data.product_ids ?? [],
       badge_overrides: data.badge_overrides ?? {},
       audience_tags: data.audience_tags ?? [],
+      target_group_ids: data.target_group_ids ?? [],
       starts_at: dateOnly(data.starts_at),
       ends_at: dateOnly(data.ends_at),
       is_active: data.is_active ?? true,
@@ -260,14 +277,8 @@ export function AnnouncementsManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div /> {/* spacer — page title lives in PageHeader */}
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          {activeTab === 'deals' ? 'New deal' : 'New announcement'}
-        </Button>
-      </div>
-
+      {/* The legacy "+ New announcement" button retired with prompts v2.
+          Create now lives on the page-level evergreen prompt card. */}
       {error && (
         <div
           role="alert"
@@ -297,6 +308,7 @@ export function AnnouncementsManager({
             rows={announcementRows}
             allRows={rows}
             now={now}
+            customerGroups={customerGroups}
             onMoveRow={moveRow}
             onToggleActive={toggleActive}
             onEdit={openEdit}
@@ -311,6 +323,7 @@ export function AnnouncementsManager({
             rows={dealRows}
             allRows={rows}
             now={now}
+            customerGroups={customerGroups}
             onMoveRow={moveRow}
             onToggleActive={toggleActive}
             onEdit={openEdit}
@@ -337,6 +350,7 @@ export function AnnouncementsManager({
         defaultKind={createKind}
         onSave={handleSave}
         pickerProducts={pickerProducts}
+        customerGroups={customerGroups}
       />
     </div>
   )
@@ -346,6 +360,7 @@ interface KindSectionProps {
   rows: Announcement[]
   allRows: Announcement[]
   now: Date
+  customerGroups: CustomerGroupOption[]
   onMoveRow: (id: string, direction: 'up' | 'down') => void
   onToggleActive: (id: string, isActive: boolean) => void
   onEdit: (a: Announcement) => void
@@ -363,6 +378,7 @@ function KindSection({
   rows,
   allRows,
   now,
+  customerGroups,
   onMoveRow,
   onToggleActive,
   onEdit,
@@ -391,6 +407,7 @@ function KindSection({
           <AnnouncementsTable
             rows={liveRows}
             allRows={allRows}
+            customerGroups={customerGroups}
             onMoveRow={onMoveRow}
             onToggleActive={onToggleActive}
             onEdit={onEdit}
@@ -407,6 +424,7 @@ function KindSection({
           <AnnouncementsTable
             rows={scheduledRows}
             allRows={allRows}
+            customerGroups={customerGroups}
             onMoveRow={onMoveRow}
             onToggleActive={onToggleActive}
             onEdit={onEdit}
@@ -422,6 +440,7 @@ function KindSection({
 interface AnnouncementsTableProps {
   rows: Announcement[]
   allRows: Announcement[]
+  customerGroups: CustomerGroupOption[]
   onMoveRow: (id: string, direction: 'up' | 'down') => void
   onToggleActive: (id: string, isActive: boolean) => void
   onEdit: (a: Announcement) => void
@@ -432,6 +451,7 @@ interface AnnouncementsTableProps {
 function AnnouncementsTable({
   rows,
   allRows,
+  customerGroups,
   onMoveRow,
   onToggleActive,
   onEdit,
@@ -453,7 +473,7 @@ function AnnouncementsTable({
           <tr className="border-b bg-muted/50">
             <th className="px-4 py-3 text-left font-medium">Title</th>
             <th className="px-4 py-3 text-left font-medium">Type</th>
-            <th className="px-4 py-3 text-left font-medium">Audience</th>
+            <th className="px-4 py-3 text-left font-medium">Target</th>
             <th className="px-4 py-3 text-left font-medium">Dates</th>
             <th className="px-4 py-3 text-left font-medium">Active</th>
             <th className="w-32 px-4 py-3 text-left font-medium">Order</th>
@@ -472,7 +492,7 @@ function AnnouncementsTable({
                   {TYPE_LABELS[row.content_type]}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
-                  {formatAudience(row.audience_tags)}
+                  {formatTargetGroups(row.target_group_ids, customerGroups)}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {formatDateRange(row)}

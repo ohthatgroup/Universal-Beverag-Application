@@ -20,7 +20,7 @@ export default function LoginPage() {
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') ?? '/admin/dashboard'
+  const redirect = searchParams.get('redirect') ?? '/admin'
   const code = searchParams.get('code')
   const error = searchParams.get('error')
 

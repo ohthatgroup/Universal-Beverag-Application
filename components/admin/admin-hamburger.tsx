@@ -33,8 +33,7 @@ export function AdminHamburger({ primaryLinks, adminLinks }: AdminHamburgerProps
     setOpen(false)
   }, [pathname])
 
-  const homeActive =
-    pathname === '/admin/dashboard' || pathname.startsWith('/admin/dashboard')
+  const homeActive = pathname === '/admin'
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -60,7 +59,7 @@ export function AdminHamburger({ primaryLinks, adminLinks }: AdminHamburgerProps
             <ul className="space-y-1">
               <li>
                 <Link
-                  href="/admin/dashboard"
+                  href="/admin"
                   className={cn(
                     'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
                     homeActive

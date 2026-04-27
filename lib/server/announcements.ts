@@ -1,9 +1,16 @@
 // Server-only helpers for announcements. Used by the homepage RSC, the
 // promo-route RSC, and the admin announcements list.
 //
-// The `announcements` table backs all three surfaces. Per-customer overrides
-// (hide/pin) live on `customer_announcements` and are applied in
-// `fetchHomepageAnnouncements`.
+// Targeting model (post-migration 202604260007):
+//   - Each announcement has `target_group_ids uuid[]`. Empty = broadcast.
+//   - Each customer has exactly one `customer_group_id` (Default if no
+//     specific group was picked).
+//   - Visibility: `target_group_ids = '{}' OR customer_group_id = ANY(target_group_ids)`
+//   - Order/visibility tweaks layer on top via `announcement_overrides`
+//     (scope='group' only — customer-scope was retired in the same migration).
+//
+// `audience_tags` is no longer consulted (legacy column kept in DB for
+// back-compat).
 
 import type {
   Announcement,
@@ -29,6 +36,7 @@ interface AnnouncementRow {
   badge_overrides: Record<string, string> | null
   product_quantities: Record<string, ProductQuantityOverride> | null
   audience_tags: string[] | null
+  target_group_ids: string[] | null
   starts_at: string | null
   ends_at: string | null
   is_active: boolean
@@ -38,10 +46,9 @@ interface AnnouncementRow {
 }
 
 interface AnnouncementWithOverrideRow extends AnnouncementRow {
-  // Resolved values from the override cascade: customer overrides win,
-  // then group, then the announcement's own column. Selected as
-  // `effective_*` from the SQL so the rowToAnnouncement mapper just
-  // overlays them.
+  // Resolved values from the override cascade: group override wins,
+  // then the announcement's own column. Customer-scope retired in
+  // 202604260007. Selected as `effective_*` from SQL.
   effective_is_hidden: boolean | null
   effective_sort_order: number | null
 }
@@ -75,6 +82,7 @@ export function rowToAnnouncement(row: AnnouncementRow): Announcement {
     badge_overrides: row.badge_overrides ?? {},
     product_quantities: row.product_quantities ?? {},
     audience_tags: row.audience_tags ?? [],
+    target_group_ids: row.target_group_ids ?? [],
     starts_at: toIsoDate(row.starts_at),
     ends_at: toIsoDate(row.ends_at),
     is_active: row.is_active,
@@ -101,6 +109,7 @@ const ANNOUNCEMENT_COLUMNS_UNPREFIXED = `
   badge_overrides,
   product_quantities,
   audience_tags,
+  target_group_ids,
   starts_at::text as starts_at,
   ends_at::text as ends_at,
   is_active,
@@ -126,6 +135,7 @@ const ANNOUNCEMENT_COLUMNS_A_PREFIXED = `
   a.badge_overrides,
   a.product_quantities,
   a.audience_tags,
+  a.target_group_ids,
   a.starts_at::text as starts_at,
   a.ends_at::text as ends_at,
   a.is_active,
@@ -136,40 +146,32 @@ const ANNOUNCEMENT_COLUMNS_A_PREFIXED = `
 
 /**
  * Homepage query — resolves the announcement cascade for a single
- * customer. Cascade order (most-specific wins per column):
+ * customer. Two-tier post-202604260007:
  *
- *   1. customer override — `announcement_overrides` where scope='customer'
- *      and scope_id = customer_id
- *   2. group override    — `announcement_overrides` where scope='group'
- *      and scope_id = the customer's profiles.customer_group_id
- *   3. global default    — announcements.is_active / .sort_order
+ *   1. group override — `announcement_overrides` (scope='group') joined
+ *      against the customer's `profiles.customer_group_id`
+ *   2. global default — `announcements.is_active` / `.sort_order`
  *
- * `is_hidden` and `sort_order` cascade independently. A customer can
- * inherit a group's pinned order while overriding only visibility, etc.
+ * Targeting filter (replaces the legacy `audience_tags` path):
+ *   `target_group_ids = '{}' OR customer_group_id = ANY(target_group_ids)`
  *
- * Audience-tag filter still applies on top — a hidden override is
- * unnecessary when the announcement doesn't match the customer's tags
- * at all.
+ * `is_hidden` and `sort_order` cascade independently. A group override
+ * with `sort_order` set but `is_hidden` null inherits visibility from
+ * the announcement's global default.
  */
 export async function fetchHomepageAnnouncements(
   db: DbFacade,
   customerId: string,
-  audienceTags: string[],
 ): Promise<Announcement[]> {
   const { rows } = await db.query<AnnouncementWithOverrideRow>(
     `select ${ANNOUNCEMENT_COLUMNS_A_PREFIXED},
-            -- Resolved is_hidden: customer wins, then group, then false.
-            coalesce(co.is_hidden, go.is_hidden, false) as effective_is_hidden,
-            -- Resolved sort_order: customer wins, then group, then announcement.
-            coalesce(co.sort_order, go.sort_order, a.sort_order) as effective_sort_order
+            -- Resolved is_hidden: group override wins, else false.
+            coalesce(go.is_hidden, false) as effective_is_hidden,
+            -- Resolved sort_order: group override wins, else announcement default.
+            coalesce(go.sort_order, a.sort_order) as effective_sort_order
        from announcements a
-       -- Resolve the customer's group once, then left-join overrides at
-       -- both scopes for this announcement.
+       -- Resolve the customer's group once, then left-join its override.
        left join profiles p on p.id = $1
-       left join announcement_overrides co
-         on co.announcement_id = a.id
-        and co.scope = 'customer'
-        and co.scope_id = $1
        left join announcement_overrides go
          on go.announcement_id = a.id
         and go.scope = 'group'
@@ -177,12 +179,13 @@ export async function fetchHomepageAnnouncements(
       where a.is_active
         and (a.starts_at is null or a.starts_at <= now())
         and (a.ends_at   is null or a.ends_at   >= now())
-        and (a.audience_tags = '{}' or a.audience_tags && $2::text[])
-        and coalesce(co.is_hidden, go.is_hidden, false) = false
+        and (a.target_group_ids = '{}'::uuid[]
+             or p.customer_group_id = any(a.target_group_ids))
+        and coalesce(go.is_hidden, false) = false
       order by
-        coalesce(co.sort_order, go.sort_order, a.sort_order) asc,
+        coalesce(go.sort_order, a.sort_order) asc,
         a.created_at asc`,
-    [customerId, audienceTags],
+    [customerId],
   )
   return rows.map(rowToAnnouncement)
 }

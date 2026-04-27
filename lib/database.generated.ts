@@ -74,6 +74,7 @@ export type Database = {
           updated_at: string
           product_quantities: Json
           kind: string
+          target_group_ids: string[]
         }
         Insert: {
           id?: string
@@ -98,6 +99,7 @@ export type Database = {
           updated_at?: string
           product_quantities?: Json
           kind?: string
+          target_group_ids?: string[]
         }
         Update: {
           id?: string
@@ -122,6 +124,7 @@ export type Database = {
           updated_at?: string
           product_quantities?: Json
           kind?: string
+          target_group_ids?: string[]
         }
         Relationships: [
           {
@@ -229,6 +232,61 @@ export type Database = {
         Relationships: [
         ]
       }
+      customer_outreach: {
+        Row: {
+          id: string
+          customer_id: string
+          channel: string
+          kind: string
+          sent_at: string
+          salesman_id: string | null
+          message_snapshot: string
+          related_order_id: string | null
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          channel: string
+          kind: string
+          sent_at?: string
+          salesman_id?: string | null
+          message_snapshot: string
+          related_order_id?: string | null
+        }
+        Update: {
+          id?: string
+          customer_id?: string
+          channel?: string
+          kind?: string
+          sent_at?: string
+          salesman_id?: string | null
+          message_snapshot?: string
+          related_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'customer_outreach_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_outreach_related_order_id_fkey'
+            columns: ['related_order_id']
+            isOneToOne: false
+            referencedRelation: 'orders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_outreach_salesman_id_fkey'
+            columns: ['salesman_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       customer_products: {
         Row: {
           customer_id: string
@@ -294,6 +352,35 @@ export type Database = {
           {
             foreignKeyName: 'customer_sizes_customer_id_fkey'
             columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      message_templates: {
+        Row: {
+          kind: string
+          body: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          kind: string
+          body: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          kind?: string
+          body?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'message_templates_updated_by_fkey'
+            columns: ['updated_by']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']

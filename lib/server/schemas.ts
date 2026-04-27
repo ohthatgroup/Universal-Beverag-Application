@@ -332,7 +332,14 @@ const announcementFields = {
   product_ids: z.array(uuidSchema),
   badge_overrides: z.record(z.string(), z.string()),
   product_quantities: z.record(uuidSchema, announcementProductQuantitySchema),
+  // `audience_tags` is no longer consulted by the resolver (since
+  // migration 202604260007). Schema accepts it for back-compat with old
+  // clients but it has no effect. Drop in a future cleanup migration.
   audience_tags: z.array(z.string().max(80)),
+  // Group-based targeting. Empty array = visible to all groups
+  // (broadcast). Non-empty = only customers whose customer_group_id is
+  // in this list see the announcement.
+  target_group_ids: z.array(uuidSchema),
   starts_at: isoDateSchema.nullable(),
   ends_at: isoDateSchema.nullable(),
   is_active: z.boolean(),

@@ -58,7 +58,19 @@ export interface Announcement {
   product_ids: string[]
   badge_overrides: Record<string, string>
   product_quantities: Record<string, ProductQuantityOverride>
+  /**
+   * Legacy heuristic targeting via free-text tags. No longer consulted by
+   * the resolver as of migration 202604260007 — superseded by
+   * `target_group_ids`. Kept on the type for back-compat with existing
+   * data; future cleanup migration can drop the column + this field.
+   */
   audience_tags: string[]
+  /**
+   * Group-based targeting. Empty array = visible to ALL groups
+   * (broadcast). Non-empty = only customers whose `customer_group_id`
+   * is in this list see the announcement.
+   */
+  target_group_ids: string[]
   starts_at: string | null
   ends_at: string | null
   is_active: boolean

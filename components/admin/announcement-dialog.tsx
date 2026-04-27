@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Panel } from '@/components/ui/panel'
 import { Switch } from '@/components/ui/switch'
-import { TagChipInput } from '@/components/ui/tag-chip-input'
 import {
   ProductPicker,
   type PickerProduct,
@@ -20,6 +19,11 @@ import type {
   ProductQuantityOverride,
 } from '@/components/portal/announcements-stack'
 import { cn } from '@/lib/utils'
+
+export interface CustomerGroupOption {
+  id: string
+  name: string
+}
 
 interface AnnouncementDialogProps {
   open: boolean
@@ -38,6 +42,11 @@ interface AnnouncementDialogProps {
    * because it doesn't have an RSC parent that fetches them yet.
    */
   pickerProducts?: PickerProduct[]
+  /**
+   * Customer groups for the target-groups multi-select. Empty array =
+   * no group filter UI (announcement is broadcast to all groups).
+   */
+  customerGroups?: CustomerGroupOption[]
 }
 
 interface TypeOption {
@@ -77,7 +86,14 @@ interface FormState {
    * Specials grid (the CTA destination picker doesn't carry these).
    */
   product_quantities: Record<string, ProductQuantityOverride>
+  /**
+   * Legacy audience_tags — no longer surfaced in the UI but kept on the
+   * form so we round-trip existing rows without dropping data. Future
+   * cleanup migration will drop the column.
+   */
   audience_tags: string[]
+  /** Empty = visible to all groups (broadcast). */
+  target_group_ids: string[]
   starts_at: string
   ends_at: string
   is_active: boolean
@@ -98,6 +114,7 @@ const EMPTY_FORM: FormState = {
   product_ids: [],
   product_quantities: {},
   audience_tags: [],
+  target_group_ids: [],
   starts_at: '',
   ends_at: '',
   is_active: true,
@@ -119,6 +136,7 @@ function announcementToForm(a: Announcement): FormState {
     product_ids: a.product_ids,
     product_quantities: a.product_quantities ?? {},
     audience_tags: a.audience_tags,
+    target_group_ids: a.target_group_ids ?? [],
     starts_at: a.starts_at ? a.starts_at.slice(0, 10) : '',
     ends_at: a.ends_at ? a.ends_at.slice(0, 10) : '',
     is_active: a.is_active,
@@ -132,6 +150,7 @@ export function AnnouncementDialog({
   defaultKind = 'announcement',
   onSave,
   pickerProducts = [],
+  customerGroups = [],
 }: AnnouncementDialogProps) {
   const isEditing = initialAnnouncement !== null
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -246,6 +265,7 @@ export function AnnouncementDialog({
       product_ids: form.product_ids,
       product_quantities: trimmedQuantities,
       audience_tags: form.audience_tags,
+      target_group_ids: form.target_group_ids,
       starts_at: form.starts_at || null,
       ends_at: form.ends_at || null,
       is_active: form.is_active,
@@ -305,6 +325,7 @@ export function AnnouncementDialog({
             setField={setField}
             error={error}
             pickerProducts={pickerProducts}
+            customerGroups={customerGroups}
           />
         )}
       </Panel.Body>
@@ -356,6 +377,7 @@ interface FieldsFormProps {
   setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void
   error: string | null
   pickerProducts: PickerProduct[]
+  customerGroups: CustomerGroupOption[]
 }
 
 function FieldsForm({
@@ -364,6 +386,7 @@ function FieldsForm({
   setField,
   error,
   pickerProducts,
+  customerGroups,
 }: FieldsFormProps) {
   const isEditorial =
     type === 'text' || type === 'image' || type === 'image_text'
@@ -502,11 +525,16 @@ function FieldsForm({
       <hr className="border-foreground/10" />
 
       {/* Common fields */}
-      <Field label="Audience tags">
-        <TagChipInput
-          value={form.audience_tags}
-          onChange={(next) => setField('audience_tags', next)}
+      <Field label="Target groups">
+        <TargetGroupsMultiSelect
+          groups={customerGroups}
+          value={form.target_group_ids}
+          onChange={(next) => setField('target_group_ids', next)}
         />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Leave empty to broadcast to every customer. Pick groups to limit
+          visibility to those segments.
+        </p>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
@@ -630,6 +658,67 @@ function Field({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
+    </div>
+  )
+}
+
+interface TargetGroupsMultiSelectProps {
+  groups: CustomerGroupOption[]
+  value: string[]
+  onChange: (next: string[]) => void
+}
+
+function TargetGroupsMultiSelect({
+  groups,
+  value,
+  onChange,
+}: TargetGroupsMultiSelectProps) {
+  if (groups.length === 0) {
+    return (
+      <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        No customer groups yet. This row will be visible to everyone.
+      </p>
+    )
+  }
+
+  const selected = new Set(value)
+  const toggle = (id: string) => {
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    onChange(Array.from(next))
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {groups.map((group) => {
+        const active = selected.has(group.id)
+        return (
+          <button
+            key={group.id}
+            type="button"
+            onClick={() => toggle(group.id)}
+            aria-pressed={active}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              active
+                ? 'border-foreground bg-foreground text-background'
+                : 'border-border bg-background text-muted-foreground hover:bg-muted/40',
+            )}
+          >
+            {group.name}
+          </button>
+        )
+      })}
+      {selected.size > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className="rounded-full border border-dashed border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted/40"
+        >
+          Clear (broadcast)
+        </button>
+      )}
     </div>
   )
 }

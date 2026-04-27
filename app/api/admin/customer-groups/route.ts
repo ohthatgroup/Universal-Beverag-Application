@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { apiOk, getRequestId, parseBody, toErrorResponse } from '@/lib/server/api'
 import { requireAuthContext } from '@/lib/server/auth'
 import { getRequestDb } from '@/lib/server/db'
+import { resolveDefaultGroupId } from '@/lib/server/default-group'
 
 const createGroupSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -43,16 +44,23 @@ export async function GET(request: Request) {
   try {
     await requireAuthContext(['salesman'])
     const db = await getRequestDb()
-    const { rows } = await db.query<GroupRow>(
-      `select g.id, g.name, g.description, g.sort_order, g.created_at, g.updated_at,
-              (
-                select count(*)::int from profiles p
-                where p.customer_group_id = g.id and p.role = 'customer'
-              ) as member_count
-         from customer_groups g
-        order by g.sort_order asc, lower(g.name) asc`,
-    )
-    return apiOk({ groups: rows.map(rowToGroup) }, 200, requestId)
+    const [{ rows }, defaultGroupId] = await Promise.all([
+      db.query<GroupRow>(
+        `select g.id, g.name, g.description, g.sort_order, g.created_at, g.updated_at,
+                (
+                  select count(*)::int from profiles p
+                  where p.customer_group_id = g.id and p.role = 'customer'
+                ) as member_count
+           from customer_groups g
+          order by g.sort_order asc, lower(g.name) asc`,
+      ),
+      resolveDefaultGroupId(),
+    ])
+    const groups = rows.map((row) => ({
+      ...rowToGroup(row),
+      isDefault: row.id === defaultGroupId,
+    }))
+    return apiOk({ groups, defaultGroupId }, 200, requestId)
   } catch (error) {
     return toErrorResponse(error, requestId)
   }

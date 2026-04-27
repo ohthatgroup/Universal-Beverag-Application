@@ -29,6 +29,7 @@ interface UpdatedRow {
     { default_qty?: number; locked?: boolean }
   > | null
   audience_tags: string[] | null
+  target_group_ids: string[] | null
   starts_at: string | null
   ends_at: string | null
   is_active: boolean
@@ -92,6 +93,8 @@ export async function PATCH(
       )
     if (has('audience_tags'))
       addSet('audience_tags', payload.audience_tags ?? [], 'text[]')
+    if (has('target_group_ids'))
+      addSet('target_group_ids', payload.target_group_ids ?? [], 'uuid[]')
     if (has('starts_at')) addSet('starts_at', payload.starts_at, 'date')
     if (has('ends_at')) addSet('ends_at', payload.ends_at, 'date')
     if (has('is_active')) addSet('is_active', payload.is_active)
@@ -104,7 +107,7 @@ export async function PATCH(
            id, kind, content_type, title, body, image_url, cta_label,
            cta_target_kind, cta_target_url, cta_target_product_id,
            cta_target_product_ids, product_id, product_ids,
-           badge_overrides, product_quantities, audience_tags,
+           badge_overrides, product_quantities, audience_tags, target_group_ids,
            starts_at::text as starts_at, ends_at::text as ends_at,
            is_active, sort_order, created_at, updated_at
          from announcements where id = $1 limit 1`,
@@ -124,7 +127,7 @@ export async function PATCH(
                    id, kind, content_type, title, body, image_url, cta_label,
                    cta_target_kind, cta_target_url, cta_target_product_id,
                    cta_target_product_ids, product_id, product_ids,
-                   badge_overrides, product_quantities, audience_tags,
+                   badge_overrides, product_quantities, audience_tags, target_group_ids,
                    starts_at::text as starts_at, ends_at::text as ends_at,
                    is_active, sort_order, created_at, updated_at`
 

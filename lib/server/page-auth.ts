@@ -21,7 +21,7 @@ export async function requirePageAuth(allowedRoles?: UserRole[]) {
 
   if (allowedRoles && !allowedRoles.includes(context.profile.role)) {
     if (context.profile.role === 'salesman') {
-      redirect('/admin/dashboard')
+      redirect('/admin')
     }
     redirect('/')
   }

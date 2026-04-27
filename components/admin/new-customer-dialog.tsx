@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  CustomerTypePicker,
+  type GroupOption,
+} from '@/components/admin/customer-type-picker'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -19,25 +23,40 @@ import {
 interface NewCustomerDialogProps {
   action: (formData: FormData) => Promise<void>
   variant?: 'header' | 'fab'
+  groups: GroupOption[]
+  defaultGroupId: string
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function NewCustomerDialog({ action, variant = 'header' }: NewCustomerDialogProps) {
+export function NewCustomerDialog({
+  action,
+  variant = 'header',
+  groups,
+  defaultGroupId,
+}: NewCustomerDialogProps) {
   const [open, setOpen] = useState(false)
   const [businessName, setBusinessName] = useState('')
   const [email, setEmail] = useState('')
+  const [groupId, setGroupId] = useState<string | null>(defaultGroupId)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const isBusinessValid = businessName.trim().length > 0
   const isEmailValid = email.trim() === '' || EMAIL_RE.test(email.trim())
-  const canSubmit = isBusinessValid && email.trim().length > 0 && isEmailValid && !submitting
+  const isGroupValid = !!groupId
+  const canSubmit =
+    isBusinessValid &&
+    email.trim().length > 0 &&
+    isEmailValid &&
+    isGroupValid &&
+    !submitting
 
   const reset = () => {
     setBusinessName('')
     setEmail('')
+    setGroupId(defaultGroupId)
     setEmailError(null)
     setSubmitError(null)
     setSubmitting(false)
@@ -128,6 +147,21 @@ export function NewCustomerDialog({ action, variant = 'header' }: NewCustomerDia
             {emailError && (
               <p className="text-xs text-destructive">{emailError}</p>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="customer-type">Type *</Label>
+            <CustomerTypePicker
+              id="customer-type"
+              groups={groups}
+              value={groupId}
+              onChange={(next) => setGroupId(next)}
+              defaultGroupId={defaultGroupId}
+            />
+            <input
+              type="hidden"
+              name="customerGroupId"
+              value={groupId ?? ''}
+            />
           </div>
           {submitError && (
             <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">

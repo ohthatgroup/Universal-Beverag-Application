@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'crypto'
 import { RouteError } from '@/lib/server/auth'
 import { getRequestDb } from '@/lib/server/db'
+import { resolveDefaultGroupId } from '@/lib/server/default-group'
 import { ensureNeonAuthUser } from '@/lib/server/neon-auth-users'
 
 type ProvisionedCustomer = {
@@ -14,9 +15,19 @@ type ProvisionedCustomer = {
 export async function provisionCustomerProfile(input: {
   businessName: string
   email: string
+  /**
+   * Group membership for the new customer. If omitted, the Default group
+   * is resolved automatically. The migration seeds Default and assigns
+   * every existing customer to it; new rows must also live in a group.
+   */
+  customerGroupId?: string | null
 }) {
   const businessName = input.businessName.trim()
   const email = input.email.trim().toLowerCase()
+  const customerGroupId =
+    input.customerGroupId && input.customerGroupId.trim().length > 0
+      ? input.customerGroupId.trim()
+      : await resolveDefaultGroupId()
 
   if (!businessName) {
     throw new RouteError(400, 'validation_error', 'Business name is required')
@@ -57,12 +68,12 @@ export async function provisionCustomerProfile(input: {
 
   const { rows } = await db.query<ProvisionedCustomer>(
     `insert into profiles (
-      id, auth_user_id, role, business_name, email, contact_name, phone, show_prices, custom_pricing, default_group, access_token
+      id, auth_user_id, role, business_name, email, contact_name, phone, show_prices, custom_pricing, default_group, access_token, customer_group_id
     ) values (
-      $1, $2, 'customer', $3, $4, null, null, true, false, 'brand', $5
+      $1, $2, 'customer', $3, $4, null, null, true, false, 'brand', $5, $6
     )
     returning id, business_name, email, access_token, auth_user_id`,
-    [customerId, authUserId, businessName, email, accessToken]
+    [customerId, authUserId, businessName, email, accessToken, customerGroupId]
   )
 
   const profile = rows[0]
